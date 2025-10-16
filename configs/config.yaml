@@ -1,0 +1,65 @@
+server:
+  port: 9446
+  host: localhost
+  readTimeout: 30s
+  writeTimeout: 30s
+  idleTimeout: 120s
+
+database:
+  host: localhost
+  port: 3306
+  user: root
+  password: password
+  database: AATest
+  maxOpenConns: 25
+  maxIdleConns: 5
+  connMaxLifetime: 5m
+
+extension:
+  enabled: true
+  baseUrl: http://localhost:8080/api/services
+  timeout: 30s
+  retryAttempts: 3
+  endpoints:
+    preProcessConsentCreation: /pre-process-consent-creation
+    enrichConsentCreationResponse: /enrich-consent-creation-response
+    preProcessConsentRetrieval: /pre-process-consent-retrieval
+    preProcessConsentUpdate: /pre-process-consent-update
+    enrichConsentUpdateResponse: /enrich-consent-update-response
+    preProcessConsentRevoke: /pre-process-consent-revoke
+    preProcessConsentFileUpload: /pre-process-consent-file-upload
+    enrichConsentFileResponse: /enrich-consent-file-response
+    validateConsentFileRetrieval: /validate-consent-file-retrieval
+    preProcessConsentFileUpdate: /pre-process-consent-file-update
+    enrichConsentFileUpdateResponse: /enrich-consent-file-update-response
+    mapAcceleratorErrorResponse: /map-accelerator-error-response
+
+logging:
+  level: info
+  format: json
+  output: stdout
+
+security:
+  basicAuth:
+    enabled: true
+    # Default credentials for development (should be changed in production)
+    users:
+      - username: admin
+        password: admin123
+      - username: testuser
+        password: test123
+
+cors:
+  enabled: true
+  allowedOrigins:
+    - "*"
+  allowedMethods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+  allowedHeaders:
+    - "*"
+  allowCredentials: true
+  maxAge: 3600

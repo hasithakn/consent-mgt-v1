@@ -91,6 +91,9 @@ func (s *AuthResourceService) GetAuthResource(ctx context.Context, authID, orgID
 	if authID == "" {
 		return nil, fmt.Errorf("auth ID is required")
 	}
+	if len(authID) > 255 {
+		return nil, fmt.Errorf("auth ID too long: maximum 255 characters")
+	}
 	if err := utils.ValidateOrgID(orgID); err != nil {
 		return nil, err
 	}

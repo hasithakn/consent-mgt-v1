@@ -157,9 +157,6 @@ func TestConsentCreate_Success(t *testing.T) {
 	assert.NotNil(t, response.Receipt, "Receipt should not be nil")
 	assert.Equal(t, request.Attributes, response.Attributes, "Attributes should match")
 
-	// Cleanup
-	cleanupTestData(t, env, response.ConsentID)
-
 	t.Logf("Successfully created consent: %s", response.ConsentID)
 }
 

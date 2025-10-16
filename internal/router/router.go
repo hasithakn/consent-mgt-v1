@@ -53,6 +53,8 @@ func SetupRouter(
 
 			// Authorization resource routes under consent
 			consents.POST("/:consentId/authorizations", authResourceHandler.CreateAuthResource)
+			consents.GET("/:consentId/authorizations/:authId", authResourceHandler.GetAuthResource)
+			consents.PUT("/:consentId/authorizations/:authId", authResourceHandler.UpdateAuthResource)
 		}
 	}
 

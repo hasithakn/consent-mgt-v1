@@ -118,6 +118,28 @@ func (req *AuthorizationAPIRequest) ToAuthResourceCreateRequest() *ConsentAuthRe
 	}
 }
 
+// AuthorizationAPIUpdateRequest represents the API payload for updating authorization resource (external format)
+type AuthorizationAPIUpdateRequest struct {
+	UserID   string                 `json:"userId,omitempty"`
+	Type     string                 `json:"type,omitempty"`
+	Status   string                 `json:"status,omitempty"`
+	Resource map[string]interface{} `json:"resource,omitempty"`
+}
+
+// ToAuthResourceUpdateRequest converts API update request format to internal format
+func (req *AuthorizationAPIUpdateRequest) ToAuthResourceUpdateRequest() *ConsentAuthResourceUpdateRequest {
+	var userID *string
+	if req.UserID != "" {
+		userID = &req.UserID
+	}
+
+	return &ConsentAuthResourceUpdateRequest{
+		AuthStatus: req.Status,
+		UserID:     userID,
+		Resource:   req.Resource,
+	}
+}
+
 // ConsentAPIUpdateRequest represents the API payload for updating a consent (external format)
 type ConsentAPIUpdateRequest struct {
 	Type               string                    `json:"type,omitempty"`

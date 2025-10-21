@@ -1,5 +1,5 @@
 server:
-  port: 9446
+  port: 3000
   host: localhost
   readTimeout: 30s
   writeTimeout: 30s

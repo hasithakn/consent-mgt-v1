@@ -54,3 +54,4 @@ logs/
 # Configuration overrides (keep examples)
 configs/config.local.yaml
 consent-api-server
+main

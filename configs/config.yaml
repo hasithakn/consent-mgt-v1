@@ -10,7 +10,7 @@ database:
   port: 3306
   user: root
   password: password
-  database: AATest
+  database: AAconsent-mgt-v3
   maxOpenConns: 25
   maxIdleConns: 5
   connMaxLifetime: 5m

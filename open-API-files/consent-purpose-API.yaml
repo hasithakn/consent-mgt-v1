@@ -1,0 +1,494 @@
+openapi: 3.0.0
+info:
+  version: v1.0
+  title: Consent Purpose Management API
+  description: |
+    This API provides endpoints for managing consent purposes. Consent purposes are used to categorize and define 
+    the intended use of consents (e.g., "Account Information Access", "Payment Initiation", "Marketing", etc.).
+    
+    Purposes can be created, retrieved, updated, and deleted. They serve as reference data that can be optionally 
+    linked to consents to provide clear categorization of consent usage.
+  contact:
+    name: WSO2
+    url: 'https://wso2.com/solutions/financial-services/'
+    email: "architecture@wso2.com"
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: https://{host}:{port}/api/v1
+    variables:
+      host:
+        default: localhost
+        description: Hostname of the Consent Management server.
+      port:
+        default: "8080"
+        description: Port number for the Consent Management server.
+tags:
+  - name: Consent Purpose
+    description: Manage consent purposes (reference data for categorizing consents)
+paths:
+  /consent-purposes:
+    post:
+      summary: Create one or more consent purposes
+      description: |
+        Creates one or more consent purposes in a single request. Supports batch creation by accepting 
+        an array of purpose definitions.
+        
+        Each purpose must have a unique name within the organization. The description field is optional 
+        and can be used to provide additional context about the purpose.
+        
+        **Validation Rules:**
+        - Name is required and must not exceed 255 characters
+        - Description is optional but must not exceed 1024 characters if provided
+        - At least one purpose must be provided in the request array
+      operationId: createConsentPurposes
+      tags:
+        - Consent Purpose
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization that owns these purposes
+          schema:
+            type: string
+            example: "ORG-123"
+        - in: header
+          name: client-id
+          required: false
+          description: The client ID of the application making the request (for audit purposes)
+          schema:
+            type: string
+            example: "CLIENT-456"
+      requestBody:
+        description: Array of consent purposes to create
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              items:
+                $ref: "#/components/schemas/ConsentPurposeCreateRequest"
+            examples:
+              single:
+                summary: Create a single purpose
+                value:
+                  - name: "readAccountBasic"
+                    description: "Allows reading basic account information such as account holder name and account number."
+              multiple:
+                summary: Create multiple purposes
+                value:
+                  - name: "readAccountBasic"
+                    description: "Allows reading basic account information."
+                  - name: "readAccountDetailed"
+                    description: "Allows reading detailed account information including balances."
+                  - name: "readTransactions"
+                    description: "Allows reading transaction history."
+      responses:
+        "201":
+          description: Successfully created consent purpose(s)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ConsentPurposeResponse"
+                  message:
+                    type: string
+                    example: "Consent purposes created successfully"
+              examples:
+                single:
+                  summary: Single purpose created
+                  value:
+                    data:
+                      - id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                        name: "readAccountBasic"
+                        description: "Allows reading basic account information."
+                    message: "Consent purposes created successfully"
+                multiple:
+                  summary: Multiple purposes created
+                  value:
+                    data:
+                      - id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                        name: "readAccountBasic"
+                        description: "Allows reading basic account information."
+                      - id: "PURPOSE-b2c3d4e5-f6a7-8901-bcde-f12345678901"
+                        name: "readAccountDetailed"
+                        description: "Allows reading detailed account information."
+                      - id: "PURPOSE-c3d4e5f6-a7b8-9012-cdef-123456789012"
+                        name: "readTransactions"
+                        description: "Allows reading transaction history."
+                    message: "Consent purposes created successfully"
+        "400":
+          description: Bad Request - Invalid input or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                emptyArray:
+                  summary: Empty array provided
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Empty request"
+                    details: "At least one purpose must be provided"
+                missingName:
+                  summary: Missing required name field
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request body"
+                    details: "Key: 'ConsentPurposeCreateRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag"
+                nameTooLong:
+                  summary: Name exceeds maximum length
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request"
+                    details: "purpose name too long: maximum 255 characters"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - basicAuth: []
+    get:
+      summary: List all consent purposes
+      description: |
+        Retrieves a paginated list of all consent purposes for the specified organization.
+        
+        Results are ordered alphabetically by purpose name by default. Use the `limit` and `offset` 
+        query parameters to control pagination.
+      operationId: listConsentPurposes
+      tags:
+        - Consent Purpose
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-123"
+        - name: limit
+          in: query
+          description: Maximum number of purposes to return (default 100, max 100)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
+            example: 10
+        - name: offset
+          in: query
+          description: Number of purposes to skip for pagination (default 0)
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+            example: 0
+      responses:
+        "200":
+          description: Successfully retrieved consent purposes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentPurposeListResponse"
+              example:
+                purposes:
+                  - id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    name: "Marketing"
+                    description: "Purpose for marketing and promotional communications"
+                  - id: "PURPOSE-b2c3d4e5-f6a7-8901-bcde-f12345678901"
+                    name: "readAccountBasic"
+                    description: "Allows reading basic account information"
+                  - id: "PURPOSE-c3d4e5f6-a7b8-9012-cdef-123456789012"
+                    name: "readTransactions"
+                    description: "Allows reading transaction history"
+                total: 3
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - basicAuth: []
+  /consent-purposes/{purposeId}:
+    get:
+      summary: Get a specific consent purpose
+      description: Retrieves the details of a specific consent purpose by its ID
+      operationId: getConsentPurpose
+      tags:
+        - Consent Purpose
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-123"
+        - name: purposeId
+          in: path
+          required: true
+          description: The unique identifier of the consent purpose
+          schema:
+            type: string
+            example: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      responses:
+        "200":
+          description: Successfully retrieved consent purpose
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentPurposeResponse"
+              example:
+                id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                name: "readAccountBasic"
+                description: "Allows reading basic account information"
+        "404":
+          description: Consent purpose not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: "NOT_FOUND"
+                message: "Consent purpose not found"
+                details: ""
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - basicAuth: []
+    put:
+      summary: Update a consent purpose
+      description: |
+        Updates an existing consent purpose. Supports partial updates - only provided fields will be updated.
+        
+        **Validation Rules:**
+        - If name is provided, it must not exceed 255 characters
+        - If description is provided, it must not exceed 1024 characters
+        - At least one field (name or description) must be provided for update
+      operationId: updateConsentPurpose
+      tags:
+        - Consent Purpose
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-123"
+        - name: purposeId
+          in: path
+          required: true
+          description: The unique identifier of the consent purpose to update
+          schema:
+            type: string
+            example: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      requestBody:
+        description: Updated purpose data (partial update supported)
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsentPurposeUpdateRequest"
+            examples:
+              updateName:
+                summary: Update only name
+                value:
+                  name: "readAccountDetailedV2"
+              updateDescription:
+                summary: Update only description
+                value:
+                  description: "Updated description with more details"
+              updateBoth:
+                summary: Update both fields
+                value:
+                  name: "readAccountDetailedV2"
+                  description: "Updated description with more details"
+      responses:
+        "200":
+          description: Successfully updated consent purpose
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentPurposeResponse"
+              example:
+                id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                name: "readAccountDetailedV2"
+                description: "Updated description with more details"
+        "400":
+          description: Bad Request - Invalid input or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Consent purpose not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - basicAuth: []
+    delete:
+      summary: Delete a consent purpose
+      description: |
+        Deletes a consent purpose. The purpose must exist and belong to the specified organization.
+        
+        **Note:** This operation will not delete any mappings if the purpose is currently linked to consents. 
+        The CASCADE DELETE in the database schema will handle cleanup of purpose-consent mappings automatically 
+        when a consent is deleted.
+      operationId: deleteConsentPurpose
+      tags:
+        - Consent Purpose
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-123"
+        - name: purposeId
+          in: path
+          required: true
+          description: The unique identifier of the consent purpose to delete
+          schema:
+            type: string
+            example: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      responses:
+        "204":
+          description: Successfully deleted consent purpose (no content returned)
+        "404":
+          description: Consent purpose not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - basicAuth: []
+
+components:
+  schemas:
+    ConsentPurposeCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          description: The name/identifier of the consent purpose (must be unique within organization)
+          example: "readAccountBasic"
+        description:
+          type: string
+          maxLength: 1024
+          description: Optional description providing additional context about the purpose
+          example: "Allows reading basic account information such as account holder name and account number."
+    
+    ConsentPurposeUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          description: Updated name for the consent purpose
+          example: "readAccountDetailedV2"
+        description:
+          type: string
+          maxLength: 1024
+          description: Updated description for the consent purpose
+          example: "Updated description with more details about account information access"
+      description: At least one field must be provided for update
+    
+    ConsentPurposeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the consent purpose (UUID with PURPOSE- prefix)
+          example: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        name:
+          type: string
+          description: The name/identifier of the consent purpose
+          example: "readAccountBasic"
+        description:
+          type: string
+          description: Description of the consent purpose
+          example: "Allows reading basic account information"
+      required:
+        - id
+        - name
+    
+    ConsentPurposeListResponse:
+      type: object
+      properties:
+        purposes:
+          type: array
+          description: Array of consent purposes
+          items:
+            $ref: "#/components/schemas/ConsentPurposeResponse"
+        total:
+          type: integer
+          description: Total number of purposes available (for pagination)
+          example: 25
+      required:
+        - purposes
+        - total
+    
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Error code identifying the type of error
+          enum:
+            - BAD_REQUEST
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - NOT_FOUND
+            - INTERNAL_SERVER_ERROR
+          example: "BAD_REQUEST"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid request body"
+        details:
+          type: string
+          description: Additional details about the error
+          example: "Key: 'ConsentPurposeCreateRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag"
+      required:
+        - code
+        - message
+
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: HTTP Basic Authentication

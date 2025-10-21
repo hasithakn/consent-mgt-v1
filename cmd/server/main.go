@@ -68,6 +68,7 @@ func main() {
 	statusAuditDAO := dao.NewStatusAuditDAO(db)
 	attributeDAO := dao.NewConsentAttributeDAO(db)
 	authResourceDAO := dao.NewAuthResourceDAO(db)
+	purposeDAO := dao.NewConsentPurposeDAO(db.DB)
 
 	logger.Info("DAOs initialized successfully")
 
@@ -88,10 +89,17 @@ func main() {
 		logger,
 	)
 
+	purposeService := service.NewConsentPurposeService(
+		purposeDAO,
+		consentDAO,
+		db.DB,
+		logger,
+	)
+
 	logger.Info("Services initialized successfully")
 
 	// Setup router
-	ginRouter := router.SetupRouter(consentService, authResourceService)
+	ginRouter := router.SetupRouter(consentService, authResourceService, purposeService)
 
 	// Configure HTTP server
 	serverAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

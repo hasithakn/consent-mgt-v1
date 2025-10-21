@@ -12,6 +12,7 @@ import (
 func SetupRouter(
 	consentService *service.ConsentService,
 	authResourceService *service.AuthResourceService,
+	purposeService *service.ConsentPurposeService,
 ) *gin.Engine {
 	router := gin.Default()
 
@@ -40,10 +41,18 @@ func SetupRouter(
 	// Create handlers
 	consentHandler := handlers.NewConsentHandler(consentService)
 	authResourceHandler := handlers.NewAuthResourceHandler(authResourceService)
+	purposeHandler := handlers.NewConsentPurposeHandler(purposeService)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
+		// Consent purpose routes
+		v1.POST("/consent-purposes", purposeHandler.CreateConsentPurposes)
+		v1.GET("/consent-purposes", purposeHandler.ListConsentPurposes)
+		v1.GET("/consent-purposes/:purposeId", purposeHandler.GetConsentPurpose)
+		v1.PUT("/consent-purposes/:purposeId", purposeHandler.UpdateConsentPurpose)
+		v1.DELETE("/consent-purposes/:purposeId", purposeHandler.DeleteConsentPurpose)
+
 		// Consent routes
 		consents := v1.Group("/consents")
 		{

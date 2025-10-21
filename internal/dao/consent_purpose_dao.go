@@ -98,7 +98,7 @@ func (dao *ConsentPurposeDAO) Update(ctx context.Context, purpose *models.Consen
 		WHERE ID = ? AND ORG_ID = ?
 	`
 
-	result, err := dao.db.ExecContext(ctx, query,
+	_, err := dao.db.ExecContext(ctx, query,
 		purpose.Name,
 		purpose.Description,
 		purpose.ID,
@@ -109,14 +109,10 @@ func (dao *ConsentPurposeDAO) Update(ctx context.Context, purpose *models.Consen
 		return fmt.Errorf("failed to update consent purpose: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
-		return fmt.Errorf("consent purpose not found: %s", purpose.ID)
-	}
+	// Note: MySQL returns 0 rows affected when values don't change
+	// We don't check rowsAffected here because:
+	// 1. If ID doesn't exist, we should have caught it earlier (via GetByID in service)
+	// 2. If values are the same, UPDATE returns 0 but it's not an error
 
 	return nil
 }
@@ -239,4 +235,20 @@ func (dao *ConsentPurposeDAO) ClearConsentPurposes(ctx context.Context, consentI
 	}
 
 	return nil
+}
+
+// ExistsByName checks if a purpose with the given name already exists for the organization
+func (dao *ConsentPurposeDAO) ExistsByName(ctx context.Context, name, orgID string) (bool, error) {
+	query := `
+		SELECT COUNT(*) FROM CONSENT_PURPOSE
+		WHERE NAME = ? AND ORG_ID = ?
+	`
+
+	var count int
+	err := dao.db.GetContext(ctx, &count, query, name, orgID)
+	if err != nil {
+		return false, fmt.Errorf("failed to check purpose name existence: %w", err)
+	}
+
+	return count > 0, nil
 }

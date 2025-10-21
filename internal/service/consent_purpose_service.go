@@ -58,6 +58,16 @@ func (s *ConsentPurposeService) CreatePurpose(ctx context.Context, orgID string,
 		return nil, err
 	}
 
+	// Check if purpose name already exists for this organization
+	exists, err := s.purposeDAO.ExistsByName(ctx, req.Name, orgID)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to check purpose name existence")
+		return nil, fmt.Errorf("failed to validate purpose name: %w", err)
+	}
+	if exists {
+		return nil, fmt.Errorf("purpose name '%s' already exists for this organization", req.Name)
+	}
+
 	// Generate unique ID
 	purposeID := "PURPOSE-" + utils.GenerateID()
 
@@ -152,15 +162,6 @@ func (s *ConsentPurposeService) UpdatePurpose(ctx context.Context, purposeID, or
 		return nil, err
 	}
 
-	// Start transaction
-	tx, err := s.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	s.logger.Debug("Transaction started")
-
 	// Check if purpose exists
 	existingPurpose, err := s.purposeDAO.GetByID(ctx, purposeID, orgID)
 	if err != nil {
@@ -169,6 +170,17 @@ func (s *ConsentPurposeService) UpdatePurpose(ctx context.Context, purposeID, or
 
 	// Update fields
 	if req.Name != nil {
+		// If name is being updated, check if the new name already exists (and it's not the same purpose)
+		if *req.Name != existingPurpose.Name {
+			exists, err := s.purposeDAO.ExistsByName(ctx, *req.Name, orgID)
+			if err != nil {
+				s.logger.WithError(err).Error("Failed to check purpose name existence")
+				return nil, fmt.Errorf("failed to validate purpose name: %w", err)
+			}
+			if exists {
+				return nil, fmt.Errorf("purpose name '%s' already exists for this organization", *req.Name)
+			}
+		}
 		existingPurpose.Name = *req.Name
 	}
 	if req.Description != nil {
@@ -181,18 +193,10 @@ func (s *ConsentPurposeService) UpdatePurpose(ctx context.Context, purposeID, or
 		return nil, fmt.Errorf("failed to update consent purpose: %w", err)
 	}
 
-	// Commit transaction
-	if err := tx.Commit(); err != nil {
-		s.logger.WithError(err).Error("Failed to commit transaction")
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
 	s.logger.WithFields(logrus.Fields{
 		"purpose_id": purposeID,
 		"org_id":     orgID,
 	}).Info("Consent purpose updated successfully")
-
-	s.logger.Debug("Transaction committed")
 
 	return s.buildPurposeResponse(existingPurpose), nil
 }

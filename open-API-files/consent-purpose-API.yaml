@@ -40,8 +40,13 @@ paths:
         
         **Validation Rules:**
         - Name is required and must not exceed 255 characters
+        - Name must be unique within the organization (constraint enforced at database level)
         - Description is optional but must not exceed 1024 characters if provided
         - At least one purpose must be provided in the request array
+        
+        **Uniqueness Constraint:**
+        If a purpose with the same name already exists for the organization, the request will be rejected 
+        with a 400 Bad Request error.
       operationId: createConsentPurposes
       tags:
         - Consent Purpose
@@ -148,6 +153,12 @@ paths:
                     code: "BAD_REQUEST"
                     message: "Invalid request"
                     details: "purpose name too long: maximum 255 characters"
+                duplicateName:
+                  summary: Purpose name already exists
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request"
+                    details: "purpose name 'readAccountBasic' already exists for this organization"
         "500":
           description: Internal Server Error
           content:
@@ -278,8 +289,13 @@ paths:
         
         **Validation Rules:**
         - If name is provided, it must not exceed 255 characters
+        - If name is provided, it must be unique within the organization (unless it's the same as current name)
         - If description is provided, it must not exceed 1024 characters
         - At least one field (name or description) must be provided for update
+        
+        **Uniqueness Constraint:**
+        If changing the name to a value that already exists for another purpose in the organization, 
+        the request will be rejected with a 400 Bad Request error.
       operationId: updateConsentPurpose
       tags:
         - Consent Purpose
@@ -404,7 +420,9 @@ components:
         name:
           type: string
           maxLength: 255
-          description: The name/identifier of the consent purpose (must be unique within organization)
+          description: |
+            The name/identifier of the consent purpose. Must be unique within the organization.
+            Database constraint: UNIQUE KEY unique_name_per_org (NAME, ORG_ID)
           example: "readAccountBasic"
         description:
           type: string

@@ -51,6 +51,11 @@ func (h *ConsentHandler) CreateConsent(c *gin.Context) {
 	// Create consent
 	consent, err := h.consentService.CreateConsent(c.Request.Context(), request, clientID, orgID)
 	if err != nil {
+		// Check if it's a validation error
+		if strings.Contains(err.Error(), "must be") || strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
+			utils.SendBadRequestError(c, "Failed to create consent", err.Error())
+			return
+		}
 		utils.SendInternalServerError(c, "Failed to create consent", err.Error())
 		return
 	}
@@ -128,8 +133,9 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 	if err != nil {
 		// Check if it's a validation error
 		if strings.Contains(err.Error(), "cannot be empty") || strings.Contains(err.Error(), "too long") ||
-			strings.Contains(err.Error(), "invalid status") {
-			utils.SendBadRequestError(c, "Invalid request", err.Error())
+			strings.Contains(err.Error(), "invalid status") || strings.Contains(err.Error(), "must be") ||
+			strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
+			utils.SendBadRequestError(c, "Failed to update consent", err.Error())
 			return
 		}
 		// Check if it's a not found error

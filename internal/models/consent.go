@@ -9,17 +9,18 @@ import (
 
 // Consent represents the FS_CONSENT table
 type Consent struct {
-	ConsentID          string `db:"CONSENT_ID" json:"consentId"`
-	Receipt            JSON   `db:"RECEIPT" json:"receipt"`
-	CreatedTime        int64  `db:"CREATED_TIME" json:"createdTime"`
-	UpdatedTime        int64  `db:"UPDATED_TIME" json:"updatedTime"`
-	ClientID           string `db:"CLIENT_ID" json:"clientId"`
-	ConsentType        string `db:"CONSENT_TYPE" json:"consentType"`
-	CurrentStatus      string `db:"CURRENT_STATUS" json:"currentStatus"`
-	ConsentFrequency   *int   `db:"CONSENT_FREQUENCY" json:"consentFrequency,omitempty"`
-	ValidityTime       *int64 `db:"VALIDITY_TIME" json:"validityTime,omitempty"`
-	RecurringIndicator *bool  `db:"RECURRING_INDICATOR" json:"recurringIndicator,omitempty"`
-	OrgID              string `db:"ORG_ID" json:"orgId"`
+	ConsentID                  string `db:"CONSENT_ID" json:"consentId"`
+	Receipt                    JSON   `db:"RECEIPT" json:"receipt"`
+	CreatedTime                int64  `db:"CREATED_TIME" json:"createdTime"`
+	UpdatedTime                int64  `db:"UPDATED_TIME" json:"updatedTime"`
+	ClientID                   string `db:"CLIENT_ID" json:"clientId"`
+	ConsentType                string `db:"CONSENT_TYPE" json:"consentType"`
+	CurrentStatus              string `db:"CURRENT_STATUS" json:"currentStatus"`
+	ConsentFrequency           *int   `db:"CONSENT_FREQUENCY" json:"consentFrequency,omitempty"`
+	ValidityTime               *int64 `db:"VALIDITY_TIME" json:"validityTime,omitempty"`
+	RecurringIndicator         *bool  `db:"RECURRING_INDICATOR" json:"recurringIndicator,omitempty"`
+	DataAccessValidityDuration *int64 `db:"DATA_ACCESS_VALIDITY_DURATION" json:"dataAccessValidityDuration,omitempty"`
+	OrgID                      string `db:"ORG_ID" json:"orgId"`
 }
 
 // JSON type for handling JSON fields in MySQL
@@ -85,14 +86,15 @@ func (j *JSON) UnmarshalJSON(data []byte) error {
 
 // ConsentAPIRequest represents the API payload for creating a consent (external format)
 type ConsentAPIRequest struct {
-	Type               string                    `json:"type" binding:"required"`
-	Status             string                    `json:"status" binding:"required"`
-	ValidityTime       *int64                    `json:"validityTime,omitempty"`
-	RecurringIndicator *bool                     `json:"recurringIndicator,omitempty"`
-	Frequency          *int                      `json:"frequency,omitempty"`
-	RequestPayload     map[string]interface{}    `json:"requestPayload" binding:"required"`
-	Attributes         map[string]string         `json:"attributes,omitempty"`
-	Authorizations     []AuthorizationAPIRequest `json:"authorizations,omitempty"`
+	Type                       string                    `json:"type" binding:"required"`
+	Status                     string                    `json:"status" binding:"required"`
+	ValidityTime               *int64                    `json:"validityTime,omitempty"`
+	RecurringIndicator         *bool                     `json:"recurringIndicator,omitempty"`
+	Frequency                  *int                      `json:"frequency,omitempty"`
+	DataAccessValidityDuration *int64                    `json:"dataAccessValidityDuration,omitempty"`
+	RequestPayload             map[string]interface{}    `json:"requestPayload" binding:"required"`
+	Attributes                 map[string]string         `json:"attributes,omitempty"`
+	Authorizations             []AuthorizationAPIRequest `json:"authorizations,omitempty"`
 }
 
 // AuthorizationAPIRequest represents the API payload for authorization resource (external format)
@@ -142,55 +144,59 @@ func (req *AuthorizationAPIUpdateRequest) ToAuthResourceUpdateRequest() *Consent
 
 // ConsentAPIUpdateRequest represents the API payload for updating a consent (external format)
 type ConsentAPIUpdateRequest struct {
-	Type               string                    `json:"type,omitempty"`
-	Status             string                    `json:"status,omitempty"`
-	ValidityTime       *int64                    `json:"validityTime,omitempty"`
-	RecurringIndicator *bool                     `json:"recurringIndicator,omitempty"`
-	Frequency          *int                      `json:"frequency,omitempty"`
-	RequestPayload     map[string]interface{}    `json:"requestPayload,omitempty"`
-	Attributes         map[string]string         `json:"attributes,omitempty"`
-	Authorizations     []AuthorizationAPIRequest `json:"authorizations,omitempty"`
+	Type                       string                    `json:"type,omitempty"`
+	Status                     string                    `json:"status,omitempty"`
+	ValidityTime               *int64                    `json:"validityTime,omitempty"`
+	RecurringIndicator         *bool                     `json:"recurringIndicator,omitempty"`
+	Frequency                  *int                      `json:"frequency,omitempty"`
+	DataAccessValidityDuration *int64                    `json:"dataAccessValidityDuration,omitempty"`
+	RequestPayload             map[string]interface{}    `json:"requestPayload,omitempty"`
+	Attributes                 map[string]string         `json:"attributes,omitempty"`
+	Authorizations             []AuthorizationAPIRequest `json:"authorizations,omitempty"`
 }
 
 // ConsentCreateRequest represents the internal request payload for creating a consent
 type ConsentCreateRequest struct {
-	Receipt            map[string]interface{}             `json:"receipt" binding:"required"`
-	ConsentType        string                             `json:"consentType" binding:"required"`
-	CurrentStatus      string                             `json:"currentStatus" binding:"required"`
-	ConsentFrequency   *int                               `json:"consentFrequency,omitempty"`
-	ValidityTime       *int64                             `json:"validityTime,omitempty"`
-	RecurringIndicator *bool                              `json:"recurringIndicator,omitempty"`
-	Attributes         map[string]string                  `json:"attributes,omitempty"`
-	AuthResources      []ConsentAuthResourceCreateRequest `json:"authResources,omitempty"`
+	Receipt                    map[string]interface{}             `json:"receipt" binding:"required"`
+	ConsentType                string                             `json:"consentType" binding:"required"`
+	CurrentStatus              string                             `json:"currentStatus" binding:"required"`
+	ConsentFrequency           *int                               `json:"consentFrequency,omitempty"`
+	ValidityTime               *int64                             `json:"validityTime,omitempty"`
+	RecurringIndicator         *bool                              `json:"recurringIndicator,omitempty"`
+	DataAccessValidityDuration *int64                             `json:"dataAccessValidityDuration,omitempty"`
+	Attributes                 map[string]string                  `json:"attributes,omitempty"`
+	AuthResources              []ConsentAuthResourceCreateRequest `json:"authResources,omitempty"`
 }
 
 // ConsentUpdateRequest represents the request payload for updating a consent
 type ConsentUpdateRequest struct {
-	Receipt            map[string]interface{}             `json:"receipt,omitempty"`
-	ConsentType        string                             `json:"consentType,omitempty"`
-	CurrentStatus      string                             `json:"currentStatus,omitempty"`
-	ConsentFrequency   *int                               `json:"consentFrequency,omitempty"`
-	ValidityTime       *int64                             `json:"validityTime,omitempty"`
-	RecurringIndicator *bool                              `json:"recurringIndicator,omitempty"`
-	Attributes         map[string]string                  `json:"attributes,omitempty"`
-	AuthResources      []ConsentAuthResourceCreateRequest `json:"authResources,omitempty"`
+	Receipt                    map[string]interface{}             `json:"receipt,omitempty"`
+	ConsentType                string                             `json:"consentType,omitempty"`
+	CurrentStatus              string                             `json:"currentStatus,omitempty"`
+	ConsentFrequency           *int                               `json:"consentFrequency,omitempty"`
+	ValidityTime               *int64                             `json:"validityTime,omitempty"`
+	RecurringIndicator         *bool                              `json:"recurringIndicator,omitempty"`
+	DataAccessValidityDuration *int64                             `json:"dataAccessValidityDuration,omitempty"`
+	Attributes                 map[string]string                  `json:"attributes,omitempty"`
+	AuthResources              []ConsentAuthResourceCreateRequest `json:"authResources,omitempty"`
 }
 
 // ConsentResponse represents the response after consent creation/retrieval
 type ConsentResponse struct {
-	ConsentID          string                 `json:"consentId"`
-	Receipt            map[string]interface{} `json:"receipt"`
-	CreatedTime        int64                  `json:"createdTime"`
-	UpdatedTime        int64                  `json:"updatedTime"`
-	ClientID           string                 `json:"clientId"`
-	ConsentType        string                 `json:"consentType"`
-	CurrentStatus      string                 `json:"currentStatus"`
-	ConsentFrequency   *int                   `json:"consentFrequency,omitempty"`
-	ValidityTime       *int64                 `json:"validityTime,omitempty"`
-	RecurringIndicator *bool                  `json:"recurringIndicator,omitempty"`
-	OrgID              string                 `json:"orgId"`
-	Attributes         map[string]string      `json:"attributes,omitempty"`
-	AuthResources      []ConsentAuthResource  `json:"authResources,omitempty"`
+	ConsentID                  string                 `json:"consentId"`
+	Receipt                    map[string]interface{} `json:"receipt"`
+	CreatedTime                int64                  `json:"createdTime"`
+	UpdatedTime                int64                  `json:"updatedTime"`
+	ClientID                   string                 `json:"clientId"`
+	ConsentType                string                 `json:"consentType"`
+	CurrentStatus              string                 `json:"currentStatus"`
+	ConsentFrequency           *int                   `json:"consentFrequency,omitempty"`
+	ValidityTime               *int64                 `json:"validityTime,omitempty"`
+	RecurringIndicator         *bool                  `json:"recurringIndicator,omitempty"`
+	DataAccessValidityDuration *int64                 `json:"dataAccessValidityDuration,omitempty"`
+	OrgID                      string                 `json:"orgId"`
+	Attributes                 map[string]string      `json:"attributes,omitempty"`
+	AuthResources              []ConsentAuthResource  `json:"authResources,omitempty"`
 }
 
 // ConsentSearchParams represents search parameters for consent queries
@@ -239,13 +245,14 @@ func (c *Consent) GetUpdatedTime() time.Time {
 // ToConsentCreateRequest converts API request format to internal format
 func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, error) {
 	createReq := &ConsentCreateRequest{
-		Receipt:            req.RequestPayload,
-		ConsentType:        req.Type,
-		CurrentStatus:      req.Status,
-		Attributes:         req.Attributes,
-		ValidityTime:       req.ValidityTime,
-		ConsentFrequency:   req.Frequency,
-		RecurringIndicator: req.RecurringIndicator,
+		Receipt:                    req.RequestPayload,
+		ConsentType:                req.Type,
+		CurrentStatus:              req.Status,
+		Attributes:                 req.Attributes,
+		ValidityTime:               req.ValidityTime,
+		ConsentFrequency:           req.Frequency,
+		RecurringIndicator:         req.RecurringIndicator,
+		DataAccessValidityDuration: req.DataAccessValidityDuration,
 	}
 
 	// Map authorizations to auth resources
@@ -272,13 +279,14 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 // ToConsentUpdateRequest converts API update request format to internal format
 func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequest, error) {
 	updateReq := &ConsentUpdateRequest{
-		Receipt:            req.RequestPayload,
-		ConsentType:        req.Type,
-		CurrentStatus:      req.Status,
-		Attributes:         req.Attributes,
-		ValidityTime:       req.ValidityTime,
-		ConsentFrequency:   req.Frequency,
-		RecurringIndicator: req.RecurringIndicator,
+		Receipt:                    req.RequestPayload,
+		ConsentType:                req.Type,
+		CurrentStatus:              req.Status,
+		Attributes:                 req.Attributes,
+		ValidityTime:               req.ValidityTime,
+		ConsentFrequency:           req.Frequency,
+		RecurringIndicator:         req.RecurringIndicator,
+		DataAccessValidityDuration: req.DataAccessValidityDuration,
 	}
 
 	// Map authorizations to auth resources
@@ -304,19 +312,20 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 
 // ConsentAPIResponse represents the API response format for consent (external format)
 type ConsentAPIResponse struct {
-	ID                 string                     `json:"id"`
-	RequestPayload     map[string]interface{}     `json:"requestPayload"`
-	CreatedTime        int64                      `json:"createdTime"`
-	UpdatedTime        int64                      `json:"updatedTime"`
-	ClientID           string                     `json:"clientId"`
-	Type               string                     `json:"type"`
-	Status             string                     `json:"status"`
-	Frequency          *int                       `json:"frequency"`
-	ValidityTime       *int64                     `json:"validityTime"`
-	RecurringIndicator *bool                      `json:"recurringIndicator"`
-	Attributes         map[string]string          `json:"attributes"`
-	Authorizations     []AuthorizationAPIResponse `json:"authorizations"`
-	ModifiedResponse   map[string]interface{}     `json:"modifiedResponse"`
+	ID                         string                     `json:"id"`
+	RequestPayload             map[string]interface{}     `json:"requestPayload"`
+	CreatedTime                int64                      `json:"createdTime"`
+	UpdatedTime                int64                      `json:"updatedTime"`
+	ClientID                   string                     `json:"clientId"`
+	Type                       string                     `json:"type"`
+	Status                     string                     `json:"status"`
+	Frequency                  *int                       `json:"frequency"`
+	ValidityTime               *int64                     `json:"validityTime"`
+	RecurringIndicator         *bool                      `json:"recurringIndicator"`
+	DataAccessValidityDuration *int64                     `json:"dataAccessValidityDuration,omitempty"`
+	Attributes                 map[string]string          `json:"attributes"`
+	Authorizations             []AuthorizationAPIResponse `json:"authorizations"`
+	ModifiedResponse           map[string]interface{}     `json:"modifiedResponse"`
 }
 
 // AuthorizationAPIResponse represents the API response format for authorization resource (external format)
@@ -344,19 +353,20 @@ func (resp *ConsentResponse) ToAPIResponse() *ConsentAPIResponse {
 	}
 
 	apiResp := &ConsentAPIResponse{
-		ID:                 resp.ConsentID,
-		RequestPayload:     requestPayload,
-		CreatedTime:        resp.CreatedTime,
-		UpdatedTime:        resp.UpdatedTime,
-		ClientID:           resp.ClientID,
-		Type:               resp.ConsentType,
-		Status:             resp.CurrentStatus,
-		Frequency:          resp.ConsentFrequency,
-		ValidityTime:       resp.ValidityTime,
-		RecurringIndicator: resp.RecurringIndicator,
-		Attributes:         attributes,
-		ModifiedResponse:   make(map[string]interface{}),
-		Authorizations:     make([]AuthorizationAPIResponse, 0),
+		ID:                         resp.ConsentID,
+		RequestPayload:             requestPayload,
+		CreatedTime:                resp.CreatedTime,
+		UpdatedTime:                resp.UpdatedTime,
+		ClientID:                   resp.ClientID,
+		Type:                       resp.ConsentType,
+		Status:                     resp.CurrentStatus,
+		Frequency:                  resp.ConsentFrequency,
+		ValidityTime:               resp.ValidityTime,
+		RecurringIndicator:         resp.RecurringIndicator,
+		DataAccessValidityDuration: resp.DataAccessValidityDuration,
+		Attributes:                 attributes,
+		ModifiedResponse:           make(map[string]interface{}),
+		Authorizations:             make([]AuthorizationAPIResponse, 0),
 	}
 
 	// Map auth resources to authorizations

@@ -697,3 +697,454 @@ func TestAPI_UpdateConsentInvalidStatus(t *testing.T) {
 	// Cleanup
 	cleanupAPITestData(t, env, createResponse.ID)
 }
+
+// TestAPI_CreateConsent_WithDataAccessValidityDuration tests POST /api/v1/consents with dataAccessValidityDuration
+func TestAPI_CreateConsent_WithDataAccessValidityDuration(t *testing.T) {
+	env := setupAPITestEnvironment(t)
+
+	// Prepare request with dataAccessValidityDuration
+	validityTime := int64(7776000) // ~90 days in seconds
+	frequency := 1
+	recurringIndicator := false
+	dataAccessValidityDuration := int64(86400) // 24 hours
+
+	createReq := &models.ConsentAPIRequest{
+		Type:                       "accounts",
+		Status:                     "awaitingAuthorization",
+		ValidityTime:               &validityTime,
+		RecurringIndicator:         &recurringIndicator,
+		Frequency:                  &frequency,
+		DataAccessValidityDuration: &dataAccessValidityDuration,
+		RequestPayload: map[string]interface{}{
+			"data":    "API test with dataAccessValidityDuration",
+			"purpose": "testing",
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	// Make POST request
+	req, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+
+	// Execute request
+	recorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(recorder, req)
+
+	// Assert response
+	assert.Equal(t, http.StatusCreated, recorder.Code, "Expected 201 Created status")
+
+	var response models.ConsentAPIResponse
+	err = json.Unmarshal(recorder.Body.Bytes(), &response)
+	require.NoError(t, err)
+
+	// Verify dataAccessValidityDuration in response
+	assert.NotNil(t, response.DataAccessValidityDuration, "DataAccessValidityDuration should be present in response")
+	assert.Equal(t, dataAccessValidityDuration, *response.DataAccessValidityDuration, "DataAccessValidityDuration should match request value")
+
+	t.Logf("✓ Created consent %s with dataAccessValidityDuration=%d", response.ID, *response.DataAccessValidityDuration)
+
+	// Cleanup
+	cleanupAPITestData(t, env, response.ID)
+}
+
+// TestAPI_CreateConsent_WithoutDataAccessValidityDuration tests POST without dataAccessValidityDuration (should be null)
+func TestAPI_CreateConsent_WithoutDataAccessValidityDuration(t *testing.T) {
+	env := setupAPITestEnvironment(t)
+
+	// Prepare request WITHOUT dataAccessValidityDuration
+	validityTime := int64(7776000)
+	frequency := 1
+	recurringIndicator := false
+
+	createReq := &models.ConsentAPIRequest{
+		Type:               "accounts",
+		Status:             "awaitingAuthorization",
+		ValidityTime:       &validityTime,
+		RecurringIndicator: &recurringIndicator,
+		Frequency:          &frequency,
+		RequestPayload: map[string]interface{}{
+			"data": "API test without dataAccessValidityDuration",
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	// Make POST request
+	req, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+
+	// Execute request
+	recorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(recorder, req)
+
+	// Assert response
+	assert.Equal(t, http.StatusCreated, recorder.Code, "Expected 201 Created status")
+
+	var response models.ConsentAPIResponse
+	err = json.Unmarshal(recorder.Body.Bytes(), &response)
+	require.NoError(t, err)
+
+	// Verify dataAccessValidityDuration is null in response
+	assert.Nil(t, response.DataAccessValidityDuration, "DataAccessValidityDuration should be null when not provided")
+
+	t.Logf("✓ Created consent %s without dataAccessValidityDuration (null)", response.ID)
+
+	// Cleanup
+	cleanupAPITestData(t, env, response.ID)
+}
+
+// TestAPI_CreateConsent_WithNegativeDataAccessValidityDuration tests POST with negative value (should fail)
+func TestAPI_CreateConsent_WithNegativeDataAccessValidityDuration(t *testing.T) {
+	env := setupAPITestEnvironment(t)
+
+	// Prepare request with NEGATIVE dataAccessValidityDuration
+	validityTime := int64(7776000)
+	frequency := 1
+	recurringIndicator := false
+	negativeDataAccessValidityDuration := int64(-100)
+
+	createReq := &models.ConsentAPIRequest{
+		Type:                       "accounts",
+		Status:                     "awaitingAuthorization",
+		ValidityTime:               &validityTime,
+		RecurringIndicator:         &recurringIndicator,
+		Frequency:                  &frequency,
+		DataAccessValidityDuration: &negativeDataAccessValidityDuration,
+		RequestPayload: map[string]interface{}{
+			"data": "API test with negative dataAccessValidityDuration",
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	// Make POST request
+	req, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+
+	// Execute request
+	recorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(recorder, req)
+
+	// Assert 400 Bad Request
+	assert.Equal(t, http.StatusBadRequest, recorder.Code, "Expected 400 Bad Request for negative dataAccessValidityDuration")
+
+	var errorResponse map[string]interface{}
+	err = json.Unmarshal(recorder.Body.Bytes(), &errorResponse)
+	require.NoError(t, err)
+
+	// Verify error message or details mentions validation failure
+	errorText := strings.ToLower(errorResponse["message"].(string))
+	if details, ok := errorResponse["details"].(string); ok {
+		errorText += " " + strings.ToLower(details)
+	}
+	assert.Contains(t, errorText, "dataaccessvalidityduration", "Error should mention dataAccessValidityDuration")
+
+	t.Log("✓ Correctly rejected negative dataAccessValidityDuration via API")
+}
+
+// TestAPI_GetConsent_ReturnsDataAccessValidityDuration tests GET /api/v1/consents/:id returns dataAccessValidityDuration
+func TestAPI_GetConsent_ReturnsDataAccessValidityDuration(t *testing.T) {
+	env := setupAPITestEnvironment(t)
+
+	// Step 1: Create consent with dataAccessValidityDuration
+	validityTime := int64(7776000)
+	frequency := 1
+	recurringIndicator := false
+	dataAccessValidityDuration := int64(172800) // 48 hours
+
+	createReq := &models.ConsentAPIRequest{
+		Type:                       "accounts",
+		Status:                     "awaitingAuthorization",
+		ValidityTime:               &validityTime,
+		RecurringIndicator:         &recurringIndicator,
+		Frequency:                  &frequency,
+		DataAccessValidityDuration: &dataAccessValidityDuration,
+		RequestPayload: map[string]interface{}{
+			"data": "API test for GET",
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	postReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	postReq.Header.Set("Content-Type", "application/json")
+	postReq.Header.Set("org-id", "TEST_ORG")
+	postReq.Header.Set("client-id", "TEST_CLIENT")
+
+	postRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(postRecorder, postReq)
+	require.Equal(t, http.StatusCreated, postRecorder.Code)
+
+	var createResponse models.ConsentAPIResponse
+	err = json.Unmarshal(postRecorder.Body.Bytes(), &createResponse)
+	require.NoError(t, err)
+
+	// Step 2: GET the consent
+	getReq, err := http.NewRequest("GET", "/api/v1/consents/"+createResponse.ID, nil)
+	require.NoError(t, err)
+	getReq.Header.Set("org-id", "TEST_ORG")
+
+	getRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(getRecorder, getReq)
+
+	// Assert response
+	assert.Equal(t, http.StatusOK, getRecorder.Code, "Expected 200 OK status")
+
+	var getResponse models.ConsentAPIResponse
+	err = json.Unmarshal(getRecorder.Body.Bytes(), &getResponse)
+	require.NoError(t, err)
+
+	// Verify dataAccessValidityDuration is returned correctly
+	assert.NotNil(t, getResponse.DataAccessValidityDuration, "DataAccessValidityDuration should be present in GET response")
+	assert.Equal(t, dataAccessValidityDuration, *getResponse.DataAccessValidityDuration, "DataAccessValidityDuration should match created value")
+
+	t.Logf("✓ GET returned consent %s with correct dataAccessValidityDuration=%d", getResponse.ID, *getResponse.DataAccessValidityDuration)
+
+	// Cleanup
+	cleanupAPITestData(t, env, createResponse.ID)
+}
+
+// TestAPI_UpdateConsent_AddDataAccessValidityDuration tests PUT to add dataAccessValidityDuration to existing consent
+func TestAPI_UpdateConsent_AddDataAccessValidityDuration(t *testing.T) {
+	env := setupAPITestEnvironment(t)
+
+	// Step 1: Create consent WITHOUT dataAccessValidityDuration
+	validityTime := int64(7776000)
+	frequency := 1
+	recurringIndicator := false
+
+	createReq := &models.ConsentAPIRequest{
+		Type:               "accounts",
+		Status:             "awaitingAuthorization",
+		ValidityTime:       &validityTime,
+		RecurringIndicator: &recurringIndicator,
+		Frequency:          &frequency,
+		RequestPayload: map[string]interface{}{
+			"data": "API test for update",
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	postReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	postReq.Header.Set("Content-Type", "application/json")
+	postReq.Header.Set("org-id", "TEST_ORG")
+	postReq.Header.Set("client-id", "TEST_CLIENT")
+
+	postRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(postRecorder, postReq)
+	require.Equal(t, http.StatusCreated, postRecorder.Code)
+
+	var createResponse models.ConsentAPIResponse
+	err = json.Unmarshal(postRecorder.Body.Bytes(), &createResponse)
+	require.NoError(t, err)
+	assert.Nil(t, createResponse.DataAccessValidityDuration, "Initial dataAccessValidityDuration should be null")
+
+	// Step 2: UPDATE to add dataAccessValidityDuration
+	dataAccessValidityDuration := int64(259200) // 72 hours
+	updateReq := &models.ConsentAPIUpdateRequest{
+		DataAccessValidityDuration: &dataAccessValidityDuration,
+		RequestPayload: map[string]interface{}{
+			"data": "updated",
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	putReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResponse.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	putReq.Header.Set("Content-Type", "application/json")
+	putReq.Header.Set("org-id", "TEST_ORG")
+
+	putRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(putRecorder, putReq)
+
+	// Assert response
+	assert.Equal(t, http.StatusOK, putRecorder.Code, "Expected 200 OK status")
+
+	var updateResponse models.ConsentAPIResponse
+	err = json.Unmarshal(putRecorder.Body.Bytes(), &updateResponse)
+	require.NoError(t, err)
+
+	// Verify dataAccessValidityDuration was added
+	assert.NotNil(t, updateResponse.DataAccessValidityDuration, "DataAccessValidityDuration should now be set")
+	assert.Equal(t, dataAccessValidityDuration, *updateResponse.DataAccessValidityDuration, "DataAccessValidityDuration should match updated value")
+
+	t.Logf("✓ Updated consent %s to add dataAccessValidityDuration=%d", updateResponse.ID, *updateResponse.DataAccessValidityDuration)
+
+	// Cleanup
+	cleanupAPITestData(t, env, createResponse.ID)
+}
+
+// TestAPI_UpdateConsent_ChangeDataAccessValidityDuration tests PUT to change dataAccessValidityDuration value
+func TestAPI_UpdateConsent_ChangeDataAccessValidityDuration(t *testing.T) {
+	env := setupAPITestEnvironment(t)
+
+	// Step 1: Create consent WITH dataAccessValidityDuration
+	validityTime := int64(7776000)
+	frequency := 1
+	recurringIndicator := false
+	initialDuration := int64(86400) // 24 hours
+
+	createReq := &models.ConsentAPIRequest{
+		Type:                       "accounts",
+		Status:                     "awaitingAuthorization",
+		ValidityTime:               &validityTime,
+		RecurringIndicator:         &recurringIndicator,
+		Frequency:                  &frequency,
+		DataAccessValidityDuration: &initialDuration,
+		RequestPayload: map[string]interface{}{
+			"data": "API test for change",
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	postReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	postReq.Header.Set("Content-Type", "application/json")
+	postReq.Header.Set("org-id", "TEST_ORG")
+	postReq.Header.Set("client-id", "TEST_CLIENT")
+
+	postRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(postRecorder, postReq)
+	require.Equal(t, http.StatusCreated, postRecorder.Code)
+
+	var createResponse models.ConsentAPIResponse
+	err = json.Unmarshal(postRecorder.Body.Bytes(), &createResponse)
+	require.NoError(t, err)
+	assert.Equal(t, initialDuration, *createResponse.DataAccessValidityDuration, "Initial duration should match")
+
+	// Step 2: UPDATE to change dataAccessValidityDuration
+	newDuration := int64(604800) // 7 days
+	updateReq := &models.ConsentAPIUpdateRequest{
+		DataAccessValidityDuration: &newDuration,
+		RequestPayload: map[string]interface{}{
+			"data": "updated",
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	putReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResponse.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	putReq.Header.Set("Content-Type", "application/json")
+	putReq.Header.Set("org-id", "TEST_ORG")
+
+	putRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(putRecorder, putReq)
+
+	// Assert response
+	assert.Equal(t, http.StatusOK, putRecorder.Code, "Expected 200 OK status")
+
+	var updateResponse models.ConsentAPIResponse
+	err = json.Unmarshal(putRecorder.Body.Bytes(), &updateResponse)
+	require.NoError(t, err)
+
+	// Verify dataAccessValidityDuration was changed
+	assert.NotNil(t, updateResponse.DataAccessValidityDuration, "DataAccessValidityDuration should still be set")
+	assert.Equal(t, newDuration, *updateResponse.DataAccessValidityDuration, "DataAccessValidityDuration should match new value")
+	assert.NotEqual(t, initialDuration, *updateResponse.DataAccessValidityDuration, "DataAccessValidityDuration should be different from initial")
+
+	t.Logf("✓ Updated consent %s to change dataAccessValidityDuration from %d to %d", updateResponse.ID, initialDuration, newDuration)
+
+	// Cleanup
+	cleanupAPITestData(t, env, createResponse.ID)
+}
+
+// TestAPI_UpdateConsent_NegativeDataAccessValidityDuration tests PUT with negative value (should fail)
+func TestAPI_UpdateConsent_NegativeDataAccessValidityDuration(t *testing.T) {
+	env := setupAPITestEnvironment(t)
+
+	// Step 1: Create consent
+	validityTime := int64(7776000)
+	frequency := 1
+	recurringIndicator := false
+
+	createReq := &models.ConsentAPIRequest{
+		Type:               "accounts",
+		Status:             "awaitingAuthorization",
+		ValidityTime:       &validityTime,
+		RecurringIndicator: &recurringIndicator,
+		Frequency:          &frequency,
+		RequestPayload: map[string]interface{}{
+			"data": "test",
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	postReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	postReq.Header.Set("Content-Type", "application/json")
+	postReq.Header.Set("org-id", "TEST_ORG")
+	postReq.Header.Set("client-id", "TEST_CLIENT")
+
+	postRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(postRecorder, postReq)
+	require.Equal(t, http.StatusCreated, postRecorder.Code)
+
+	var createResponse models.ConsentAPIResponse
+	err = json.Unmarshal(postRecorder.Body.Bytes(), &createResponse)
+	require.NoError(t, err)
+
+	// Step 2: Try to UPDATE with negative dataAccessValidityDuration
+	negativeDuration := int64(-500)
+	updateReq := &models.ConsentAPIUpdateRequest{
+		DataAccessValidityDuration: &negativeDuration,
+		RequestPayload: map[string]interface{}{
+			"data": "test",
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	putReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResponse.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	putReq.Header.Set("Content-Type", "application/json")
+	putReq.Header.Set("org-id", "TEST_ORG")
+
+	putRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(putRecorder, putReq)
+
+	// Assert 400 Bad Request
+	assert.Equal(t, http.StatusBadRequest, putRecorder.Code, "Expected 400 Bad Request for negative dataAccessValidityDuration")
+
+	var errorResponse map[string]interface{}
+	err = json.Unmarshal(putRecorder.Body.Bytes(), &errorResponse)
+	require.NoError(t, err)
+
+	// Verify error message or details mentions validation failure
+	errorText := strings.ToLower(errorResponse["message"].(string))
+	if details, ok := errorResponse["details"].(string); ok {
+		errorText += " " + strings.ToLower(details)
+	}
+	assert.Contains(t, errorText, "dataaccessvalidityduration", "Error should mention dataAccessValidityDuration")
+
+	t.Log("✓ Correctly rejected negative dataAccessValidityDuration in PUT request")
+
+	// Cleanup
+	cleanupAPITestData(t, env, createResponse.ID)
+}

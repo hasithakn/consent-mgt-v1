@@ -771,6 +771,11 @@ components:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
           type: string
           example: "false"
+        dataAccessValidityDuration:
+          description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
+          type: integer
+          format: int64
+          example: 86400
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
           type: string
@@ -881,6 +886,11 @@ components:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
           type: string
           example: "false"
+        dataAccessValidityDuration:
+          description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
+          type: integer
+          format: int64
+          example: 86400
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
           type: string
@@ -938,6 +948,11 @@ components:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
           type: string
           example: "false"
+        dataAccessValidityDuration:
+          description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
+          type: integer
+          format: int64
+          example: 86400
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
@@ -990,6 +1005,11 @@ components:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
           type: string
           example: "false"
+        dataAccessValidityDuration:
+          description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
+          type: integer
+          format: int64
+          example: 86400
 
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
@@ -1083,6 +1103,11 @@ components:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
           type: string
           example: "false"
+        dataAccessValidityDuration:
+          description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
+          type: integer
+          format: int64
+          example: 86400
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
@@ -1136,6 +1161,11 @@ components:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
           type: string
           example: "false"
+        dataAccessValidityDuration:
+          description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
+          type: integer
+          format: int64
+          example: 86400
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object

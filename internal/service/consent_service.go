@@ -57,17 +57,18 @@ func (s *ConsentService) CreateConsent(ctx context.Context, request *models.Cons
 
 	// Build consent model
 	consent := &models.Consent{
-		ConsentID:          utils.GenerateConsentID(),
-		Receipt:            models.JSON(receiptJSON),
-		ClientID:           clientID,
-		ConsentType:        request.ConsentType,
-		CurrentStatus:      request.CurrentStatus,
-		ConsentFrequency:   request.ConsentFrequency,
-		ValidityTime:       request.ValidityTime,
-		RecurringIndicator: request.RecurringIndicator,
-		OrgID:              orgID,
-		CreatedTime:        utils.GetCurrentTimeMillis(),
-		UpdatedTime:        utils.GetCurrentTimeMillis(),
+		ConsentID:                  utils.GenerateConsentID(),
+		Receipt:                    models.JSON(receiptJSON),
+		ClientID:                   clientID,
+		ConsentType:                request.ConsentType,
+		CurrentStatus:              request.CurrentStatus,
+		ConsentFrequency:           request.ConsentFrequency,
+		ValidityTime:               request.ValidityTime,
+		RecurringIndicator:         request.RecurringIndicator,
+		DataAccessValidityDuration: request.DataAccessValidityDuration,
+		OrgID:                      orgID,
+		CreatedTime:                utils.GetCurrentTimeMillis(),
+		UpdatedTime:                utils.GetCurrentTimeMillis(),
 	}
 
 	// Start transaction
@@ -237,6 +238,14 @@ func (s *ConsentService) UpdateConsent(ctx context.Context, consentID, orgID str
 
 	if request.RecurringIndicator != nil {
 		updatedConsent.RecurringIndicator = request.RecurringIndicator
+	}
+
+	if request.DataAccessValidityDuration != nil {
+		// Validate that it's non-negative
+		if *request.DataAccessValidityDuration < 0 {
+			return nil, fmt.Errorf("dataAccessValidityDuration must be non-negative")
+		}
+		updatedConsent.DataAccessValidityDuration = request.DataAccessValidityDuration
 	}
 
 	// Update consent
@@ -409,6 +418,10 @@ func (s *ConsentService) validateConsentCreateRequest(request *models.ConsentCre
 	if request.Receipt == nil {
 		return fmt.Errorf("receipt is required")
 	}
+	// Validate DataAccessValidityDuration if provided (must be non-negative)
+	if request.DataAccessValidityDuration != nil && *request.DataAccessValidityDuration < 0 {
+		return fmt.Errorf("dataAccessValidityDuration must be non-negative")
+	}
 	return nil
 }
 
@@ -428,18 +441,19 @@ func (s *ConsentService) buildConsentResponse(consent *models.Consent, attribute
 	}
 
 	return &models.ConsentResponse{
-		ConsentID:          consent.ConsentID,
-		Receipt:            receiptMap,
-		CreatedTime:        consent.CreatedTime,
-		UpdatedTime:        consent.UpdatedTime,
-		ClientID:           consent.ClientID,
-		ConsentType:        consent.ConsentType,
-		CurrentStatus:      consent.CurrentStatus,
-		ConsentFrequency:   consent.ConsentFrequency,
-		ValidityTime:       consent.ValidityTime,
-		RecurringIndicator: consent.RecurringIndicator,
-		OrgID:              consent.OrgID,
-		Attributes:         attributes,
-		AuthResources:      authResourceResponses,
+		ConsentID:                  consent.ConsentID,
+		Receipt:                    receiptMap,
+		CreatedTime:                consent.CreatedTime,
+		UpdatedTime:                consent.UpdatedTime,
+		ClientID:                   consent.ClientID,
+		ConsentType:                consent.ConsentType,
+		CurrentStatus:              consent.CurrentStatus,
+		ConsentFrequency:           consent.ConsentFrequency,
+		ValidityTime:               consent.ValidityTime,
+		RecurringIndicator:         consent.RecurringIndicator,
+		DataAccessValidityDuration: consent.DataAccessValidityDuration,
+		OrgID:                      consent.OrgID,
+		Attributes:                 attributes,
+		AuthResources:              authResourceResponses,
 	}
 }

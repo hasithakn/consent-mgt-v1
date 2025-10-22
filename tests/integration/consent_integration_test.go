@@ -930,3 +930,240 @@ func TestConsentUpdate_NonExistent(t *testing.T) {
 func stringPtr(s string) *string {
 	return &s
 }
+
+// Helper function to create int64 pointer
+func int64Ptr(i int64) *int64 {
+	return &i
+}
+
+// TestConsentCreate_WithDataAccessValidityDuration tests consent creation with dataAccessValidityDuration field
+func TestConsentCreate_WithDataAccessValidityDuration(t *testing.T) {
+	env := setupTestEnvironment(t)
+
+	ctx := context.Background()
+
+	// Test with valid dataAccessValidityDuration (24 hours = 86400 seconds)
+	dataAccessValidityDuration := int64(86400)
+	request := createTestConsentRequest()
+	request.DataAccessValidityDuration = &dataAccessValidityDuration
+
+	// Create consent
+	response, err := env.ConsentService.CreateConsent(ctx, request, testClientID, testOrgID)
+
+	// Assertions
+	require.NoError(t, err, "Should create consent with dataAccessValidityDuration")
+	require.NotNil(t, response, "Response should not be nil")
+	assert.NotNil(t, response.DataAccessValidityDuration, "DataAccessValidityDuration should be set")
+	assert.Equal(t, dataAccessValidityDuration, *response.DataAccessValidityDuration, "DataAccessValidityDuration should match")
+
+	// Cleanup
+	cleanupTestData(t, env, response.ConsentID)
+
+	t.Logf("✓ Successfully created consent with dataAccessValidityDuration: %d seconds", dataAccessValidityDuration)
+}
+
+// TestConsentCreate_WithoutDataAccessValidityDuration tests consent creation without dataAccessValidityDuration field (should be NULL)
+func TestConsentCreate_WithoutDataAccessValidityDuration(t *testing.T) {
+	env := setupTestEnvironment(t)
+
+	ctx := context.Background()
+
+	// Create consent without dataAccessValidityDuration
+	request := createTestConsentRequest()
+	request.DataAccessValidityDuration = nil
+
+	// Create consent
+	response, err := env.ConsentService.CreateConsent(ctx, request, testClientID, testOrgID)
+
+	// Assertions
+	require.NoError(t, err, "Should create consent without dataAccessValidityDuration")
+	require.NotNil(t, response, "Response should not be nil")
+	assert.Nil(t, response.DataAccessValidityDuration, "DataAccessValidityDuration should be nil when not provided")
+
+	// Cleanup
+	cleanupTestData(t, env, response.ConsentID)
+
+	t.Log("✓ Successfully created consent without dataAccessValidityDuration (NULL)")
+}
+
+// TestConsentCreate_WithZeroDataAccessValidityDuration tests consent creation with zero dataAccessValidityDuration
+func TestConsentCreate_WithZeroDataAccessValidityDuration(t *testing.T) {
+	env := setupTestEnvironment(t)
+
+	ctx := context.Background()
+
+	// Test with zero dataAccessValidityDuration
+	dataAccessValidityDuration := int64(0)
+	request := createTestConsentRequest()
+	request.DataAccessValidityDuration = &dataAccessValidityDuration
+
+	// Create consent
+	response, err := env.ConsentService.CreateConsent(ctx, request, testClientID, testOrgID)
+
+	// Assertions
+	require.NoError(t, err, "Should create consent with zero dataAccessValidityDuration")
+	require.NotNil(t, response, "Response should not be nil")
+	assert.NotNil(t, response.DataAccessValidityDuration, "DataAccessValidityDuration should be set")
+	assert.Equal(t, int64(0), *response.DataAccessValidityDuration, "DataAccessValidityDuration should be 0")
+
+	// Cleanup
+	cleanupTestData(t, env, response.ConsentID)
+
+	t.Log("✓ Successfully created consent with zero dataAccessValidityDuration")
+}
+
+// TestConsentCreate_WithNegativeDataAccessValidityDuration tests that negative values are rejected
+func TestConsentCreate_WithNegativeDataAccessValidityDuration(t *testing.T) {
+	env := setupTestEnvironment(t)
+
+	ctx := context.Background()
+
+	// Test with negative dataAccessValidityDuration
+	dataAccessValidityDuration := int64(-100)
+	request := createTestConsentRequest()
+	request.DataAccessValidityDuration = &dataAccessValidityDuration
+
+	// Attempt to create consent
+	response, err := env.ConsentService.CreateConsent(ctx, request, testClientID, testOrgID)
+
+	// Assertions
+	require.Error(t, err, "Should reject negative dataAccessValidityDuration")
+	require.Nil(t, response, "Response should be nil on validation error")
+	assert.Contains(t, err.Error(), "dataAccessValidityDuration must be non-negative", "Error should mention validation failure")
+
+	t.Log("✓ Correctly rejected consent with negative dataAccessValidityDuration")
+}
+
+// TestConsentUpdate_AddDataAccessValidityDuration tests adding dataAccessValidityDuration to existing consent
+func TestConsentUpdate_AddDataAccessValidityDuration(t *testing.T) {
+	env := setupTestEnvironment(t)
+
+	ctx := context.Background()
+
+	// Step 1: Create consent without dataAccessValidityDuration
+	t.Log("Step 1: Creating consent without dataAccessValidityDuration...")
+	createRequest := createTestConsentRequest()
+	createRequest.DataAccessValidityDuration = nil
+
+	created, err := env.ConsentService.CreateConsent(ctx, createRequest, testClientID, testOrgID)
+	require.NoError(t, err, "Should create consent")
+	assert.Nil(t, created.DataAccessValidityDuration, "Initial dataAccessValidityDuration should be nil")
+	t.Logf("Step 1: Created consent %s without dataAccessValidityDuration", created.ConsentID)
+
+	defer cleanupTestData(t, env, created.ConsentID)
+
+	// Step 2: Update to add dataAccessValidityDuration
+	t.Log("Step 2: Adding dataAccessValidityDuration via update...")
+	dataAccessValidityDuration := int64(172800) // 48 hours
+	updateRequest := &models.ConsentUpdateRequest{
+		DataAccessValidityDuration: &dataAccessValidityDuration,
+	}
+
+	updated, err := env.ConsentService.UpdateConsent(ctx, created.ConsentID, testOrgID, updateRequest)
+	require.NoError(t, err, "Should update consent successfully")
+	t.Logf("Step 2: Updated consent %s", updated.ConsentID)
+
+	// Step 3: Verify dataAccessValidityDuration was added
+	t.Log("Step 3: Verifying dataAccessValidityDuration was added...")
+	assert.NotNil(t, updated.DataAccessValidityDuration, "DataAccessValidityDuration should now be set")
+	assert.Equal(t, dataAccessValidityDuration, *updated.DataAccessValidityDuration, "DataAccessValidityDuration should match updated value")
+
+	t.Log("✓ Successfully added dataAccessValidityDuration to existing consent")
+}
+
+// TestConsentUpdate_ChangeDataAccessValidityDuration tests changing dataAccessValidityDuration value
+func TestConsentUpdate_ChangeDataAccessValidityDuration(t *testing.T) {
+	env := setupTestEnvironment(t)
+
+	ctx := context.Background()
+
+	// Step 1: Create consent with initial dataAccessValidityDuration
+	t.Log("Step 1: Creating consent with initial dataAccessValidityDuration...")
+	initialDuration := int64(86400) // 24 hours
+	createRequest := createTestConsentRequest()
+	createRequest.DataAccessValidityDuration = &initialDuration
+
+	created, err := env.ConsentService.CreateConsent(ctx, createRequest, testClientID, testOrgID)
+	require.NoError(t, err, "Should create consent")
+	assert.NotNil(t, created.DataAccessValidityDuration, "Initial dataAccessValidityDuration should be set")
+	assert.Equal(t, initialDuration, *created.DataAccessValidityDuration, "Initial value should match")
+	t.Logf("Step 1: Created consent %s with dataAccessValidityDuration=%d", created.ConsentID, initialDuration)
+
+	defer cleanupTestData(t, env, created.ConsentID)
+
+	// Step 2: Update to change dataAccessValidityDuration
+	t.Log("Step 2: Changing dataAccessValidityDuration via update...")
+	newDuration := int64(259200) // 72 hours
+	updateRequest := &models.ConsentUpdateRequest{
+		DataAccessValidityDuration: &newDuration,
+	}
+
+	updated, err := env.ConsentService.UpdateConsent(ctx, created.ConsentID, testOrgID, updateRequest)
+	require.NoError(t, err, "Should update consent successfully")
+	t.Logf("Step 2: Updated consent %s", updated.ConsentID)
+
+	// Step 3: Retrieve consent to verify dataAccessValidityDuration was persisted
+	t.Log("Step 3: Retrieving consent to verify dataAccessValidityDuration was changed...")
+	retrieved, err := env.ConsentService.GetConsent(ctx, created.ConsentID, testOrgID)
+	require.NoError(t, err, "Should retrieve consent successfully")
+
+	assert.NotNil(t, retrieved.DataAccessValidityDuration, "DataAccessValidityDuration should still be set")
+	assert.Equal(t, newDuration, *retrieved.DataAccessValidityDuration, "DataAccessValidityDuration should match new value")
+	assert.NotEqual(t, initialDuration, *retrieved.DataAccessValidityDuration, "DataAccessValidityDuration should be different from initial")
+
+	t.Log("✓ Successfully changed and persisted dataAccessValidityDuration value")
+}
+
+// TestConsentUpdate_NegativeDataAccessValidityDuration tests that negative values are rejected during update
+func TestConsentUpdate_NegativeDataAccessValidityDuration(t *testing.T) {
+	env := setupTestEnvironment(t)
+
+	ctx := context.Background()
+
+	// Create consent
+	createRequest := createTestConsentRequest()
+	created, err := env.ConsentService.CreateConsent(ctx, createRequest, testClientID, testOrgID)
+	require.NoError(t, err, "Should create consent")
+
+	defer cleanupTestData(t, env, created.ConsentID)
+
+	// Try to update with negative dataAccessValidityDuration
+	negativeDuration := int64(-500)
+	updateRequest := &models.ConsentUpdateRequest{
+		DataAccessValidityDuration: &negativeDuration,
+	}
+
+	_, err = env.ConsentService.UpdateConsent(ctx, created.ConsentID, testOrgID, updateRequest)
+	assert.Error(t, err, "Should reject negative dataAccessValidityDuration")
+	assert.Contains(t, err.Error(), "dataAccessValidityDuration must be non-negative", "Error should mention validation failure")
+
+	t.Log("✓ Correctly rejected update with negative dataAccessValidityDuration")
+}
+
+// TestConsentRetrieve_WithDataAccessValidityDuration tests that dataAccessValidityDuration is correctly retrieved
+func TestConsentRetrieve_WithDataAccessValidityDuration(t *testing.T) {
+	env := setupTestEnvironment(t)
+
+	ctx := context.Background()
+
+	// Create consent with dataAccessValidityDuration
+	dataAccessValidityDuration := int64(604800) // 7 days
+	createRequest := createTestConsentRequest()
+	createRequest.DataAccessValidityDuration = &dataAccessValidityDuration
+
+	created, err := env.ConsentService.CreateConsent(ctx, createRequest, testClientID, testOrgID)
+	require.NoError(t, err, "Should create consent")
+	t.Logf("Created consent %s with dataAccessValidityDuration=%d", created.ConsentID, dataAccessValidityDuration)
+
+	defer cleanupTestData(t, env, created.ConsentID)
+
+	// Retrieve consent by ID
+	retrieved, err := env.ConsentService.GetConsent(ctx, created.ConsentID, testOrgID)
+	require.NoError(t, err, "Should retrieve consent successfully")
+
+	// Verify dataAccessValidityDuration persisted and retrieved correctly
+	assert.NotNil(t, retrieved.DataAccessValidityDuration, "DataAccessValidityDuration should be retrieved")
+	assert.Equal(t, dataAccessValidityDuration, *retrieved.DataAccessValidityDuration, "Retrieved dataAccessValidityDuration should match created value")
+
+	t.Log("✓ Successfully retrieved consent with correct dataAccessValidityDuration")
+}

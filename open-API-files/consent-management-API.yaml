@@ -765,12 +765,13 @@ components:
           example: "AwaitingAuthorisation"
         validityTime:
           description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
-          type: string
-          example: "0"
+          type: integer
+          format: int64
+          example: 0
         recurringIndicator:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
-          type: string
-          example: "false"
+          type: boolean
+          example: false
         dataAccessValidityDuration:
           description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
           type: integer
@@ -778,8 +779,9 @@ components:
           example: 86400
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
-          type: string
-          example: "0"
+          type: integer
+          format: int32
+          example: 0
         requestPayload:
           description: The original consent initiation request payload from the TPP.
           type: object
@@ -880,12 +882,13 @@ components:
           example: "AwaitingAuthorisation"
         validityTime:
           description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
-          type: string
-          example: "0"
+          type: integer
+          format: int64
+          example: 0
         recurringIndicator:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
-          type: string
-          example: "false"
+          type: boolean
+          example: false
         dataAccessValidityDuration:
           description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
           type: integer
@@ -893,8 +896,9 @@ components:
           example: 86400
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
-          type: string
-          example: "0"
+          type: integer
+          format: int32
+          example: 0
         requestPayload:
           description: The original consent initiation request payload from the TPP.
           type: object
@@ -938,16 +942,18 @@ components:
           example: "AwaitingAuthorisation"
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
-          type: string
-          example: "0"
+          type: integer
+          format: int32
+          example: 0
         validityTime:
           description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
-          type: string
-          example: "0"
+          type: integer
+          format: int64
+          example: 0
         recurringIndicator:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
-          type: string
-          example: "false"
+          type: boolean
+          example: false
         dataAccessValidityDuration:
           description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
           type: integer
@@ -995,16 +1001,18 @@ components:
           example: "AwaitingAuthorisation"
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
-          type: string
-          example: "0"
+          type: integer
+          format: int32
+          example: 0
         validityTime:
           description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
-          type: string
-          example: "0"
+          type: integer
+          format: int64
+          example: 0
         recurringIndicator:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
-          type: string
-          example: "false"
+          type: boolean
+          example: false
         dataAccessValidityDuration:
           description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
           type: integer
@@ -1093,16 +1101,18 @@ components:
           example: "AwaitingAuthorisation"
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
-          type: string
-          example: "0"
+          type: integer
+          format: int32
+          example: 0
         validityTime:
           description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
-          type: string
-          example: "0"
+          type: integer
+          format: int64
+          example: 0
         recurringIndicator:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
-          type: string
-          example: "false"
+          type: boolean
+          example: false
         dataAccessValidityDuration:
           description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
           type: integer
@@ -1151,16 +1161,18 @@ components:
           example: "AwaitingAuthorisation"
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
-          type: string
-          example: "0"
+          type: integer
+          format: int32
+          example: 0
         validityTime:
           description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
-          type: string
-          example: "0"
+          type: integer
+          format: int64
+          example: 0
         recurringIndicator:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
-          type: string
-          example: "false"
+          type: boolean
+          example: false
         dataAccessValidityDuration:
           description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
           type: integer

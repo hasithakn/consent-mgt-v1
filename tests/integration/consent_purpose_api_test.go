@@ -54,6 +54,7 @@ func setupConsentPurposeAPITestEnvironment(t *testing.T) *TestConsentPurposeAPIE
 		statusAuditDAO,
 		attributeDAO,
 		authResourceDAO,
+		purposeDAO,
 		db,
 		logger,
 	)

@@ -147,6 +147,31 @@ func (s *ConsentPurposeService) ListPurposes(ctx context.Context, orgID string, 
 	}, nil
 }
 
+// GetPurposesByConsentID retrieves all purposes linked to a specific consent
+func (s *ConsentPurposeService) GetPurposesByConsentID(ctx context.Context, consentID, orgID string) ([]models.ConsentPurposeResponse, error) {
+	if consentID == "" {
+		return nil, fmt.Errorf("consent ID is required")
+	}
+	if err := utils.ValidateOrgID(orgID); err != nil {
+		return nil, err
+	}
+
+	// Retrieve purposes from DAO
+	purposes, err := s.purposeDAO.GetByConsentID(ctx, consentID, orgID)
+	if err != nil {
+		s.logger.WithError(err).WithField("consent_id", consentID).Error("Failed to get purposes for consent")
+		return nil, fmt.Errorf("failed to get purposes for consent: %w", err)
+	}
+
+	// Build response
+	purposeResponses := make([]models.ConsentPurposeResponse, 0, len(purposes))
+	for _, purpose := range purposes {
+		purposeResponses = append(purposeResponses, *s.buildPurposeResponse(&purpose))
+	}
+
+	return purposeResponses, nil
+}
+
 // UpdatePurpose updates an existing consent purpose
 func (s *ConsentPurposeService) UpdatePurpose(ctx context.Context, purposeID, orgID string, req *ConsentPurposeUpdateRequest) (*models.ConsentPurposeResponse, error) {
 	// Validate inputs
@@ -397,4 +422,87 @@ func (s *ConsentPurposeService) ExistsByName(ctx context.Context, name, orgID st
 	}
 
 	return exists, nil
+}
+
+// LinkPurposesToConsent links multiple purposes to a consent by purpose names
+// This should be called within a transaction
+func (s *ConsentPurposeService) LinkPurposesToConsent(ctx context.Context, consentID, orgID string, purposeNames []string) error {
+	if len(purposeNames) == 0 {
+		return nil // Nothing to link
+	}
+
+	if consentID == "" {
+		return fmt.Errorf("consent ID is required")
+	}
+	if orgID == "" {
+		return fmt.Errorf("organization ID is required")
+	}
+
+	// Get purpose IDs by names
+	purposeIDMap, err := s.purposeDAO.GetIDsByNames(ctx, purposeNames, orgID)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to get purpose IDs by names")
+		return fmt.Errorf("failed to get purpose IDs: %w", err)
+	}
+
+	// Verify all purposes were found
+	if len(purposeIDMap) != len(purposeNames) {
+		missingPurposes := []string{}
+		for _, name := range purposeNames {
+			if _, found := purposeIDMap[name]; !found {
+				missingPurposes = append(missingPurposes, name)
+			}
+		}
+		return fmt.Errorf("purposes not found: %v", missingPurposes)
+	}
+
+	// Link each purpose to the consent
+	for _, purposeID := range purposeIDMap {
+		if err := s.purposeDAO.LinkPurposeToConsent(ctx, consentID, purposeID, orgID); err != nil {
+			s.logger.WithError(err).WithFields(logrus.Fields{
+				"consent_id": consentID,
+				"purpose_id": purposeID,
+			}).Error("Failed to link purpose to consent")
+			return fmt.Errorf("failed to link purpose: %w", err)
+		}
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"consent_id":    consentID,
+		"purpose_count": len(purposeNames),
+	}).Info("Successfully linked purposes to consent")
+
+	return nil
+}
+
+// UpdateConsentPurposes updates the purpose mappings for a consent
+// Clears existing mappings and creates new ones
+// This should be called within a transaction
+func (s *ConsentPurposeService) UpdateConsentPurposes(ctx context.Context, consentID, orgID string, purposeNames []string) error {
+	if consentID == "" {
+		return fmt.Errorf("consent ID is required")
+	}
+	if orgID == "" {
+		return fmt.Errorf("organization ID is required")
+	}
+
+	// Clear existing mappings
+	if err := s.purposeDAO.ClearConsentPurposes(ctx, consentID, orgID); err != nil {
+		s.logger.WithError(err).WithField("consent_id", consentID).Error("Failed to clear existing purpose mappings")
+		return fmt.Errorf("failed to clear existing purposes: %w", err)
+	}
+
+	// Link new purposes if any
+	if len(purposeNames) > 0 {
+		if err := s.LinkPurposesToConsent(ctx, consentID, orgID, purposeNames); err != nil {
+			return err
+		}
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"consent_id":    consentID,
+		"purpose_count": len(purposeNames),
+	}).Info("Successfully updated consent purposes")
+
+	return nil
 }

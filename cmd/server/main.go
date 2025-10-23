@@ -79,6 +79,7 @@ func main() {
 		statusAuditDAO,
 		attributeDAO,
 		authResourceDAO,
+		purposeDAO,
 		db,
 		logger,
 	)

@@ -57,7 +57,7 @@ func setupAPITestEnvironment(t *testing.T) *TestAPIEnvironment {
 	consentPurposeDAO := dao.NewConsentPurposeDAO(db.DB)
 
 	// Create services
-	consentService := service.NewConsentService(consentDAO, statusAuditDAO, attributeDAO, authResourceDAO, db, logger)
+	consentService := service.NewConsentService(consentDAO, statusAuditDAO, attributeDAO, authResourceDAO, consentPurposeDAO, db, logger)
 	authResourceService := service.NewAuthResourceService(authResourceDAO, consentDAO, db, logger)
 	consentPurposeService := service.NewConsentPurposeService(consentPurposeDAO, consentDAO, db.DB, logger)
 

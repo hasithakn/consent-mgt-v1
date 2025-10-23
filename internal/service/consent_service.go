@@ -15,12 +15,13 @@ import (
 
 // ConsentService handles business logic for consent operations
 type ConsentService struct {
-	consentDAO      *dao.ConsentDAO
-	statusAuditDAO  *dao.StatusAuditDAO
-	attributeDAO    *dao.ConsentAttributeDAO
-	authResourceDAO *dao.AuthResourceDAO
-	db              *database.DB
-	logger          *logrus.Logger
+	consentDAO        *dao.ConsentDAO
+	statusAuditDAO    *dao.StatusAuditDAO
+	attributeDAO      *dao.ConsentAttributeDAO
+	authResourceDAO   *dao.AuthResourceDAO
+	consentPurposeDAO *dao.ConsentPurposeDAO
+	db                *database.DB
+	logger            *logrus.Logger
 }
 
 // NewConsentService creates a new consent service instance
@@ -29,21 +30,28 @@ func NewConsentService(
 	statusAuditDAO *dao.StatusAuditDAO,
 	attributeDAO *dao.ConsentAttributeDAO,
 	authResourceDAO *dao.AuthResourceDAO,
+	consentPurposeDAO *dao.ConsentPurposeDAO,
 	db *database.DB,
 	logger *logrus.Logger,
 ) *ConsentService {
 	return &ConsentService{
-		consentDAO:      consentDAO,
-		statusAuditDAO:  statusAuditDAO,
-		attributeDAO:    attributeDAO,
-		authResourceDAO: authResourceDAO,
-		db:              db,
-		logger:          logger,
+		consentDAO:        consentDAO,
+		statusAuditDAO:    statusAuditDAO,
+		attributeDAO:      attributeDAO,
+		authResourceDAO:   authResourceDAO,
+		consentPurposeDAO: consentPurposeDAO,
+		db:                db,
+		logger:            logger,
 	}
 }
 
 // CreateConsent creates a new consent
 func (s *ConsentService) CreateConsent(ctx context.Context, request *models.ConsentCreateRequest, clientID, orgID string) (*models.ConsentResponse, error) {
+	return s.CreateConsentWithPurposes(ctx, request, clientID, orgID, nil)
+}
+
+// CreateConsentWithPurposes creates a new consent and links it to purposes
+func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request *models.ConsentCreateRequest, clientID, orgID string, purposeNames []string) (*models.ConsentResponse, error) {
 	// Validate request
 	if err := s.validateConsentCreateRequest(request, clientID, orgID); err != nil {
 		return nil, err
@@ -140,6 +148,38 @@ func (s *ConsentService) CreateConsent(ctx context.Context, request *models.Cons
 		}
 	}
 
+	// Link consent purposes if provided
+	if len(purposeNames) > 0 {
+		// Get purpose IDs by names
+		purposeIDMap, err := s.consentPurposeDAO.GetIDsByNames(ctx, purposeNames, orgID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get purpose IDs: %w", err)
+		}
+
+		// Verify all purposes were found
+		if len(purposeIDMap) != len(purposeNames) {
+			missingPurposes := []string{}
+			for _, name := range purposeNames {
+				if _, found := purposeIDMap[name]; !found {
+					missingPurposes = append(missingPurposes, name)
+				}
+			}
+			return nil, fmt.Errorf("purposes not found: %v", missingPurposes)
+		}
+
+		// Link each purpose to the consent within transaction
+		for _, purposeID := range purposeIDMap {
+			if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consent.ConsentID, purposeID, orgID); err != nil {
+				return nil, fmt.Errorf("failed to link purpose: %w", err)
+			}
+		}
+
+		s.logger.WithFields(logrus.Fields{
+			"consent_id":    consent.ConsentID,
+			"purpose_count": len(purposeNames),
+		}).Info("Linked purposes to consent within transaction")
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -172,6 +212,11 @@ func (s *ConsentService) GetConsent(ctx context.Context, consentID, orgID string
 
 // UpdateConsent updates an existing consent
 func (s *ConsentService) UpdateConsent(ctx context.Context, consentID, orgID string, request *models.ConsentUpdateRequest) (*models.ConsentResponse, error) {
+	return s.UpdateConsentWithPurposes(ctx, consentID, orgID, request, nil)
+}
+
+// UpdateConsentWithPurposes updates a consent and replaces its purpose mappings
+func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentID, orgID string, request *models.ConsentUpdateRequest, purposeNames []string) (*models.ConsentResponse, error) {
 	// Validate inputs
 	if err := utils.ValidateConsentID(consentID); err != nil {
 		return nil, err
@@ -322,6 +367,46 @@ func (s *ConsentService) UpdateConsent(ctx context.Context, consentID, orgID str
 					return nil, fmt.Errorf("failed to create auth resource: %w", err)
 				}
 			}
+		}
+	}
+
+	// Update consent purposes if provided
+	if purposeNames != nil {
+		// Clear existing purpose mappings
+		if err := s.consentPurposeDAO.ClearConsentPurposesWithTx(ctx, tx.Tx, consentID, orgID); err != nil {
+			return nil, fmt.Errorf("failed to clear existing purposes: %w", err)
+		}
+
+		// Link new purposes if any
+		if len(purposeNames) > 0 {
+			// Get purpose IDs by names
+			purposeIDMap, err := s.consentPurposeDAO.GetIDsByNames(ctx, purposeNames, orgID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get purpose IDs: %w", err)
+			}
+
+			// Verify all purposes were found
+			if len(purposeIDMap) != len(purposeNames) {
+				missingPurposes := []string{}
+				for _, name := range purposeNames {
+					if _, found := purposeIDMap[name]; !found {
+						missingPurposes = append(missingPurposes, name)
+					}
+				}
+				return nil, fmt.Errorf("purposes not found: %v", missingPurposes)
+			}
+
+			// Link each purpose to the consent within transaction
+			for _, purposeID := range purposeIDMap {
+				if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consentID, purposeID, orgID); err != nil {
+					return nil, fmt.Errorf("failed to link purpose: %w", err)
+				}
+			}
+
+			s.logger.WithFields(logrus.Fields{
+				"consent_id":    consentID,
+				"purpose_count": len(purposeNames),
+			}).Info("Updated consent purposes within transaction")
 		}
 	}
 

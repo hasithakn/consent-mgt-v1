@@ -130,8 +130,19 @@ func (h *ConsentHandler) CreateConsent(c *gin.Context) {
 		}
 	}
 
-	// Create consent
-	consent, err := h.consentService.CreateConsent(c.Request.Context(), request, clientID, orgID)
+	// Create consent with purposes if resolved from extension
+	var consent *models.ConsentResponse
+
+	if resolvedPurposesRaw, exists := c.Get("resolvedConsentPurposes"); exists {
+		if purposeNames, ok := resolvedPurposesRaw.([]string); ok && len(purposeNames) > 0 {
+			consent, err = h.consentService.CreateConsentWithPurposes(c.Request.Context(), request, clientID, orgID, purposeNames)
+		} else {
+			consent, err = h.consentService.CreateConsent(c.Request.Context(), request, clientID, orgID)
+		}
+	} else {
+		consent, err = h.consentService.CreateConsent(c.Request.Context(), request, clientID, orgID)
+	}
+
 	if err != nil {
 		// Check if it's a validation error
 		if strings.Contains(err.Error(), "must be") || strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
@@ -265,8 +276,19 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 		}
 	}
 
-	// Update consent via service
-	updatedConsent, err := h.consentService.UpdateConsent(c.Request.Context(), consentID, orgID, updateRequest)
+	// Update consent with purposes if resolved from extension
+	var updatedConsent *models.ConsentResponse
+
+	if resolvedPurposesRaw, exists := c.Get("resolvedConsentPurposes"); exists {
+		if purposeNames, ok := resolvedPurposesRaw.([]string); ok {
+			updatedConsent, err = h.consentService.UpdateConsentWithPurposes(c.Request.Context(), consentID, orgID, updateRequest, purposeNames)
+		} else {
+			updatedConsent, err = h.consentService.UpdateConsent(c.Request.Context(), consentID, orgID, updateRequest)
+		}
+	} else {
+		updatedConsent, err = h.consentService.UpdateConsent(c.Request.Context(), consentID, orgID, updateRequest)
+	}
+
 	if err != nil {
 		// Check if it's a validation error
 		if strings.Contains(err.Error(), "cannot be empty") || strings.Contains(err.Error(), "too long") ||

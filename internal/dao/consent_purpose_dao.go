@@ -172,6 +172,21 @@ func (dao *ConsentPurposeDAO) LinkPurposeToConsent(ctx context.Context, consentI
 	return nil
 }
 
+// LinkPurposeToConsentWithTx creates a mapping between a consent and a purpose within a transaction
+func (dao *ConsentPurposeDAO) LinkPurposeToConsentWithTx(ctx context.Context, tx *sqlx.Tx, consentID, purposeID, orgID string) error {
+	query := `
+		INSERT INTO CONSENT_PURPOSE_MAPPING (CONSENT_ID, ORG_ID, PURPOSE_ID)
+		VALUES (?, ?, ?)
+	`
+
+	_, err := tx.ExecContext(ctx, query, consentID, orgID, purposeID)
+	if err != nil {
+		return fmt.Errorf("failed to link purpose to consent: %w", err)
+	}
+
+	return nil
+}
+
 // UnlinkPurposeFromConsent removes the mapping between a consent and a purpose
 func (dao *ConsentPurposeDAO) UnlinkPurposeFromConsent(ctx context.Context, consentID, purposeID, orgID string) error {
 	query := `
@@ -237,6 +252,18 @@ func (dao *ConsentPurposeDAO) ClearConsentPurposes(ctx context.Context, consentI
 	return nil
 }
 
+// ClearConsentPurposesWithTx removes all purpose mappings for a consent within a transaction
+func (dao *ConsentPurposeDAO) ClearConsentPurposesWithTx(ctx context.Context, tx *sqlx.Tx, consentID, orgID string) error {
+	query := `DELETE FROM CONSENT_PURPOSE_MAPPING WHERE CONSENT_ID = ? AND ORG_ID = ?`
+
+	_, err := tx.ExecContext(ctx, query, consentID, orgID)
+	if err != nil {
+		return fmt.Errorf("failed to clear consent purposes: %w", err)
+	}
+
+	return nil
+}
+
 // ExistsByName checks if a purpose with the given name already exists for the organization
 func (dao *ConsentPurposeDAO) ExistsByName(ctx context.Context, name, orgID string) (bool, error) {
 	query := `
@@ -251,4 +278,44 @@ func (dao *ConsentPurposeDAO) ExistsByName(ctx context.Context, name, orgID stri
 	}
 
 	return count > 0, nil
+}
+
+// GetIDsByNames retrieves purpose IDs for given purpose names
+func (dao *ConsentPurposeDAO) GetIDsByNames(ctx context.Context, names []string, orgID string) (map[string]string, error) {
+	if len(names) == 0 {
+		return make(map[string]string), nil
+	}
+
+	// Build query with IN clause
+	query := `
+		SELECT NAME, ID FROM CONSENT_PURPOSE
+		WHERE ORG_ID = ? AND NAME IN (?)
+	`
+
+	query, args, err := sqlx.In(query, orgID, names)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+	query = dao.db.Rebind(query)
+
+	rows, err := dao.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get purpose IDs by names: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]string)
+	for rows.Next() {
+		var name, id string
+		if err := rows.Scan(&name, &id); err != nil {
+			return nil, fmt.Errorf("failed to scan purpose: %w", err)
+		}
+		result[name] = id
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return result, nil
 }

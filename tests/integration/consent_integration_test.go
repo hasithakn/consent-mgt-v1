@@ -58,6 +58,7 @@ func setupTestEnvironment(t *testing.T) *TestEnvironment {
 	auditDAO := dao.NewStatusAuditDAO(db)
 	attributeDAO := dao.NewConsentAttributeDAO(db)
 	authResourceDAO := dao.NewAuthResourceDAO(db)
+	purposeDAO := dao.NewConsentPurposeDAO(db.DB)
 
 	// Initialize services
 	consentService := service.NewConsentService(
@@ -65,6 +66,7 @@ func setupTestEnvironment(t *testing.T) *TestEnvironment {
 		auditDAO,
 		attributeDAO,
 		authResourceDAO,
+		purposeDAO,
 		db,
 		logger,
 	)

@@ -17,22 +17,22 @@ database:
 
 extension:
   enabled: true
-  baseUrl: http://localhost:8080/api/services
+  baseUrl: http://localhost:3005/api/services
   timeout: 30s
   retryAttempts: 3
   endpoints:
     preProcessConsentCreation: /pre-process-consent-creation
-    enrichConsentCreationResponse: /enrich-consent-creation-response
-    preProcessConsentRetrieval: /pre-process-consent-retrieval
+    # enrichConsentCreationResponse: /enrich-consent-creation-response
+    # preProcessConsentRetrieval: /pre-process-consent-retrieval
     preProcessConsentUpdate: /pre-process-consent-update
-    enrichConsentUpdateResponse: /enrich-consent-update-response
-    preProcessConsentRevoke: /pre-process-consent-revoke
-    preProcessConsentFileUpload: /pre-process-consent-file-upload
-    enrichConsentFileResponse: /enrich-consent-file-response
-    validateConsentFileRetrieval: /validate-consent-file-retrieval
-    preProcessConsentFileUpdate: /pre-process-consent-file-update
-    enrichConsentFileUpdateResponse: /enrich-consent-file-update-response
-    mapAcceleratorErrorResponse: /map-accelerator-error-response
+    # enrichConsentUpdateResponse: /enrich-consent-update-response
+    # preProcessConsentRevoke: /pre-process-consent-revoke
+    # preProcessConsentFileUpload: /pre-process-consent-file-upload
+    # enrichConsentFileResponse: /enrich-consent-file-response
+    # validateConsentFileRetrieval: /validate-consent-file-retrieval
+    # preProcessConsentFileUpdate: /pre-process-consent-file-update
+    # enrichConsentFileUpdateResponse: /enrich-consent-file-update-response
+    # mapAcceleratorErrorResponse: /map-accelerator-error-response
 
 logging:
   level: info

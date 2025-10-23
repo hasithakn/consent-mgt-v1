@@ -79,8 +79,8 @@ func setupAPITestEnvironment(t *testing.T) *TestAPIEnvironment {
 		c.Next()
 	})
 
-	// Create handlers
-	consentHandler := handlers.NewConsentHandler(consentService)
+	// Create handlers (pass nil for extension client in tests)
+	consentHandler := handlers.NewConsentHandler(consentService, nil)
 	authResourceHandler := handlers.NewAuthResourceHandler(authResourceService)
 
 	// API v1 routes

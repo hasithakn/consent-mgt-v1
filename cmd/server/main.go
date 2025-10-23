@@ -11,6 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/wso2/consent-management-api/internal/client"
 	"github.com/wso2/consent-management-api/internal/config"
 	"github.com/wso2/consent-management-api/internal/dao"
 	"github.com/wso2/consent-management-api/internal/database"
@@ -98,8 +99,12 @@ func main() {
 
 	logger.Info("Services initialized successfully")
 
+	// Initialize extension client
+	extensionClient := client.NewExtensionClient(&cfg.Extension, logger)
+	logger.WithField("enabled", extensionClient.IsExtensionEnabled()).Info("Extension client initialized")
+
 	// Setup router
-	ginRouter := router.SetupRouter(consentService, authResourceService, purposeService)
+	ginRouter := router.SetupRouter(consentService, authResourceService, purposeService, extensionClient)
 
 	// Configure HTTP server
 	serverAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

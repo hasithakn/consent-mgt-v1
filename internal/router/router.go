@@ -3,6 +3,7 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
+	"github.com/wso2/consent-management-api/internal/client"
 	"github.com/wso2/consent-management-api/internal/handlers"
 	"github.com/wso2/consent-management-api/internal/service"
 	"github.com/wso2/consent-management-api/pkg/utils"
@@ -13,6 +14,7 @@ func SetupRouter(
 	consentService *service.ConsentService,
 	authResourceService *service.AuthResourceService,
 	purposeService *service.ConsentPurposeService,
+	extensionClient *client.ExtensionClient,
 ) *gin.Engine {
 	router := gin.Default()
 
@@ -39,7 +41,7 @@ func SetupRouter(
 	})
 
 	// Create handlers
-	consentHandler := handlers.NewConsentHandler(consentService)
+	consentHandler := handlers.NewConsentHandler(consentService, extensionClient)
 	authResourceHandler := handlers.NewAuthResourceHandler(authResourceService)
 	purposeHandler := handlers.NewConsentPurposeHandler(purposeService)
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/wso2/consent-management-api/internal/client"
 	"github.com/wso2/consent-management-api/internal/models"
 	"github.com/wso2/consent-management-api/internal/service"
 	"github.com/wso2/consent-management-api/pkg/utils"
@@ -12,13 +13,15 @@ import (
 
 // ConsentHandler handles consent-related HTTP requests
 type ConsentHandler struct {
-	consentService *service.ConsentService
+	consentService  *service.ConsentService
+	extensionClient *client.ExtensionClient
 }
 
 // NewConsentHandler creates a new consent handler instance
-func NewConsentHandler(consentService *service.ConsentService) *ConsentHandler {
+func NewConsentHandler(consentService *service.ConsentService, extensionClient *client.ExtensionClient) *ConsentHandler {
 	return &ConsentHandler{
-		consentService: consentService,
+		consentService:  consentService,
+		extensionClient: extensionClient,
 	}
 }
 
@@ -46,6 +49,55 @@ func (h *ConsentHandler) CreateConsent(c *gin.Context) {
 	if err := utils.ValidateRequired("ConsentType", request.ConsentType); err != nil {
 		utils.SendValidationError(c, err.Error())
 		return
+	}
+
+	// Call pre-create consent extension if configured
+	if h.extensionClient != nil {
+		// Extract request headers to pass to extension
+		headers := make(map[string]string)
+		for key, values := range c.Request.Header {
+			if len(values) > 0 {
+				headers[key] = values[0]
+			}
+		}
+
+		extResponse, err := h.extensionClient.PreProcessConsentCreation(c.Request.Context(), request, headers)
+		if err != nil {
+			utils.SendInternalServerError(c, "Extension service error", err.Error())
+			return
+		}
+
+		// Check if extension returned an error
+		if extResponse != nil && extResponse.Status == "ERROR" {
+			errorMessage := "Extension validation failed"
+			if extResponse.ErrorData != nil {
+				if msg, ok := extResponse.ErrorData["errorMessage"].(string); ok {
+					errorMessage = msg
+				}
+			}
+			statusCode := 400
+			if extResponse.ErrorCode != nil {
+				statusCode = *extResponse.ErrorCode
+			}
+			c.JSON(statusCode, gin.H{
+				"error":   errorMessage,
+				"details": extResponse.ErrorData,
+			})
+			return
+		}
+
+		// If extension returned modified consent data, use it
+		if extResponse != nil && extResponse.Data != nil {
+			modifiedRequest := extResponse.Data.ConsentResource.ToConsentCreateRequest()
+			if modifiedRequest != nil {
+				request = modifiedRequest
+			}
+
+			// Store resolved consent purposes if provided (to be used after consent creation)
+			if len(extResponse.Data.ResolvedConsentPurposes) > 0 {
+				utils.SetContextValue(c, "resolvedConsentPurposes", extResponse.Data.ResolvedConsentPurposes)
+			}
+		}
 	}
 
 	// Create consent
@@ -126,6 +178,55 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 	if err != nil {
 		utils.SendBadRequestError(c, "Invalid request format", err.Error())
 		return
+	}
+
+	// Call pre-update consent extension if configured
+	if h.extensionClient != nil {
+		// Extract request headers to pass to extension
+		headers := make(map[string]string)
+		for key, values := range c.Request.Header {
+			if len(values) > 0 {
+				headers[key] = values[0]
+			}
+		}
+
+		extResponse, err := h.extensionClient.PreProcessConsentUpdate(c.Request.Context(), consentID, updateRequest, headers)
+		if err != nil {
+			utils.SendInternalServerError(c, "Extension service error", err.Error())
+			return
+		}
+
+		// Check if extension returned an error
+		if extResponse != nil && extResponse.Status == "ERROR" {
+			errorMessage := "Extension validation failed"
+			if extResponse.ErrorData != nil {
+				if msg, ok := extResponse.ErrorData["errorMessage"].(string); ok {
+					errorMessage = msg
+				}
+			}
+			statusCode := 400
+			if extResponse.ErrorCode != nil {
+				statusCode = *extResponse.ErrorCode
+			}
+			c.JSON(statusCode, gin.H{
+				"error":   errorMessage,
+				"details": extResponse.ErrorData,
+			})
+			return
+		}
+
+		// If extension returned modified consent data, use it
+		if extResponse != nil && extResponse.Data != nil {
+			modifiedRequest := extResponse.Data.ConsentResource.ToConsentUpdateRequest()
+			if modifiedRequest != nil {
+				updateRequest = modifiedRequest
+			}
+
+			// Store resolved consent purposes if provided (to be used after consent update)
+			if len(extResponse.Data.ResolvedConsentPurposes) > 0 {
+				utils.SetContextValue(c, "resolvedConsentPurposes", extResponse.Data.ResolvedConsentPurposes)
+			}
+		}
 	}
 
 	// Update consent via service

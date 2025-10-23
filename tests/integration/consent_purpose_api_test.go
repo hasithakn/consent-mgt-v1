@@ -72,8 +72,8 @@ func setupConsentPurposeAPITestEnvironment(t *testing.T) *TestConsentPurposeAPIE
 		logger,
 	)
 
-	// Setup router
-	ginRouter := router.SetupRouter(consentService, authResourceService, purposeService)
+	// Setup router (pass nil for extension client in tests)
+	ginRouter := router.SetupRouter(consentService, authResourceService, purposeService, nil)
 
 	return &TestConsentPurposeAPIEnvironment{
 		Router:         ginRouter,

@@ -39,6 +39,31 @@ logging:
   format: json
   output: stdout
 
+# Consent status configuration
+consent:
+  # List of allowed consent statuses
+  allowedStatuses:
+    - CREATED
+    - awaitingAuthorization
+    - AUTHORIZED
+    - ACTIVE
+    - REJECTED
+    - REVOKED
+    - EXPIRED
+  
+  # Status mappings for specific consent lifecycle states
+  statusMappings:
+    # Status representing an active/authorized consent
+    activeStatus: AUTHORIZED
+    # Status representing an expired consent
+    expiredStatus: EXPIRED
+    # Status representing a revoked consent
+    revokedStatus: REVOKED
+    # Status representing a created consent
+    createdStatus: CREATED
+    # Status representing a rejected consent
+    rejectedStatus: REJECTED
+  
 security:
   basicAuth:
     enabled: true

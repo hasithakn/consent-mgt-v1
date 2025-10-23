@@ -13,6 +13,7 @@ type Config struct {
 	Database  DatabaseConfig  `mapstructure:"database"`
 	Extension ExtensionConfig `mapstructure:"extension"`
 	Logging   LoggingConfig   `mapstructure:"logging"`
+	Consent   ConsentConfig   `mapstructure:"consent"`
 	Security  SecurityConfig  `mapstructure:"security"`
 	CORS      CORSConfig      `mapstructure:"cors"`
 }
@@ -68,6 +69,21 @@ type LoggingConfig struct {
 	Level  string `mapstructure:"level"`
 	Format string `mapstructure:"format"`
 	Output string `mapstructure:"output"`
+}
+
+// ConsentConfig holds consent-related configuration
+type ConsentConfig struct {
+	AllowedStatuses []string              `mapstructure:"allowedStatuses"`
+	StatusMappings  ConsentStatusMappings `mapstructure:"statusMappings"`
+}
+
+// ConsentStatusMappings holds the mapping of specific consent lifecycle states
+type ConsentStatusMappings struct {
+	ActiveStatus   string `mapstructure:"activeStatus"`
+	ExpiredStatus  string `mapstructure:"expiredStatus"`
+	RevokedStatus  string `mapstructure:"revokedStatus"`
+	CreatedStatus  string `mapstructure:"createdStatus"`
+	RejectedStatus string `mapstructure:"rejectedStatus"`
 }
 
 // SecurityConfig holds security configuration
@@ -157,12 +173,54 @@ func validateConfig(config *Config) error {
 		return fmt.Errorf("extension base URL is required when extension is enabled")
 	}
 
+	// Validate consent configuration
+	if len(config.Consent.AllowedStatuses) == 0 {
+		return fmt.Errorf("at least one allowed consent status is required")
+	}
+
+	if config.Consent.StatusMappings.ActiveStatus == "" {
+		return fmt.Errorf("active status mapping is required")
+	}
+
+	if config.Consent.StatusMappings.ExpiredStatus == "" {
+		return fmt.Errorf("expired status mapping is required")
+	}
+
+	if config.Consent.StatusMappings.RevokedStatus == "" {
+		return fmt.Errorf("revoked status mapping is required")
+	}
+
+	// Verify that mapped statuses exist in allowed statuses
+	mappedStatuses := []string{
+		config.Consent.StatusMappings.ActiveStatus,
+		config.Consent.StatusMappings.ExpiredStatus,
+		config.Consent.StatusMappings.RevokedStatus,
+		config.Consent.StatusMappings.CreatedStatus,
+		config.Consent.StatusMappings.RejectedStatus,
+	}
+
+	allowedStatusMap := make(map[string]bool)
+	for _, status := range config.Consent.AllowedStatuses {
+		allowedStatusMap[status] = true
+	}
+
+	for _, mappedStatus := range mappedStatuses {
+		if mappedStatus != "" && !allowedStatusMap[mappedStatus] {
+			return fmt.Errorf("mapped status '%s' not found in allowedStatuses", mappedStatus)
+		}
+	}
+
 	return nil
 }
 
 // Get returns the global configuration
 func Get() *Config {
 	return globalConfig
+}
+
+// SetGlobal sets the global configuration (for testing purposes)
+func SetGlobal(cfg *Config) {
+	globalConfig = cfg
 }
 
 // GetDSN returns the database connection string
@@ -199,4 +257,51 @@ func (s *SecurityConfig) ValidateUser(username, password string) bool {
 		}
 	}
 	return false
+}
+
+// IsStatusAllowed checks if a given status is in the allowed statuses list
+func (c *ConsentConfig) IsStatusAllowed(status string) bool {
+	for _, allowedStatus := range c.AllowedStatuses {
+		if allowedStatus == status {
+			return true
+		}
+	}
+	return false
+}
+
+// IsActiveStatus checks if the given status represents an active consent
+func (c *ConsentConfig) IsActiveStatus(status string) bool {
+	return status == c.StatusMappings.ActiveStatus
+}
+
+// IsExpiredStatus checks if the given status represents an expired consent
+func (c *ConsentConfig) IsExpiredStatus(status string) bool {
+	return status == c.StatusMappings.ExpiredStatus
+}
+
+// IsRevokedStatus checks if the given status represents a revoked consent
+func (c *ConsentConfig) IsRevokedStatus(status string) bool {
+	return status == c.StatusMappings.RevokedStatus
+}
+
+// IsCreatedStatus checks if the given status represents a created consent
+func (c *ConsentConfig) IsCreatedStatus(status string) bool {
+	return status == c.StatusMappings.CreatedStatus
+}
+
+// IsRejectedStatus checks if the given status represents a rejected consent
+func (c *ConsentConfig) IsRejectedStatus(status string) bool {
+	return status == c.StatusMappings.RejectedStatus
+}
+
+// IsTerminalStatus checks if the given status is a terminal state (expired or revoked)
+func (c *ConsentConfig) IsTerminalStatus(status string) bool {
+	return c.IsExpiredStatus(status) || c.IsRevokedStatus(status)
+}
+
+// GetAllowedStatuses returns a copy of the allowed statuses list
+func (c *ConsentConfig) GetAllowedStatuses() []string {
+	statuses := make([]string, len(c.AllowedStatuses))
+	copy(statuses, c.AllowedStatuses)
+	return statuses
 }

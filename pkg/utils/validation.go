@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/wso2/consent-management-api/internal/config"
 )
 
 // ValidateConsentID validates consent ID format
@@ -39,24 +41,20 @@ func ValidateOrgID(orgID string) error {
 	return nil
 }
 
-// ValidateStatus validates consent status
+// ValidateStatus validates consent status against configured allowed statuses
 func ValidateStatus(status string) error {
 	if status == "" {
 		return fmt.Errorf("status cannot be empty")
 	}
 
-	validStatuses := map[string]bool{
-		"CREATED":               true,
-		"awaitingAuthorization": true,
-		"AUTHORIZED":            true,
-		"ACTIVE":                true,
-		"REJECTED":              true,
-		"REVOKED":               true,
-		"EXPIRED":               true,
+	cfg := config.Get()
+	if cfg == nil {
+		return fmt.Errorf("configuration not loaded")
 	}
 
-	if !validStatuses[status] {
-		return fmt.Errorf("invalid status: %s", status)
+	if !cfg.Consent.IsStatusAllowed(status) {
+		return fmt.Errorf("invalid status: %s, allowed statuses: %v",
+			status, cfg.Consent.GetAllowedStatuses())
 	}
 
 	return nil

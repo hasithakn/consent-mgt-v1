@@ -380,3 +380,21 @@ func (s *ConsentPurposeService) buildPurposeResponse(purpose *models.ConsentPurp
 		Description: purpose.Description,
 	}
 }
+
+// ExistsByName checks if a purpose with the given name exists in the organization
+func (s *ConsentPurposeService) ExistsByName(ctx context.Context, name, orgID string) (bool, error) {
+	if name == "" {
+		return false, fmt.Errorf("purpose name is required")
+	}
+	if orgID == "" {
+		return false, fmt.Errorf("organization ID is required")
+	}
+
+	exists, err := s.purposeDAO.ExistsByName(ctx, name, orgID)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to check purpose name existence")
+		return false, fmt.Errorf("failed to check purpose existence: %w", err)
+	}
+
+	return exists, nil
+}

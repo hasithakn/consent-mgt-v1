@@ -41,7 +41,7 @@ func SetupRouter(
 	})
 
 	// Create handlers
-	consentHandler := handlers.NewConsentHandler(consentService, extensionClient)
+	consentHandler := handlers.NewConsentHandler(consentService, purposeService, extensionClient)
 	authResourceHandler := handlers.NewAuthResourceHandler(authResourceService)
 	purposeHandler := handlers.NewConsentPurposeHandler(purposeService)
 

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -13,16 +15,38 @@ import (
 
 // ConsentHandler handles consent-related HTTP requests
 type ConsentHandler struct {
-	consentService  *service.ConsentService
-	extensionClient *client.ExtensionClient
+	consentService        *service.ConsentService
+	consentPurposeService *service.ConsentPurposeService
+	extensionClient       *client.ExtensionClient
 }
 
 // NewConsentHandler creates a new consent handler instance
-func NewConsentHandler(consentService *service.ConsentService, extensionClient *client.ExtensionClient) *ConsentHandler {
+func NewConsentHandler(consentService *service.ConsentService, consentPurposeService *service.ConsentPurposeService, extensionClient *client.ExtensionClient) *ConsentHandler {
 	return &ConsentHandler{
-		consentService:  consentService,
-		extensionClient: extensionClient,
+		consentService:        consentService,
+		consentPurposeService: consentPurposeService,
+		extensionClient:       extensionClient,
 	}
+}
+
+// validateResolvedConsentPurposes validates that all resolved consent purposes exist in the organization
+func (h *ConsentHandler) validateResolvedConsentPurposes(ctx context.Context, purposeNames []string, orgID string) error {
+	if len(purposeNames) == 0 {
+		return nil
+	}
+
+	// Check each purpose name exists in the organization
+	for _, purposeName := range purposeNames {
+		exists, err := h.consentPurposeService.ExistsByName(ctx, purposeName, orgID)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return fmt.Errorf("consent purpose '%s' does not exist in organization", purposeName)
+		}
+	}
+
+	return nil
 }
 
 // CreateConsent handles POST /consents
@@ -93,8 +117,14 @@ func (h *ConsentHandler) CreateConsent(c *gin.Context) {
 				request = modifiedRequest
 			}
 
-			// Store resolved consent purposes if provided (to be used after consent creation)
+			// Validate resolved consent purposes if provided
 			if len(extResponse.Data.ResolvedConsentPurposes) > 0 {
+				if err := h.validateResolvedConsentPurposes(c.Request.Context(), extResponse.Data.ResolvedConsentPurposes, orgID); err != nil {
+					utils.SendBadRequestError(c, "Invalid consent purposes from extension", err.Error())
+					return
+				}
+
+				// Store resolved consent purposes if provided (to be used after consent creation)
 				utils.SetContextValue(c, "resolvedConsentPurposes", extResponse.Data.ResolvedConsentPurposes)
 			}
 		}
@@ -222,8 +252,14 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 				updateRequest = modifiedRequest
 			}
 
-			// Store resolved consent purposes if provided (to be used after consent update)
+			// Validate resolved consent purposes if provided
 			if len(extResponse.Data.ResolvedConsentPurposes) > 0 {
+				if err := h.validateResolvedConsentPurposes(c.Request.Context(), extResponse.Data.ResolvedConsentPurposes, orgID); err != nil {
+					utils.SendBadRequestError(c, "Invalid consent purposes from extension", err.Error())
+					return
+				}
+
+				// Store resolved consent purposes if provided (to be used after consent update)
 				utils.SetContextValue(c, "resolvedConsentPurposes", extResponse.Data.ResolvedConsentPurposes)
 			}
 		}

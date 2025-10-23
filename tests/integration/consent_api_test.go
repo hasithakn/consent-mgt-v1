@@ -54,10 +54,12 @@ func setupAPITestEnvironment(t *testing.T) *TestAPIEnvironment {
 	attributeDAO := dao.NewConsentAttributeDAO(db)
 	fileDAO := dao.NewConsentFileDAO(db)
 	authResourceDAO := dao.NewAuthResourceDAO(db)
+	consentPurposeDAO := dao.NewConsentPurposeDAO(db.DB)
 
 	// Create services
 	consentService := service.NewConsentService(consentDAO, statusAuditDAO, attributeDAO, authResourceDAO, db, logger)
 	authResourceService := service.NewAuthResourceService(authResourceDAO, consentDAO, db, logger)
+	consentPurposeService := service.NewConsentPurposeService(consentPurposeDAO, consentDAO, db.DB, logger)
 
 	// Create router
 	gin.SetMode(gin.TestMode)
@@ -80,7 +82,7 @@ func setupAPITestEnvironment(t *testing.T) *TestAPIEnvironment {
 	})
 
 	// Create handlers (pass nil for extension client in tests)
-	consentHandler := handlers.NewConsentHandler(consentService, nil)
+	consentHandler := handlers.NewConsentHandler(consentService, consentPurposeService, nil)
 	authResourceHandler := handlers.NewAuthResourceHandler(authResourceService)
 
 	// API v1 routes

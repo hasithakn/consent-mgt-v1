@@ -397,3 +397,28 @@ func (resp *ConsentResponse) ToAPIResponse() *ConsentAPIResponse {
 
 	return apiResp
 }
+
+// ValidateRequest represents the payload for validation API
+type ValidateRequest struct {
+	Headers         map[string]interface{} `json:"headers"`
+	Payload         map[string]interface{} `json:"payload"`
+	ElectedResource string                 `json:"electedResource"`
+	ConsentID       string                 `json:"consentId"`
+	UserID          string                 `json:"userId"`
+	ClientID        string                 `json:"clientId"`
+	ResourceParams  struct {
+		Resource   string `json:"resource"`
+		HTTPMethod string `json:"httpMethod"`
+		Context    string `json:"context"`
+	} `json:"resourceParams"`
+}
+
+// ValidateResponse represents the response for validation API
+type ValidateResponse struct {
+	IsValid            bool                   `json:"isValid"`
+	ModifiedPayload    interface{}            `json:"modifiedPayload"`
+	ErrorCode          string                 `json:"errorCode,omitempty"`
+	ErrorMessage       string                 `json:"errorMessage,omitempty"`
+	HTTPCode           string                 `json:"httpCode,omitempty"`
+	ConsentInformation map[string]interface{} `json:"consentInformation"`
+}

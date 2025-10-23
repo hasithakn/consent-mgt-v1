@@ -67,6 +67,9 @@ func SetupRouter(
 			consents.GET("/:consentId/authorizations/:authId", authResourceHandler.GetAuthResource)
 			consents.PUT("/:consentId/authorizations/:authId", authResourceHandler.UpdateAuthResource)
 		}
+
+		// Validation endpoint
+		v1.POST("/validate", consentHandler.Validate)
 	}
 
 	return router

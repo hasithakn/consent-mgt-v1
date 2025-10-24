@@ -29,12 +29,31 @@ func ParseTime(timeStr string) (time.Time, error) {
 	return time.Parse(time.RFC3339, timeStr)
 }
 
-// IsExpired checks if a given validity time (in millis) has expired
+// IsExpired checks if a given validity time has expired
+// Automatically detects if the time is in seconds or milliseconds
+// Timestamps in seconds: ~10 digits (e.g., 1729756800 for year 2024)
+// Timestamps in milliseconds: ~13 digits (e.g., 1729756800000 for year 2024)
 func IsExpired(validityTime int64) bool {
 	if validityTime == 0 {
 		return false // No expiry set
 	}
-	return GetCurrentTimeMillis() > validityTime
+
+	// Detect if timestamp is in seconds or milliseconds
+	// A reasonable cutoff: timestamps > 10^11 are likely in milliseconds
+	// This works until year 5138 in seconds (safely covers our use case)
+	const timestampCutoff = 100000000000 // 10^11
+
+	var validityTimeMillis int64
+	if validityTime < timestampCutoff {
+		// Timestamp is in seconds, convert to milliseconds
+		validityTimeMillis = validityTime * 1000
+	} else {
+		// Timestamp is already in milliseconds
+		validityTimeMillis = validityTime
+	}
+
+	currentTimeMillis := GetCurrentTimeMillis()
+	return currentTimeMillis > validityTimeMillis
 }
 
 // GetExpiryTime calculates expiry time from current time and duration in seconds

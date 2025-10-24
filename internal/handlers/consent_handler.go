@@ -324,7 +324,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 			HTTPCode:           "400",
 			ConsentInformation: map[string]interface{}{},
 		}
-		c.JSON(400, response)
+		c.JSON(200, response)
 		return
 	}
 
@@ -338,7 +338,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 			HTTPCode:           "400",
 			ConsentInformation: map[string]interface{}{},
 		}
-		c.JSON(400, response)
+		c.JSON(200, response)
 		return
 	}
 
@@ -351,7 +351,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 			HTTPCode:           "400",
 			ConsentInformation: map[string]interface{}{},
 		}
-		c.JSON(400, response)
+		c.JSON(200, response)
 		return
 	}
 
@@ -364,7 +364,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 			HTTPCode:           "400",
 			ConsentInformation: map[string]interface{}{},
 		}
-		c.JSON(400, response)
+		c.JSON(200, response)
 		return
 	}
 
@@ -378,7 +378,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 			HTTPCode:           "400",
 			ConsentInformation: map[string]interface{}{},
 		}
-		c.JSON(400, response)
+		c.JSON(200, response)
 		return
 	}
 
@@ -398,7 +398,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 				HTTPCode:           "404",
 				ConsentInformation: map[string]interface{}{},
 			}
-			c.JSON(404, response)
+			c.JSON(200, response)
 			return
 		}
 
@@ -411,7 +411,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 			HTTPCode:           "500",
 			ConsentInformation: map[string]interface{}{},
 		}
-		c.JSON(500, response)
+		c.JSON(200, response)
 		return
 	}
 
@@ -426,7 +426,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 			HTTPCode:           "500",
 			ConsentInformation: map[string]interface{}{},
 		}
-		c.JSON(500, response)
+		c.JSON(200, response)
 		return
 	}
 
@@ -443,7 +443,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 				"status":    consent.CurrentStatus,
 			},
 		}
-		c.JSON(401, response)
+		c.JSON(200, response)
 		return
 	}
 
@@ -451,12 +451,12 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 	if consent.ValidityTime != nil && utils.IsExpired(*consent.ValidityTime) {
 		// Consent has expired - update the status to expired in DB
 		expiredStatus := cfg.Consent.StatusMappings.ExpiredStatus
-		
+
 		// Create update request with expired status
 		updateRequest := &models.ConsentUpdateRequest{
 			CurrentStatus: expiredStatus,
 		}
-		
+
 		// Update the consent status to expired
 		updatedConsent, err := h.consentService.UpdateConsent(c.Request.Context(), req.ConsentID, orgID, updateRequest)
 		if err != nil {
@@ -473,10 +473,10 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 					"validityTime": consent.ValidityTime,
 				},
 			}
-			c.JSON(401, response)
+			c.JSON(200, response)
 			return
 		}
-		
+
 		// Return expired response with updated consent data
 		response := models.ValidateResponse{
 			IsValid:         false,
@@ -490,7 +490,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 				"validityTime": updatedConsent.ValidityTime,
 			},
 		}
-		c.JSON(401, response)
+		c.JSON(200, response)
 		return
 	}
 

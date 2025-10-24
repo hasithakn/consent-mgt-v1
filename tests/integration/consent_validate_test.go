@@ -232,7 +232,7 @@ func TestValidateConsent_InvalidStatus(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	// Assert response
-	assert.Equal(t, http.StatusUnauthorized, w.Code, "Expected 401 Unauthorized for non-active consent")
+	assert.Equal(t, http.StatusOK, w.Code, "Expected 200 OK")
 
 	var response models.ValidateResponse
 	err = json.Unmarshal(w.Body.Bytes(), &response)
@@ -298,7 +298,7 @@ func TestValidateConsent_ExpiredConsent(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	// Assert response
-	assert.Equal(t, http.StatusUnauthorized, w.Code, "Expected 401 Unauthorized for expired consent")
+	assert.Equal(t, http.StatusOK, w.Code, "Expected 200 OK")
 
 	var response models.ValidateResponse
 	err = json.Unmarshal(w.Body.Bytes(), &response)
@@ -347,7 +347,7 @@ func TestValidateConsent_NotFound(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	// Assert response
-	assert.Equal(t, http.StatusNotFound, w.Code, "Expected 404 Not Found")
+	assert.Equal(t, http.StatusOK, w.Code, "Expected 200 OK")
 
 	var response models.ValidateResponse
 	err = json.Unmarshal(w.Body.Bytes(), &response)
@@ -388,7 +388,7 @@ func TestValidateConsent_MissingConsentID(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	// Assert response
-	assert.Equal(t, http.StatusBadRequest, w.Code, "Expected 400 Bad Request")
+	assert.Equal(t, http.StatusOK, w.Code, "Expected 200 OK")
 
 	var response models.ValidateResponse
 	err = json.Unmarshal(w.Body.Bytes(), &response)
@@ -429,7 +429,7 @@ func TestValidateConsent_MissingUserID(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	// Assert response
-	assert.Equal(t, http.StatusBadRequest, w.Code, "Expected 400 Bad Request")
+	assert.Equal(t, http.StatusOK, w.Code, "Expected 200 OK")
 
 	var response models.ValidateResponse
 	err = json.Unmarshal(w.Body.Bytes(), &response)
@@ -463,7 +463,7 @@ func TestValidateConsent_MissingResourceParams(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	// Assert response
-	assert.Equal(t, http.StatusBadRequest, w.Code, "Expected 400 Bad Request")
+	assert.Equal(t, http.StatusOK, w.Code, "Expected 200 OK")
 
 	var response models.ValidateResponse
 	err = json.Unmarshal(w.Body.Bytes(), &response)
@@ -488,7 +488,7 @@ func TestValidateConsent_InvalidJSON(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	// Assert response
-	assert.Equal(t, http.StatusBadRequest, w.Code, "Expected 400 Bad Request")
+	assert.Equal(t, http.StatusOK, w.Code, "Expected 200 OK")
 
 	var response models.ValidateResponse
 	err := json.Unmarshal(w.Body.Bytes(), &response)

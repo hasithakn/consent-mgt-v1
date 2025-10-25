@@ -56,7 +56,7 @@ consent-mgt-v1/
 │   ├── config.dev.yaml
 │   └── config.prod.yaml
 ├── migrations/              # Database migration scripts
-│   └── 001_initial_schema.sql
+│   └── db_schema_mysql.sql
 ├── tests/
 │   ├── dao/                 # DAO unit tests
 │   ├── service/             # Service unit tests

@@ -25,3 +25,9 @@ type ConsentAttributeResponse struct {
 	Attributes map[string]string `json:"attributes"`
 	OrgID      string            `json:"orgId"`
 }
+
+// ConsentAttributeSearchResponse represents the response for attribute search
+type ConsentAttributeSearchResponse struct {
+	ConsentIDs []string `json:"consentIds"`
+	Count      int      `json:"count"`
+}

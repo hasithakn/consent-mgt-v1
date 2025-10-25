@@ -17,7 +17,7 @@ database:
 
 extension:
   enabled: true
-  baseUrl: http://localhost:3005/api/services
+  baseUrl: http://localhost:3001/api/services
   timeout: 30s
   retryAttempts: 3
   endpoints:

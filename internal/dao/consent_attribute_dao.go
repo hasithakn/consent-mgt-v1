@@ -235,3 +235,39 @@ func (dao *ConsentAttributeDAO) AttributeExists(ctx context.Context, consentID, 
 
 	return exists, nil
 }
+
+// FindConsentIDsByAttributeKey finds all consent IDs that have a specific attribute key
+func (dao *ConsentAttributeDAO) FindConsentIDsByAttributeKey(ctx context.Context, key, orgID string) ([]string, error) {
+	query := `
+		SELECT DISTINCT CONSENT_ID
+		FROM FS_CONSENT_ATTRIBUTE
+		WHERE ATT_KEY = ? AND ORG_ID = ?
+		ORDER BY CONSENT_ID
+	`
+
+	var consentIDs []string
+	err := dao.db.SelectContext(ctx, &consentIDs, query, key, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find consent IDs by attribute key: %w", err)
+	}
+
+	return consentIDs, nil
+}
+
+// FindConsentIDsByAttribute finds all consent IDs that have a specific attribute key-value pair
+func (dao *ConsentAttributeDAO) FindConsentIDsByAttribute(ctx context.Context, key, value, orgID string) ([]string, error) {
+	query := `
+		SELECT DISTINCT CONSENT_ID
+		FROM FS_CONSENT_ATTRIBUTE
+		WHERE ATT_KEY = ? AND ATT_VALUE = ? AND ORG_ID = ?
+		ORDER BY CONSENT_ID
+	`
+
+	var consentIDs []string
+	err := dao.db.SelectContext(ctx, &consentIDs, query, key, value, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find consent IDs by attribute: %w", err)
+	}
+
+	return consentIDs, nil
+}

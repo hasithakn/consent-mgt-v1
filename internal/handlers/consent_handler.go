@@ -521,3 +521,34 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 	}
 	c.JSON(200, response)
 }
+
+// SearchConsentsByAttribute handles GET /consents/attributes
+func (h *ConsentHandler) SearchConsentsByAttribute(c *gin.Context) {
+	// Get query parameters
+	key := c.Query("key")
+	value := c.Query("value")
+
+	// Validate that key is provided
+	if key == "" {
+		utils.SendBadRequestError(c, "Invalid request", "key parameter is required")
+		return
+	}
+
+	// Get orgID from context
+	orgID := utils.GetOrgIDFromContext(c)
+
+	// Search for consent IDs
+	consentIDs, err := h.consentService.SearchConsentIDsByAttribute(c.Request.Context(), key, value, orgID)
+	if err != nil {
+		utils.SendInternalServerError(c, "Failed to search consents by attribute", err.Error())
+		return
+	}
+
+	// Build response
+	response := models.ConsentAttributeSearchResponse{
+		ConsentIDs: consentIDs,
+		Count:      len(consentIDs),
+	}
+
+	utils.SendOKResponse(c, response)
+}

@@ -62,6 +62,9 @@ func SetupRouter(
 			consents.GET("/:consentId", consentHandler.GetConsent)
 			consents.PUT("/:consentId", consentHandler.UpdateConsent)
 
+			// Attribute search endpoint
+			consents.GET("/attributes", consentHandler.SearchConsentsByAttribute)
+
 			// Authorization resource routes under consent
 			consents.POST("/:consentId/authorizations", authResourceHandler.CreateAuthResource)
 			consents.GET("/:consentId/authorizations/:authId", authResourceHandler.GetAuthResource)

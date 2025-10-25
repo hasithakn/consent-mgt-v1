@@ -542,3 +542,39 @@ func (s *ConsentService) buildConsentResponse(consent *models.Consent, attribute
 		AuthResources:              authResourceResponses,
 	}
 }
+
+// SearchConsentIDsByAttribute searches for consent IDs by attribute key and/or value
+func (s *ConsentService) SearchConsentIDsByAttribute(ctx context.Context, key, value, orgID string) ([]string, error) {
+	// Validate that key is provided
+	if key == "" {
+		return nil, fmt.Errorf("attribute key is required")
+	}
+
+	// Validate orgID
+	if orgID == "" {
+		return nil, fmt.Errorf("organization ID is required")
+	}
+
+	var consentIDs []string
+	var err error
+
+	// Search based on parameters
+	if value == "" {
+		// Search by key only
+		consentIDs, err = s.attributeDAO.FindConsentIDsByAttributeKey(ctx, key, orgID)
+	} else {
+		// Search by key and value
+		consentIDs, err = s.attributeDAO.FindConsentIDsByAttribute(ctx, key, value, orgID)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to search consent IDs by attribute: %w", err)
+	}
+
+	// Return empty slice instead of nil if no results
+	if consentIDs == nil {
+		consentIDs = []string{}
+	}
+
+	return consentIDs, nil
+}

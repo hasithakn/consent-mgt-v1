@@ -705,6 +705,118 @@ paths:
                 $ref: "#/components/schemas/ConsentErrorCommon" 
       security:
         - basicAuth: []
+  /validate:
+    post:
+      summary: Validate a consent for a specific action
+      description: |
+        Validates whether a consent is valid and active for a specific user action or API request.
+        
+        This endpoint checks:
+        - If the consent exists and belongs to the specified user
+        - If the consent status is active (AUTHORIZED, ACTIVE, etc.)
+        - If the consent has not expired based on validityTime
+        - Optionally validates resource parameters against consent scope
+        
+        If the consent has expired, the endpoint automatically updates the consent status to EXPIRED.
+        
+        **Note:** All responses return HTTP 200. Check the `isValid` field and `httpCode` in the response body to determine the actual validation result.
+      operationId: validate-POST
+      tags:
+        - Consent
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: "The unique identifier for the organization."
+          schema:
+            type: string
+        - in: header
+          name: client-id
+          required: true
+          description: "The client ID of the application making the validation request."
+          schema:
+            type: string
+      requestBody:
+        description: The validation request containing consent details and the action being validated.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValidateRequest"
+      responses:
+        "200":
+          description: |
+            Validation completed. Check the `isValid` field in the response body.
+            - If `isValid: true`, the consent is valid for the requested action
+            - If `isValid: false`, check `errorCode`, `errorMessage`, and `httpCode` for details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateResponse"
+      security:
+        - basicAuth: []
+  /consents/attributes:
+    get:
+      summary: Search consents by attribute key and value
+      description: |
+        Searches for consent IDs that have a specific attribute key, optionally filtered by value.
+        
+        **Search Modes:**
+        - **By key only** (`?key=department`): Returns all consents with the specified attribute key
+        - **By key and value** (`?key=department&value=sales`): Returns consents with exact key-value match
+        
+        Results are organization-scoped and sorted by consent ID.
+      operationId: consents-attributes-GET
+      tags:
+        - Consent
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: "The unique identifier for the organization."
+          schema:
+            type: string
+        - in: header
+          name: client-id
+          required: true
+          description: "The client ID of the application making the request."
+          schema:
+            type: string
+        - name: key
+          in: query
+          required: true
+          description: The attribute key to search for (required).
+          schema:
+            type: string
+          example: "department"
+        - name: value
+          in: query
+          required: false
+          description: The attribute value to search for (optional). If provided, only consents with exact key-value match are returned.
+          schema:
+            type: string
+          example: "sales"
+      responses:
+        "200":
+          description: Successfully retrieved consent IDs matching the search criteria.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentAttributeSearchResponse"
+        "400":
+          description: Bad Request. The key parameter is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+        "500":
+          description: Internal Server Error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+      security:
+        - basicAuth: []
 components:
   schemas:
     File:
@@ -1234,6 +1346,111 @@ components:
         resource:
           description: Additional resource data related to the authorization.
           type: object
+    ValidateRequest:
+      type: object
+      description: Request payload for validating a consent for a specific action.
+      required:
+        - consentId
+        - userId
+        - resourceParams
+      properties:
+        consentId:
+          description: The unique identifier of the consent to validate.
+          type: string
+          example: "CNT_123456"
+        userId:
+          description: The unique identifier of the user performing the action.
+          type: string
+          example: "user123"
+        clientId:
+          description: The client ID of the application making the request.
+          type: string
+          example: "banking-app-001"
+        headers:
+          description: Optional headers from the actual API request being validated.
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            Authorization: "Bearer token123"
+            x-request-id: "req-456"
+        payload:
+          description: Optional payload from the actual API request being validated.
+          type: object
+          example:
+            accountId: "ACC-789"
+            fromDate: "2025-01-01"
+            toDate: "2025-10-26"
+        electedResource:
+          description: The resource the user is trying to access.
+          type: string
+          example: "account-transactions"
+        resourceParams:
+          description: Parameters describing the specific action being validated.
+          type: object
+          required:
+            - resource
+            - httpMethod
+          properties:
+            resource:
+              description: The API resource path being accessed.
+              type: string
+              example: "/accounts/ACC-789/transactions"
+            httpMethod:
+              description: The HTTP method of the request.
+              type: string
+              example: "GET"
+            context:
+              description: Additional context about the request.
+              type: string
+              example: "transaction-history"
+    ValidateResponse:
+      type: object
+      description: Response payload from consent validation.
+      properties:
+        isValid:
+          description: Whether the consent is valid for the requested action.
+          type: boolean
+          example: true
+        modifiedPayload:
+          description: Optional modified payload if the consent requires transformation of the request.
+          type: object
+          nullable: true
+        errorCode:
+          description: Error code if validation failed (e.g., "Unauthorized", "Expired", "NotFound").
+          type: string
+          example: "Unauthorized"
+        errorMessage:
+          description: Human-readable error message if validation failed.
+          type: string
+          example: "Consent is not in active state"
+        httpCode:
+          description: The HTTP status code that should be returned to the client (as string).
+          type: string
+          example: "401"
+        consentInformation:
+          description: Full consent details if validation succeeded, or partial details if failed.
+          type: object
+          additionalProperties: true
+          example:
+            consentId: "CNT_123456"
+            status: "AUTHORIZED"
+            type: "accounts"
+            validityTime: 1768401854787
+    ConsentAttributeSearchResponse:
+      type: object
+      description: Response payload containing consent IDs matching the attribute search criteria.
+      properties:
+        consentIds:
+          description: Array of consent IDs that match the search criteria, sorted alphabetically.
+          type: array
+          items:
+            type: string
+          example: ["CNT_001", "CNT_002", "CNT_003"]
+        count:
+          description: The number of consent IDs returned.
+          type: integer
+          example: 3
   securitySchemes:
     basicAuth:
       type: http

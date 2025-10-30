@@ -179,16 +179,6 @@ CONFIG_PATH=configs/config.yaml ./consent-api-server
 
 Press `Ctrl+C` to gracefully shutdown
 
-## 🐳 Docker Deployment
-
-```bash
-# Build and start services
-docker-compose up --build
-
-# Stop services
-docker-compose down
-```
-
 ## 🧪 Testing
 
 ### Run All Tests

@@ -251,8 +251,8 @@ func TestValidateLimit(t *testing.T) {
 		expected int
 	}{
 		{"Valid limit", 50, 50},
-		{"Zero limit", 0, 10},
-		{"Negative limit", -5, 10},
+		{"Zero limit", 0, 20},      // Default limit is 20
+		{"Negative limit", -5, 20}, // Default limit is 20
 		{"Exceeds max", 150, 100},
 		{"Max limit", 100, 100},
 	}

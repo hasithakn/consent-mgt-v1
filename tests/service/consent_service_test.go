@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wso2/consent-management-api/internal/config"
 	"github.com/wso2/consent-management-api/internal/models"
 	"github.com/wso2/consent-management-api/pkg/utils"
 )
@@ -35,6 +36,29 @@ func TestConsentIDGeneration(t *testing.T) {
 
 // TestConsentStatusValidation tests consent status validation
 func TestConsentStatusValidation(t *testing.T) {
+	// Setup: Initialize test configuration
+	cfg := &config.Config{
+		Consent: config.ConsentConfig{
+			AllowedStatuses: []string{
+				"CREATED",
+				"awaitingAuthorization",
+				"AUTHORIZED",
+				"ACTIVE",
+				"REJECTED",
+				"REVOKED",
+				"EXPIRED",
+			},
+			StatusMappings: config.ConsentStatusMappings{
+				ActiveStatus:   "AUTHORIZED",
+				ExpiredStatus:  "EXPIRED",
+				RevokedStatus:  "REVOKED",
+				CreatedStatus:  "CREATED",
+				RejectedStatus: "REJECTED",
+			},
+		},
+	}
+	config.SetGlobal(cfg)
+
 	validStatuses := []string{
 		"CREATED",
 		"AUTHORIZED",

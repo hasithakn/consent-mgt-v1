@@ -14,13 +14,13 @@ func TestIsExpired_Milliseconds(t *testing.T) {
 	}{
 		{
 			name:         "Future time in milliseconds",
-			validityTime: time.Now().Add(1 * time.Hour).UnixNano() / int64(time.Millisecond),
+			validityTime: time.Now().Add(1*time.Hour).UnixNano() / int64(time.Millisecond),
 			expected:     false,
 			description:  "Should not be expired for future time in milliseconds",
 		},
 		{
 			name:         "Past time in milliseconds",
-			validityTime: time.Now().Add(-1 * time.Hour).UnixNano() / int64(time.Millisecond),
+			validityTime: time.Now().Add(-1*time.Hour).UnixNano() / int64(time.Millisecond),
 			expected:     true,
 			description:  "Should be expired for past time in milliseconds",
 		},
@@ -76,10 +76,10 @@ func TestIsExpired_Seconds(t *testing.T) {
 func TestIsExpired_MixedFormats(t *testing.T) {
 	// Test that both formats work correctly
 	futureTimeSeconds := time.Now().Add(24 * time.Hour).Unix()
-	futureTimeMillis := time.Now().Add(24 * time.Hour).UnixNano() / int64(time.Millisecond)
+	futureTimeMillis := time.Now().Add(24*time.Hour).UnixNano() / int64(time.Millisecond)
 
 	pastTimeSeconds := time.Now().Add(-24 * time.Hour).Unix()
-	pastTimeMillis := time.Now().Add(-24 * time.Hour).UnixNano() / int64(time.Millisecond)
+	pastTimeMillis := time.Now().Add(-24*time.Hour).UnixNano() / int64(time.Millisecond)
 
 	tests := []struct {
 		name         string
@@ -108,15 +108,15 @@ func TestIsExpired_MixedFormats(t *testing.T) {
 
 func TestGetCurrentTimeMillis(t *testing.T) {
 	now := GetCurrentTimeMillis()
-	
+
 	// Should be a reasonable timestamp (after 2020 and before 2100)
 	minTime := int64(1577836800000) // 2020-01-01 in milliseconds
 	maxTime := int64(4102444800000) // 2100-01-01 in milliseconds
-	
+
 	if now < minTime || now > maxTime {
 		t.Errorf("GetCurrentTimeMillis() = %d, expected between %d and %d", now, minTime, maxTime)
 	}
-	
+
 	// Should be ~13 digits (milliseconds since epoch)
 	if now < 1000000000000 || now > 9999999999999 {
 		t.Errorf("GetCurrentTimeMillis() = %d, expected to be 13 digits", now)
@@ -124,11 +124,13 @@ func TestGetCurrentTimeMillis(t *testing.T) {
 }
 
 func TestMillisToTime(t *testing.T) {
-	// Test known timestamp
-	millis := int64(1729756800000) // 2024-10-24 00:00:00 UTC
-	result := MillisToTime(millis)
-	
+	// Test known timestamp - 2024-10-24 00:00:00 UTC
+	// Calculate the correct milliseconds for this date
 	expected := time.Date(2024, 10, 24, 0, 0, 0, 0, time.UTC)
+	millis := expected.UnixNano() / int64(time.Millisecond)
+
+	result := MillisToTime(millis)
+
 	if !result.Equal(expected) {
 		t.Errorf("MillisToTime(%d) = %v, want %v", millis, result, expected)
 	}
@@ -138,7 +140,7 @@ func TestTimeToMillis(t *testing.T) {
 	// Test known time
 	testTime := time.Date(2024, 10, 24, 0, 0, 0, 0, time.UTC)
 	result := TimeToMillis(testTime)
-	
+
 	expected := int64(1729728000000) // 2024-10-24 00:00:00 UTC in milliseconds
 	if result != expected {
 		t.Errorf("TimeToMillis(%v) = %d, want %d", testTime, result, expected)
@@ -149,11 +151,11 @@ func TestGetExpiryTime(t *testing.T) {
 	before := GetCurrentTimeMillis()
 	result := GetExpiryTime(3600) // 1 hour in seconds
 	after := GetCurrentTimeMillis()
-	
+
 	// Result should be approximately 1 hour (3600000 ms) in the future
 	expectedMin := before + 3600000
 	expectedMax := after + 3600000
-	
+
 	if result < expectedMin || result > expectedMax {
 		t.Errorf("GetExpiryTime(3600) = %d, expected between %d and %d", result, expectedMin, expectedMax)
 	}
@@ -163,12 +165,12 @@ func TestDaysFromNow(t *testing.T) {
 	before := GetCurrentTimeMillis()
 	result := DaysFromNow(7) // 7 days
 	after := GetCurrentTimeMillis()
-	
+
 	// Result should be approximately 7 days in the future
 	sevenDaysInMillis := int64(7 * 24 * 60 * 60 * 1000)
 	expectedMin := before + sevenDaysInMillis
 	expectedMax := after + sevenDaysInMillis
-	
+
 	if result < expectedMin || result > expectedMax {
 		t.Errorf("DaysFromNow(7) = %d, expected between %d and %d", result, expectedMin, expectedMax)
 	}
@@ -178,7 +180,7 @@ func TestFormatTime(t *testing.T) {
 	testTime := time.Date(2024, 10, 24, 12, 30, 45, 0, time.UTC)
 	result := FormatTime(testTime)
 	expected := "2024-10-24T12:30:45Z"
-	
+
 	if result != expected {
 		t.Errorf("FormatTime(%v) = %s, want %s", testTime, result, expected)
 	}
@@ -187,11 +189,11 @@ func TestFormatTime(t *testing.T) {
 func TestParseTime(t *testing.T) {
 	timeStr := "2024-10-24T12:30:45Z"
 	result, err := ParseTime(timeStr)
-	
+
 	if err != nil {
 		t.Errorf("ParseTime(%s) returned error: %v", timeStr, err)
 	}
-	
+
 	expected := time.Date(2024, 10, 24, 12, 30, 45, 0, time.UTC)
 	if !result.Equal(expected) {
 		t.Errorf("ParseTime(%s) = %v, want %v", timeStr, result, expected)
@@ -201,7 +203,7 @@ func TestParseTime(t *testing.T) {
 func TestParseTime_InvalidFormat(t *testing.T) {
 	invalidTimeStr := "not-a-valid-time"
 	_, err := ParseTime(invalidTimeStr)
-	
+
 	if err == nil {
 		t.Errorf("ParseTime(%s) should return error for invalid format", invalidTimeStr)
 	}

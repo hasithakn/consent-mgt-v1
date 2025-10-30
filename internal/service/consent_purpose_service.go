@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
@@ -39,12 +40,33 @@ func NewConsentPurposeService(
 type ConsentPurposeCreateRequest struct {
 	Name        string
 	Description *string
+	Type        string
+	Value       interface{}
 }
 
 // ConsentPurposeUpdateRequest represents request to update a consent purpose
+// All fields are required - no partial updates allowed
 type ConsentPurposeUpdateRequest struct {
-	Name        *string
+	Name        string
 	Description *string
+	Type        string
+	Value       interface{}
+}
+
+// convertToJSONValue converts an interface{} to *models.JSONValue
+func convertToJSONValue(value interface{}) (*models.JSONValue, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	// Marshal the value to JSON
+	jsonBytes, err := json.Marshal(value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal value to JSON: %w", err)
+	}
+
+	jsonValue := models.JSONValue(jsonBytes)
+	return &jsonValue, nil
 }
 
 // CreatePurpose creates a new consent purpose
@@ -56,6 +78,11 @@ func (s *ConsentPurposeService) CreatePurpose(ctx context.Context, orgID string,
 
 	if err := utils.ValidateOrgID(orgID); err != nil {
 		return nil, err
+	}
+
+	// Validate purpose type
+	if err := models.ValidatePurposeType(req.Type); err != nil {
+		return nil, fmt.Errorf("invalid purpose type: %w", err)
 	}
 
 	// Check if purpose name already exists for this organization
@@ -71,11 +98,20 @@ func (s *ConsentPurposeService) CreatePurpose(ctx context.Context, orgID string,
 	// Generate unique ID
 	purposeID := "PURPOSE-" + utils.GenerateID()
 
+	// Convert value to JSONValue
+	jsonValue, err := convertToJSONValue(req.Value)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to convert value to JSON")
+		return nil, fmt.Errorf("invalid value format: %w", err)
+	}
+
 	// Create purpose object
 	purpose := &models.ConsentPurpose{
 		ID:          purposeID,
 		Name:        req.Name,
 		Description: req.Description,
+		Type:        req.Type,
+		Value:       jsonValue,
 		OrgID:       orgID,
 	}
 
@@ -91,6 +127,109 @@ func (s *ConsentPurposeService) CreatePurpose(ctx context.Context, orgID string,
 	}).Info("Consent purpose created successfully")
 
 	return s.buildPurposeResponse(purpose), nil
+}
+
+// CreatePurposesInBatch creates multiple consent purposes in a single transaction
+// Either all purposes are created or none (atomic operation)
+func (s *ConsentPurposeService) CreatePurposesInBatch(ctx context.Context, orgID string, requests []*ConsentPurposeCreateRequest) ([]models.ConsentPurposeResponse, error) {
+	// Validate inputs
+	if len(requests) == 0 {
+		return nil, fmt.Errorf("at least one purpose must be provided")
+	}
+
+	if err := utils.ValidateOrgID(orgID); err != nil {
+		return nil, err
+	}
+
+	// Start transaction
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to start transaction")
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback() // Rollback if not committed
+
+	createdPurposes := make([]models.ConsentPurposeResponse, 0, len(requests))
+
+	// Pre-validate all requests and check for duplicate names within the batch
+	namesSeen := make(map[string]bool)
+	for i, req := range requests {
+		// Validate request
+		if err := s.validateCreateRequest(req); err != nil {
+			return nil, fmt.Errorf("invalid request at index %d: %w", i, err)
+		}
+
+		// Validate purpose type
+		if err := models.ValidatePurposeType(req.Type); err != nil {
+			return nil, fmt.Errorf("invalid purpose type at index %d: %w", i, err)
+		}
+
+		// Check for duplicate names within the batch
+		if namesSeen[req.Name] {
+			return nil, fmt.Errorf("duplicate purpose name '%s' in request batch at index %d", req.Name, i)
+		}
+		namesSeen[req.Name] = true
+
+		// Check if purpose name already exists in database (using transaction)
+		exists, err := s.purposeDAO.ExistsByNameWithTx(ctx, tx, req.Name, orgID)
+		if err != nil {
+			s.logger.WithError(err).Error("Failed to check purpose name existence")
+			return nil, fmt.Errorf("failed to validate purpose name at index %d: %w", i, err)
+		}
+		if exists {
+			return nil, fmt.Errorf("purpose name '%s' already exists for this organization (at index %d)", req.Name, i)
+		}
+	}
+
+	// Create all purposes within the transaction
+	for i, req := range requests {
+		// Generate purpose ID
+		purposeID := "PURPOSE-" + utils.GenerateID()
+
+		// Convert value to JSONValue
+		jsonValue, err := convertToJSONValue(req.Value)
+		if err != nil {
+			s.logger.WithError(err).Error("Failed to convert value to JSON")
+			return nil, fmt.Errorf("invalid value format at index %d: %w", i, err)
+		}
+
+		// Create purpose object
+		purpose := &models.ConsentPurpose{
+			ID:          purposeID,
+			Name:        req.Name,
+			Description: req.Description,
+			Type:        req.Type,
+			Value:       jsonValue,
+			OrgID:       orgID,
+		}
+
+		// Save to database using transaction
+		if err := s.purposeDAO.CreateWithTx(ctx, tx, purpose); err != nil {
+			s.logger.WithError(err).Error("Failed to create consent purpose")
+			return nil, fmt.Errorf("failed to create consent purpose at index %d: %w", i, err)
+		}
+
+		// Add to response list
+		createdPurposes = append(createdPurposes, *s.buildPurposeResponse(purpose))
+
+		s.logger.WithFields(logrus.Fields{
+			"purpose_id": purposeID,
+			"org_id":     orgID,
+		}).Info("Consent purpose created successfully within transaction")
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		s.logger.WithError(err).Error("Failed to commit transaction")
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"count":  len(createdPurposes),
+		"org_id": orgID,
+	}).Info("Batch consent purpose creation completed successfully")
+
+	return createdPurposes, nil
 }
 
 // GetPurpose retrieves a consent purpose by ID
@@ -187,30 +326,41 @@ func (s *ConsentPurposeService) UpdatePurpose(ctx context.Context, purposeID, or
 		return nil, err
 	}
 
+	// Validate purpose type (now required)
+	if err := models.ValidatePurposeType(req.Type); err != nil {
+		return nil, fmt.Errorf("invalid purpose type: %w", err)
+	}
+
 	// Check if purpose exists
 	existingPurpose, err := s.purposeDAO.GetByID(ctx, purposeID, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("purpose not found: %w", err)
 	}
 
-	// Update fields
-	if req.Name != nil {
-		// If name is being updated, check if the new name already exists (and it's not the same purpose)
-		if *req.Name != existingPurpose.Name {
-			exists, err := s.purposeDAO.ExistsByName(ctx, *req.Name, orgID)
-			if err != nil {
-				s.logger.WithError(err).Error("Failed to check purpose name existence")
-				return nil, fmt.Errorf("failed to validate purpose name: %w", err)
-			}
-			if exists {
-				return nil, fmt.Errorf("purpose name '%s' already exists for this organization", *req.Name)
-			}
+	// Check if name is being changed and if the new name already exists
+	if req.Name != existingPurpose.Name {
+		exists, err := s.purposeDAO.ExistsByName(ctx, req.Name, orgID)
+		if err != nil {
+			s.logger.WithError(err).Error("Failed to check purpose name existence")
+			return nil, fmt.Errorf("failed to validate purpose name: %w", err)
 		}
-		existingPurpose.Name = *req.Name
+		if exists {
+			return nil, fmt.Errorf("purpose name '%s' already exists for this organization", req.Name)
+		}
 	}
-	if req.Description != nil {
-		existingPurpose.Description = req.Description
+
+	// Convert value to JSONValue
+	jsonValue, err := convertToJSONValue(req.Value)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to convert value to JSON")
+		return nil, fmt.Errorf("invalid value format: %w", err)
 	}
+
+	// Update all fields (no partial updates)
+	existingPurpose.Name = req.Name
+	existingPurpose.Description = req.Description
+	existingPurpose.Type = req.Type
+	existingPurpose.Value = jsonValue
 
 	// Update in database
 	if err := s.purposeDAO.Update(ctx, existingPurpose); err != nil {
@@ -375,23 +525,29 @@ func (s *ConsentPurposeService) validateCreateRequest(req *ConsentPurposeCreateR
 }
 
 // validateUpdateRequest validates the update request
+// All fields are required for update - no partial updates
 func (s *ConsentPurposeService) validateUpdateRequest(req *ConsentPurposeUpdateRequest) error {
-	// At least one field must be provided
-	if req.Name == nil && req.Description == nil {
-		return fmt.Errorf("at least one field must be provided for update")
+	// Name is required
+	if req.Name == "" {
+		return fmt.Errorf("purpose name is required")
+	}
+	if len(req.Name) > 255 {
+		return fmt.Errorf("purpose name too long: maximum 255 characters")
 	}
 
-	if req.Name != nil {
-		if *req.Name == "" {
-			return fmt.Errorf("purpose name cannot be empty")
-		}
-		if len(*req.Name) > 255 {
-			return fmt.Errorf("purpose name too long: maximum 255 characters")
-		}
-	}
-
+	// Description can be nil (optional), but if provided must be within limits
 	if req.Description != nil && len(*req.Description) > 1024 {
 		return fmt.Errorf("purpose description too long: maximum 1024 characters")
+	}
+
+	// Type is required
+	if req.Type == "" {
+		return fmt.Errorf("purpose type is required")
+	}
+
+	// Value is required (can be any valid JSON value, but must be present)
+	if req.Value == nil {
+		return fmt.Errorf("purpose value is required")
 	}
 
 	return nil
@@ -403,6 +559,8 @@ func (s *ConsentPurposeService) buildPurposeResponse(purpose *models.ConsentPurp
 		ID:          purpose.ID,
 		Name:        purpose.Name,
 		Description: purpose.Description,
+		Type:        purpose.Type,
+		Value:       purpose.Value,
 	}
 }
 

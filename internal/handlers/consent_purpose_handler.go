@@ -24,7 +24,7 @@ func NewConsentPurposeHandler(purposeService *service.ConsentPurposeService) *Co
 }
 
 // CreateConsentPurposes handles POST /consent-purposes
-// Creates one or more consent purposes in batch
+// Creates one or more consent purposes in batch (transactional - all or nothing)
 func (h *ConsentPurposeHandler) CreateConsentPurposes(c *gin.Context) {
 	// Parse request body - array of purpose requests
 	var requests []models.ConsentPurposeCreateRequest
@@ -42,32 +42,39 @@ func (h *ConsentPurposeHandler) CreateConsentPurposes(c *gin.Context) {
 	// Get orgID from context (set by middleware)
 	orgID := utils.GetOrgIDFromContext(c)
 
-	// Create all purposes
-	createdPurposes := make([]models.ConsentPurposeResponse, 0, len(requests))
+	// Convert to service requests
+	serviceRequests := make([]*service.ConsentPurposeCreateRequest, 0, len(requests))
 	for _, request := range requests {
 		// Convert to service request
 		var desc *string
 		if request.Description != "" {
 			desc = &request.Description
 		}
+
 		serviceReq := &service.ConsentPurposeCreateRequest{
 			Name:        request.Name,
 			Description: desc,
+			Type:        request.Type,
+			Value:       request.Value,
 		}
+		serviceRequests = append(serviceRequests, serviceReq)
+	}
 
-		// Create the purpose
-		response, err := h.purposeService.CreatePurpose(c.Request.Context(), orgID, serviceReq)
-		if err != nil {
-			// Check if it's a validation error
-			if strings.Contains(err.Error(), "cannot be empty") || strings.Contains(err.Error(), "too long") {
-				utils.SendBadRequestError(c, "Invalid request", err.Error())
-				return
-			}
-			utils.SendInternalServerError(c, "Failed to create consent purpose", err.Error())
+	// Create all purposes in a transaction (all or nothing)
+	createdPurposes, err := h.purposeService.CreatePurposesInBatch(c.Request.Context(), orgID, serviceRequests)
+	if err != nil {
+		// Check if it's a validation error
+		if strings.Contains(err.Error(), "cannot be empty") ||
+			strings.Contains(err.Error(), "too long") ||
+			strings.Contains(err.Error(), "invalid purpose type") ||
+			strings.Contains(err.Error(), "already exists") ||
+			strings.Contains(err.Error(), "duplicate") ||
+			strings.Contains(err.Error(), "invalid request") {
+			utils.SendBadRequestError(c, "Invalid request", err.Error())
 			return
 		}
-
-		createdPurposes = append(createdPurposes, *response)
+		utils.SendInternalServerError(c, "Failed to create consent purposes", err.Error())
+		return
 	}
 
 	// Return created purposes with 201 Created status
@@ -148,17 +155,23 @@ func (h *ConsentPurposeHandler) UpdateConsentPurpose(c *gin.Context) {
 		return
 	}
 
-	// Convert to service request
+	// Convert to service request (all fields are required, no partial updates)
 	serviceReq := &service.ConsentPurposeUpdateRequest{
 		Name:        request.Name,
 		Description: request.Description,
+		Type:        request.Type,
+		Value:       request.Value,
 	}
 
 	// Update the purpose
 	response, err := h.purposeService.UpdatePurpose(c.Request.Context(), purposeID, orgID, serviceReq)
 	if err != nil {
 		// Check if it's a validation error
-		if strings.Contains(err.Error(), "cannot be empty") || strings.Contains(err.Error(), "too long") {
+		if strings.Contains(err.Error(), "is required") ||
+			strings.Contains(err.Error(), "cannot be empty") ||
+			strings.Contains(err.Error(), "too long") ||
+			strings.Contains(err.Error(), "invalid purpose type") ||
+			strings.Contains(err.Error(), "already exists") {
 			utils.SendBadRequestError(c, "Invalid request", err.Error())
 			return
 		}

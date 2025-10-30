@@ -103,11 +103,14 @@ CREATE TABLE IF NOT EXISTS CONSENT_PURPOSE (
   ID            VARCHAR(255) NOT NULL,
   NAME          VARCHAR(255) NOT NULL,
   DESCRIPTION   VARCHAR(1024) DEFAULT NULL,
+  TYPE          VARCHAR(64) NOT NULL DEFAULT 'string',
+  VALUE         JSON DEFAULT NULL,
   ORG_ID        VARCHAR(255) DEFAULT 'DEFAULT_ORG',
   PRIMARY KEY (ID, ORG_ID),
   UNIQUE KEY unique_name_per_org (NAME, ORG_ID),
   INDEX idx_name (NAME),
-  INDEX idx_org_id (ORG_ID)
+  INDEX idx_org_id (ORG_ID),
+  INDEX idx_type (TYPE)
 ) ENGINE=INNODB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Mapping table to link consent with purposes

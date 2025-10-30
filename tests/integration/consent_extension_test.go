@@ -203,12 +203,16 @@ func TestExtension_PreCreateConsent_WithValidPurposes(t *testing.T) {
 	purpose1, err := purposeService.CreatePurpose(ctx, "TEST_ORG", &service.ConsentPurposeCreateRequest{
 		Name:        "ReadAccountsBasic",
 		Description: stringPtr("Marketing communications"),
+		Type:        "string",
+		Value:       "account:read:basic",
 	})
 	require.NoError(t, err)
 
 	purpose2, err := purposeService.CreatePurpose(ctx, "TEST_ORG", &service.ConsentPurposeCreateRequest{
 		Name:        "ReadAccountsDetail",
 		Description: stringPtr("Data analytics"),
+		Type:        "string",
+		Value:       "account:read:detail",
 	})
 	require.NoError(t, err)
 
@@ -499,6 +503,8 @@ func TestExtension_PreUpdateConsent_WithValidPurposes(t *testing.T) {
 	purpose, err := purposeService.CreatePurpose(ctx, "TEST_ORG", &service.ConsentPurposeCreateRequest{
 		Name:        "DataSharing",
 		Description: stringPtr("Data sharing consent"),
+		Type:        "string",
+		Value:       "data:sharing",
 	})
 	require.NoError(t, err)
 	t.Logf("Created test purpose: %s", purpose.Name)

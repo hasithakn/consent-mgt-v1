@@ -31,12 +31,16 @@ func TestConsentPurposeMapping_CreateWithPurposes(t *testing.T) {
 	purpose1, err := purposeService.CreatePurpose(ctx, "TEST_ORG", &service.ConsentPurposeCreateRequest{
 		Name:        "AccountData",
 		Description: stringPtr("Access to account data"),
+		Type:        "string",
+		Value:       "account:data",
 	})
 	require.NoError(t, err)
 
 	purpose2, err := purposeService.CreatePurpose(ctx, "TEST_ORG", &service.ConsentPurposeCreateRequest{
 		Name:        "TransactionHistory",
 		Description: stringPtr("Access to transaction history"),
+		Type:        "string",
+		Value:       "transaction:history",
 	})
 	require.NoError(t, err)
 
@@ -123,12 +127,16 @@ func TestConsentPurposeMapping_UpdateWithPurposes(t *testing.T) {
 	purpose1, err := purposeService.CreatePurpose(ctx, "TEST_ORG", &service.ConsentPurposeCreateRequest{
 		Name:        "InitialPurpose",
 		Description: stringPtr("Initial purpose"),
+		Type:        "string",
+		Value:       "initial:purpose",
 	})
 	require.NoError(t, err)
 
 	purpose2, err := purposeService.CreatePurpose(ctx, "TEST_ORG", &service.ConsentPurposeCreateRequest{
 		Name:        "UpdatedPurpose",
 		Description: stringPtr("Updated purpose"),
+		Type:        "string",
+		Value:       "updated:purpose",
 	})
 	require.NoError(t, err)
 
@@ -257,6 +265,8 @@ func TestConsentPurposeMapping_MultipleConsents(t *testing.T) {
 	purpose, err := purposeService.CreatePurpose(ctx, "TEST_ORG", &service.ConsentPurposeCreateRequest{
 		Name:        "SharedPurpose",
 		Description: stringPtr("Purpose shared across consents"),
+		Type:        "string",
+		Value:       "shared:purpose",
 	})
 	require.NoError(t, err)
 

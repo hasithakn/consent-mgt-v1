@@ -38,15 +38,25 @@ paths:
         Each purpose must have a unique name within the organization. The description field is optional 
         and can be used to provide additional context about the purpose.
         
+        **Transactional Behavior:**
+        Batch creation is atomic - either all purposes in the request are created successfully, or none 
+        are created. If any validation fails (e.g., duplicate name, invalid type, missing required field), 
+        the entire batch is rolled back and no purposes are persisted to the database. This ensures data 
+        consistency and prevents partial batch insertions.
+        
         **Validation Rules:**
         - Name is required and must not exceed 255 characters
-        - Name must be unique within the organization (constraint enforced at database level)
+        - Name must be unique within the organization (checked against existing purposes and within the batch)
+        - Type is required and must be one of: `string`, `json-schema`
+        - Value is required and can be a string, JSON object, or JSON array
         - Description is optional but must not exceed 1024 characters if provided
         - At least one purpose must be provided in the request array
+        - Duplicate names within the same batch are not allowed
         
         **Uniqueness Constraint:**
-        If a purpose with the same name already exists for the organization, the request will be rejected 
-        with a 400 Bad Request error.
+        If a purpose with the same name already exists for the organization (or appears multiple times 
+        in the batch), the entire request will be rejected with a 400 Bad Request error and no purposes 
+        will be created.
       operationId: createConsentPurposes
       tags:
         - Consent Purpose
@@ -77,19 +87,54 @@ paths:
                 $ref: "#/components/schemas/ConsentPurposeCreateRequest"
             examples:
               single:
-                summary: Create a single purpose
+                summary: Create a single purpose with string value
                 value:
-                  - name: "readAccountBasic"
-                    description: "Allows reading basic account information such as account holder name and account number."
+                  - name: "license_read"
+                    description: "Allows accessing license API"
+                    type: "string"
+                    value: "license:read"
               multiple:
-                summary: Create multiple purposes
+                summary: Create multiple purposes with string values
                 value:
-                  - name: "readAccountBasic"
-                    description: "Allows reading basic account information."
-                  - name: "readAccountDetailed"
-                    description: "Allows reading detailed account information including balances."
-                  - name: "readTransactions"
-                    description: "Allows reading transaction history."
+                  - name: "license_read"
+                    description: "Allows accessing license API"
+                    type: "string"
+                    value: "license:read"
+                  - name: "tax_read"
+                    description: "Allows accessing tax API"
+                    type: "string"
+                    value: "tax:read"
+                  - name: "utility_read"
+                    description: "Allows accessing utility API"
+                    type: "string"
+                    value: "utility:read"
+              jsonObject:
+                summary: Create purpose with JSON object value
+                value:
+                  - name: "account_schema"
+                    description: "Account access schema with permissions"
+                    type: "json-schema"
+                    value:
+                      permissions:
+                        - "read"
+                        - "write"
+                      scopes:
+                        - "account.basic"
+                        - "account.transactions"
+                      metadata:
+                        version: "1.0"
+                        required: true
+              jsonArray:
+                summary: Create purpose with JSON array value
+                value:
+                  - name: "allowed_operations"
+                    description: "List of allowed operations"
+                    type: "string"
+                    value:
+                      - "create"
+                      - "read"
+                      - "update"
+                      - "delete"
       responses:
         "201":
           description: Successfully created consent purpose(s)
@@ -113,20 +158,61 @@ paths:
                       - id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                         name: "readAccountBasic"
                         description: "Allows reading basic account information."
+                        type: "string"
+                        value: "account:read:basic"
                     message: "Consent purposes created successfully"
                 multiple:
                   summary: Multiple purposes created
                   value:
                     data:
                       - id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                        name: "readAccountBasic"
-                        description: "Allows reading basic account information."
+                        name: "license_read"
+                        description: "Allows accessing license API"
+                        type: "string"
+                        value: "license:read"
                       - id: "PURPOSE-b2c3d4e5-f6a7-8901-bcde-f12345678901"
-                        name: "readAccountDetailed"
-                        description: "Allows reading detailed account information."
+                        name: "tax_read"
+                        description: "Allows accessing tax API"
+                        type: "string"
+                        value: "tax:read"
                       - id: "PURPOSE-c3d4e5f6-a7b8-9012-cdef-123456789012"
-                        name: "readTransactions"
-                        description: "Allows reading transaction history."
+                        name: "utility_read"
+                        description: "Allows accessing utility API"
+                        type: "string"
+                        value: "utility:read"
+                    message: "Consent purposes created successfully"
+                jsonObject:
+                  summary: Purpose created with JSON object value
+                  value:
+                    data:
+                      - id: "PURPOSE-d4e5f6a7-b8c9-0123-def4-56789abcdef0"
+                        name: "account_schema"
+                        description: "Account access schema with permissions"
+                        type: "json-schema"
+                        value:
+                          permissions:
+                            - "read"
+                            - "write"
+                          scopes:
+                            - "account.basic"
+                            - "account.transactions"
+                          metadata:
+                            version: "1.0"
+                            required: true
+                    message: "Consent purposes created successfully"
+                jsonArray:
+                  summary: Purpose created with JSON array value
+                  value:
+                    data:
+                      - id: "PURPOSE-e5f6a7b8-c9d0-1234-ef56-789abcdef012"
+                        name: "allowed_operations"
+                        description: "List of allowed operations"
+                        type: "string"
+                        value:
+                          - "create"
+                          - "read"
+                          - "update"
+                          - "delete"
                     message: "Consent purposes created successfully"
         "400":
           description: Bad Request - Invalid input or validation error
@@ -147,6 +233,24 @@ paths:
                     code: "BAD_REQUEST"
                     message: "Invalid request body"
                     details: "Key: 'ConsentPurposeCreateRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag"
+                missingType:
+                  summary: Missing required type field
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request body"
+                    details: "Key: 'ConsentPurposeCreateRequest.Type' Error:Field validation for 'Type' failed on the 'required' tag"
+                missingValue:
+                  summary: Missing required value field
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request body"
+                    details: "Key: 'ConsentPurposeCreateRequest.Value' Error:Field validation for 'Value' failed on the 'required' tag"
+                invalidType:
+                  summary: Invalid type value
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request body"
+                    details: "invalid purpose type: invalid purpose type 'invalid-type': must be one of [string, json-schema]"
                 nameTooLong:
                   summary: Name exceeds maximum length
                   value:
@@ -159,6 +263,19 @@ paths:
                     code: "BAD_REQUEST"
                     message: "Invalid request"
                     details: "purpose name 'readAccountBasic' already exists for this organization"
+                duplicateInBatch:
+                  summary: Duplicate names within the same batch
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request"
+                    details: "duplicate purpose name 'readAccountBasic' found at index 0 and 2 in the batch"
+                transactionRollback:
+                  summary: Batch rolled back due to validation failure
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request"
+                    details: "purpose name 'existingPurpose' already exists for this organization (at index 2)"
+                    error: "Transaction rolled back - no purposes were created"
         "500":
           description: Internal Server Error
           content:
@@ -216,12 +333,18 @@ paths:
                   - id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                     name: "Marketing"
                     description: "Purpose for marketing and promotional communications"
+                    type: "string"
+                    value: "marketing:communications"
                   - id: "PURPOSE-b2c3d4e5-f6a7-8901-bcde-f12345678901"
                     name: "readAccountBasic"
                     description: "Allows reading basic account information"
+                    type: "string"
+                    value: "account:read:basic"
                   - id: "PURPOSE-c3d4e5f6-a7b8-9012-cdef-123456789012"
                     name: "readTransactions"
                     description: "Allows reading transaction history"
+                    type: "string"
+                    value: "account:read:transactions"
                 total: 3
         "500":
           description: Internal Server Error
@@ -264,6 +387,8 @@ paths:
                 id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                 name: "readAccountBasic"
                 description: "Allows reading basic account information"
+                type: "string"
+                value: "account:read:basic"
         "404":
           description: Consent purpose not found
           content:
@@ -285,13 +410,13 @@ paths:
     put:
       summary: Update a consent purpose
       description: |
-        Updates an existing consent purpose. Supports partial updates - only provided fields will be updated.
+        Updates an existing consent purpose. **All fields are required** - partial updates are not supported.
         
         **Validation Rules:**
-        - If name is provided, it must not exceed 255 characters
-        - If name is provided, it must be unique within the organization (unless it's the same as current name)
-        - If description is provided, it must not exceed 1024 characters
-        - At least one field (name or description) must be provided for update
+        - name: Required, must not exceed 255 characters, must be unique within the organization
+        - description: Optional, must not exceed 1024 characters if provided
+        - type: Required, must be either 'string' or 'json-schema'
+        - value: Required, can be a string, object, or array (any valid JSON value)
         
         **Uniqueness Constraint:**
         If changing the name to a value that already exists for another purpose in the organization, 
@@ -315,26 +440,50 @@ paths:
             type: string
             example: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
       requestBody:
-        description: Updated purpose data (partial update supported)
+        description: Complete purpose data (all fields required - no partial updates)
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/ConsentPurposeUpdateRequest"
             examples:
-              updateName:
-                summary: Update only name
-                value:
-                  name: "readAccountDetailedV2"
-              updateDescription:
-                summary: Update only description
-                value:
-                  description: "Updated description with more details"
-              updateBoth:
-                summary: Update both fields
+              updateStringValue:
+                summary: Update with string value
                 value:
                   name: "readAccountDetailedV2"
                   description: "Updated description with more details"
+                  type: "string"
+                  value: "account:read:detailed:v2"
+              updateWithoutDescription:
+                summary: Update without description (description is optional)
+                value:
+                  name: "readAccountBasic"
+                  type: "string"
+                  value: "account:read:basic"
+              updateJSONObjectValue:
+                summary: Update with JSON object value
+                value:
+                  name: "accountAccessSchema"
+                  description: "Account access schema with permissions"
+                  type: "json-schema"
+                  value:
+                    permissions:
+                      - "read"
+                      - "write"
+                    scopes:
+                      - "account.basic"
+                      - "account.transactions"
+              updateJSONArrayValue:
+                summary: Update with JSON array value
+                value:
+                  name: "allowedOperations"
+                  description: "List of allowed operations"
+                  type: "string"
+                  value:
+                    - "create"
+                    - "read"
+                    - "update"
+                    - "delete"
       responses:
         "200":
           description: Successfully updated consent purpose
@@ -342,16 +491,72 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConsentPurposeResponse"
-              example:
-                id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                name: "readAccountDetailedV2"
-                description: "Updated description with more details"
+              examples:
+                updatedNameAndDescription:
+                  summary: Updated name and description
+                  value:
+                    id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    name: "readAccountDetailedV2"
+                    description: "Updated description with more details"
+                    type: "string"
+                    value: "account:read:basic"
+                updatedValue:
+                  summary: Updated type and value
+                  value:
+                    id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    name: "readAccountBasic"
+                    description: "Allows reading basic account information"
+                    type: "json-schema"
+                    value:
+                      permissions:
+                        - "read"
+                        - "write"
+                      scopes:
+                        - "account.basic"
+                        - "account.transactions"
         "400":
           description: Bad Request - Invalid input or validation error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingName:
+                  summary: Missing required field (name)
+                  value:
+                    code: "INVALID_REQUEST"
+                    message: "Invalid request"
+                    details: "purpose name is required"
+                missingType:
+                  summary: Missing required field (type)
+                  value:
+                    code: "INVALID_REQUEST"
+                    message: "Invalid request"
+                    details: "purpose type is required"
+                missingValue:
+                  summary: Missing required field (value)
+                  value:
+                    code: "INVALID_REQUEST"
+                    message: "Invalid request"
+                    details: "purpose value is required"
+                nameTooLong:
+                  summary: Name exceeds maximum length
+                  value:
+                    code: "INVALID_REQUEST"
+                    message: "Invalid request"
+                    details: "purpose name too long: maximum 255 characters"
+                duplicateName:
+                  summary: Name already exists in organization
+                  value:
+                    code: "INVALID_REQUEST"
+                    message: "Invalid request"
+                    details: "purpose name 'readAccountBasic' already exists for this organization"
+                invalidType:
+                  summary: Invalid type value
+                  value:
+                    code: "INVALID_REQUEST"
+                    message: "Invalid request"
+                    details: "invalid purpose type: invalid purpose type 'invalid-type': must be one of [string, json-schema]"
         "404":
           description: Consent purpose not found
           content:
@@ -416,6 +621,14 @@ components:
       type: object
       required:
         - name
+        - type
+        - value
+      description: |
+        Request object for creating a consent purpose. All fields marked as required must be provided.
+        When creating multiple purposes in a batch:
+        - Each purpose name must be unique within the batch
+        - Each purpose name must not already exist in the organization
+        - If any validation fails, the entire batch is rolled back (atomic operation)
       properties:
         name:
           type: string
@@ -423,27 +636,66 @@ components:
           description: |
             The name/identifier of the consent purpose. Must be unique within the organization.
             Database constraint: UNIQUE KEY unique_name_per_org (NAME, ORG_ID)
-          example: "readAccountBasic"
+            Batch constraint: Must be unique within the batch request
+          example: "license_read"
         description:
           type: string
           maxLength: 1024
           description: Optional description providing additional context about the purpose
-          example: "Allows reading basic account information such as account holder name and account number."
+          example: "Allows accessing license API"
+        type:
+          type: string
+          enum:
+            - string
+            - json-schema
+          description: |
+            The type of the purpose value. Determines how the value should be interpreted.
+            - 'string': Simple string value (e.g., permission name, scope)
+            - 'json-schema': JSON schema definition for complex validation
+          example: "string"
+        value:
+          description: |
+            The actual value of the purpose. Format depends on the 'type' field:
+            - If type='string': A simple string value like a permission or scope
+            - If type='json-schema': A JSON schema object or any complex JSON structure
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          example: "license:read"
     
     ConsentPurposeUpdateRequest:
       type: object
+      required:
+        - name
+        - type
+        - value
       properties:
         name:
           type: string
           maxLength: 255
-          description: Updated name for the consent purpose
-          example: "readAccountDetailedV2"
+          description: Name for the consent purpose (required, must be unique within organization)
+          example: "license_read_v2"
         description:
           type: string
           maxLength: 1024
-          description: Updated description for the consent purpose
-          example: "Updated description with more details about account information access"
-      description: At least one field must be provided for update
+          description: Description for the consent purpose (optional)
+          example: "Updated description for license API access"
+        type:
+          type: string
+          enum:
+            - string
+            - json-schema
+          description: Type of the consent purpose value (required)
+          example: "string"
+        value:
+          description: Value for the consent purpose (required, can be string, object, or array)
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          example: "license:read:v2"
+      description: All fields except description are required - partial updates are not supported
     
     ConsentPurposeResponse:
       type: object
@@ -455,14 +707,29 @@ components:
         name:
           type: string
           description: The name/identifier of the consent purpose
-          example: "readAccountBasic"
+          example: "license_read"
         description:
           type: string
           description: Description of the consent purpose
-          example: "Allows reading basic account information"
+          example: "Allows accessing license API"
+        type:
+          type: string
+          enum:
+            - string
+            - json-schema
+          description: The type of the purpose value
+          example: "string"
+        value:
+          description: The actual value of the purpose (can be string, object, or array based on type)
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          example: "license:read"
       required:
         - id
         - name
+        - type
     
     ConsentPurposeListResponse:
       type: object

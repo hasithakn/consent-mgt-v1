@@ -23,14 +23,16 @@ func NewConsentPurposeDAO(db *sqlx.DB) *ConsentPurposeDAO {
 // Create inserts a new consent purpose into the database
 func (dao *ConsentPurposeDAO) Create(ctx context.Context, purpose *models.ConsentPurpose) error {
 	query := `
-		INSERT INTO CONSENT_PURPOSE (ID, NAME, DESCRIPTION, ORG_ID)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO CONSENT_PURPOSE (ID, NAME, DESCRIPTION, TYPE, VALUE, ORG_ID)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := dao.db.ExecContext(ctx, query,
 		purpose.ID,
 		purpose.Name,
 		purpose.Description,
+		purpose.Type,
+		purpose.Value,
 		purpose.OrgID,
 	)
 
@@ -41,10 +43,46 @@ func (dao *ConsentPurposeDAO) Create(ctx context.Context, purpose *models.Consen
 	return nil
 }
 
+// CreateWithTx inserts a new consent purpose within a transaction
+func (dao *ConsentPurposeDAO) CreateWithTx(ctx context.Context, tx *sqlx.Tx, purpose *models.ConsentPurpose) error {
+	query := `
+		INSERT INTO CONSENT_PURPOSE (ID, NAME, DESCRIPTION, TYPE, VALUE, ORG_ID)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`
+
+	_, err := tx.ExecContext(ctx, query,
+		purpose.ID,
+		purpose.Name,
+		purpose.Description,
+		purpose.Type,
+		purpose.Value,
+		purpose.OrgID,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to create consent purpose: %w", err)
+	}
+
+	return nil
+}
+
+// ExistsByNameWithTx checks if a purpose with the given name exists within a transaction
+func (dao *ConsentPurposeDAO) ExistsByNameWithTx(ctx context.Context, tx *sqlx.Tx, name, orgID string) (bool, error) {
+	query := `SELECT COUNT(*) FROM CONSENT_PURPOSE WHERE NAME = ? AND ORG_ID = ?`
+
+	var count int
+	err := tx.GetContext(ctx, &count, query, name, orgID)
+	if err != nil {
+		return false, fmt.Errorf("failed to check purpose name existence: %w", err)
+	}
+
+	return count > 0, nil
+}
+
 // GetByID retrieves a consent purpose by ID and organization ID
 func (dao *ConsentPurposeDAO) GetByID(ctx context.Context, purposeID, orgID string) (*models.ConsentPurpose, error) {
 	query := `
-		SELECT ID, NAME, DESCRIPTION, ORG_ID
+		SELECT ID, NAME, DESCRIPTION, TYPE, VALUE, ORG_ID
 		FROM CONSENT_PURPOSE
 		WHERE ID = ? AND ORG_ID = ?
 	`
@@ -74,7 +112,7 @@ func (dao *ConsentPurposeDAO) List(ctx context.Context, orgID string, limit, off
 
 	// Get purposes with pagination
 	query := `
-		SELECT ID, NAME, DESCRIPTION, ORG_ID
+		SELECT ID, NAME, DESCRIPTION, TYPE, VALUE, ORG_ID
 		FROM CONSENT_PURPOSE
 		WHERE ORG_ID = ?
 		ORDER BY NAME ASC
@@ -94,13 +132,15 @@ func (dao *ConsentPurposeDAO) List(ctx context.Context, orgID string, limit, off
 func (dao *ConsentPurposeDAO) Update(ctx context.Context, purpose *models.ConsentPurpose) error {
 	query := `
 		UPDATE CONSENT_PURPOSE
-		SET NAME = ?, DESCRIPTION = ?
+		SET NAME = ?, DESCRIPTION = ?, TYPE = ?, VALUE = ?
 		WHERE ID = ? AND ORG_ID = ?
 	`
 
 	_, err := dao.db.ExecContext(ctx, query,
 		purpose.Name,
 		purpose.Description,
+		purpose.Type,
+		purpose.Value,
 		purpose.ID,
 		purpose.OrgID,
 	)
@@ -141,7 +181,7 @@ func (dao *ConsentPurposeDAO) Delete(ctx context.Context, purposeID, orgID strin
 // GetByConsentID retrieves all purposes associated with a consent
 func (dao *ConsentPurposeDAO) GetByConsentID(ctx context.Context, consentID, orgID string) ([]models.ConsentPurpose, error) {
 	query := `
-		SELECT cp.ID, cp.NAME, cp.DESCRIPTION, cp.ORG_ID
+		SELECT cp.ID, cp.NAME, cp.DESCRIPTION, cp.TYPE, cp.VALUE, cp.ORG_ID
 		FROM CONSENT_PURPOSE cp
 		INNER JOIN CONSENT_PURPOSE_MAPPING cpm ON cp.ID = cpm.PURPOSE_ID AND cp.ORG_ID = cpm.ORG_ID
 		WHERE cpm.CONSENT_ID = ? AND cpm.ORG_ID = ?

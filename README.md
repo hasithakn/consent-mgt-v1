@@ -152,67 +152,32 @@ logging:
 
 ## 🚀 Running the Server
 
-### Development Mode
+### Quick Start
 
 ```bash
-# Run directly with Go
-go run cmd/server/main.go
-```
-
-The server will start on `http://localhost:9446` (or the port specified in config.yaml)
-
-You should see output like:
-```
-{"level":"info","msg":"Starting Consent Management API Server...","time":"2025-10-16T20:00:00+05:30"}
-{"level":"info","msg":"Configuration loaded successfully","config_path":"configs/config.yaml","log_level":"info","time":"2025-10-16T20:00:00+05:30"}
-{"level":"info","msg":"Database connection established successfully","time":"2025-10-16T20:00:00+05:30"}
-{"level":"info","msg":"DAOs initialized successfully","time":"2025-10-16T20:00:00+05:30"}
-{"level":"info","msg":"Services initialized successfully","time":"2025-10-16T20:00:00+05:30"}
-{"level":"info","msg":"✓ Server is running","address":"localhost:9446","time":"2025-10-16T20:00:00+05:30"}
-{"level":"info","msg":"Press Ctrl+C to stop the server","time":"2025-10-16T20:00:00+05:30"}
-```
-
-### Production Build
-
-```bash
-# Build the binary
-go build -o consent-server cmd/server/main.go
-
-# Run the binary
-./consent-server
-
-# Or with custom config path
-CONFIG_PATH=configs/config.prod.yaml ./consent-server
-```
-
-### Using Custom Configuration
-
-```bash
-# Set environment variable
-export CONFIG_PATH=configs/config.dev.yaml
+# Run the server
 go run cmd/server/main.go
 
-# Or inline
-CONFIG_PATH=configs/config.prod.yaml ./consent-server
+# Server starts at http://localhost:3000
+# Health check: curl http://localhost:3000/health
 ```
 
-### Verify Server is Running
+### Build & Run
 
 ```bash
-# Health check
-curl http://localhost:9446/health
+# Build binary
+go build -o consent-api-server cmd/server/main.go
 
-# Expected response:
-# {"status":"healthy"}
+# Run binary
+./consent-api-server
+
+# With custom config
+CONFIG_PATH=configs/config.yaml ./consent-api-server
 ```
 
-### Stopping the Server
+### Stop Server
 
-Press `Ctrl+C` to gracefully shutdown the server. The application will:
-- Stop accepting new requests
-- Complete pending requests (with 30s timeout)
-- Close database connections
-- Exit cleanly
+Press `Ctrl+C` to gracefully shutdown
 
 ## 🐳 Docker Deployment
 
@@ -226,27 +191,35 @@ docker-compose down
 
 ## 🧪 Testing
 
-### Run Unit & Integration Tests
+### Run All Tests
 
 ```bash
 # Run all tests
-go test -v ./tests/...
+go test ./...
 
-# Run specific test suites
-go test -v ./tests/dao/...
-go test -v ./tests/service/...
-go test -v ./tests/integration/...
+# Run with verbose output
+go test -v ./...
+```
 
-# Run API integration tests only
-go test -v ./tests/integration -run "TestAPI_"
+### Run Integration Tests
+
+```bash
+# Run integration tests
+go test ./tests/integration/... -v
+
+# Run specific test
+go test ./tests/integration/... -run TestCreateConsent -v
 
 # Run with coverage
-go test -v -cover ./tests/...
-
-# Generate coverage report
-go test -coverprofile=coverage.out ./tests/...
+go test ./... -coverprofile=coverage.out
 go tool cover -html=coverage.out
 ```
+
+### Test Requirements
+
+- MySQL database running on `localhost:3306`
+- Database: `AAconsent-mgt-v3` (configured in test setup)
+- User: `root` / Password: `password`
 
 ### Manual API Testing
 

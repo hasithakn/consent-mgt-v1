@@ -359,3 +359,32 @@ func (dao *ConsentPurposeDAO) GetIDsByNames(ctx context.Context, names []string,
 
 	return result, nil
 }
+
+// ValidatePurposeNames checks which purpose names exist in the database for an organization
+// Returns a slice of valid purpose names that exist in the database
+func (dao *ConsentPurposeDAO) ValidatePurposeNames(ctx context.Context, names []string, orgID string) ([]string, error) {
+	if len(names) == 0 {
+		return []string{}, nil
+	}
+
+	// Build query with IN clause
+	query := `
+		SELECT NAME FROM CONSENT_PURPOSE
+		WHERE ORG_ID = ? AND NAME IN (?)
+		ORDER BY NAME ASC
+	`
+
+	query, args, err := sqlx.In(query, orgID, names)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+	query = dao.db.Rebind(query)
+
+	var validNames []string
+	err = dao.db.SelectContext(ctx, &validNames, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate purpose names: %w", err)
+	}
+
+	return validNames, nil
+}

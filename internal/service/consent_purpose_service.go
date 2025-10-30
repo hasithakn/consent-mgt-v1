@@ -664,3 +664,45 @@ func (s *ConsentPurposeService) UpdateConsentPurposes(ctx context.Context, conse
 
 	return nil
 }
+
+// ValidatePurposeNames validates a list of purpose names against the database
+// Returns only the names that exist in the database for the given organization
+func (s *ConsentPurposeService) ValidatePurposeNames(ctx context.Context, orgID string, names []string) ([]string, error) {
+	if orgID == "" {
+		return nil, fmt.Errorf("organization ID is required")
+	}
+
+	if len(names) == 0 {
+		return nil, fmt.Errorf("at least one purpose name must be provided")
+	}
+
+	// Validate each name format
+	for _, name := range names {
+		if name == "" {
+			return nil, fmt.Errorf("purpose name cannot be empty")
+		}
+		if len(name) > 100 {
+			return nil, fmt.Errorf("purpose name too long (max 100 characters): %s", name)
+		}
+	}
+
+	// Get valid purpose names from database
+	validNames, err := s.purposeDAO.ValidatePurposeNames(ctx, names, orgID)
+	if err != nil {
+		s.logger.WithError(err).WithField("org_id", orgID).Error("Failed to validate purpose names")
+		return nil, fmt.Errorf("failed to validate purpose names: %w", err)
+	}
+
+	// Return error if no valid purposes found
+	if len(validNames) == 0 {
+		return nil, fmt.Errorf("no valid purposes found")
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"org_id":    orgID,
+		"requested": len(names),
+		"valid":     len(validNames),
+	}).Info("Validated purpose names")
+
+	return validNames, nil
+}

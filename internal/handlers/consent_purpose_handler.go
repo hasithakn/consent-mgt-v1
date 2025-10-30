@@ -212,3 +212,35 @@ func (h *ConsentPurposeHandler) DeleteConsentPurpose(c *gin.Context) {
 	// Return 204 No Content on successful deletion
 	c.Status(204)
 }
+
+// ValidateConsentPurposes handles GET /consent-purposes/validate
+// Validates a list of purpose names and returns only the valid ones that exist
+func (h *ConsentPurposeHandler) ValidateConsentPurposes(c *gin.Context) {
+	orgID := utils.GetOrgIDFromContext(c)
+
+	// Parse request body - array of purpose names
+	var purposeNames []string
+	if err := c.ShouldBindJSON(&purposeNames); err != nil {
+		utils.SendBadRequestError(c, "Invalid request body", err.Error())
+		return
+	}
+
+	// Validate purpose names and get valid ones
+	validNames, err := h.purposeService.ValidatePurposeNames(c.Request.Context(), orgID, purposeNames)
+	if err != nil {
+		// Check if it's a validation error
+		if strings.Contains(err.Error(), "cannot be empty") ||
+			strings.Contains(err.Error(), "too long") ||
+			strings.Contains(err.Error(), "is required") ||
+			strings.Contains(err.Error(), "must be provided") ||
+			strings.Contains(err.Error(), "no valid purposes found") {
+			utils.SendBadRequestError(c, "Invalid request", err.Error())
+			return
+		}
+		utils.SendInternalServerError(c, "Failed to validate purpose names", err.Error())
+		return
+	}
+
+	// Return valid purpose names with 200 OK
+	c.JSON(200, validNames)
+}

@@ -354,6 +354,117 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
         - basicAuth: []
+  /consent-purposes/validate:
+    post:
+      summary: Validate consent purpose names
+      description: |
+        Validates a list of consent purpose names and returns only the valid ones that exist in the database.
+        
+        This endpoint is useful for:
+        - Validating purpose names before creating consents
+        - Filtering out invalid purposes from a list
+        - Checking which purposes are available in the organization
+        
+        **Behavior:**
+        - Accepts an array of purpose names
+        - Returns an array of names that exist in the organization
+        - If none of the provided names are valid, returns 400 Bad Request
+        - Names are case-sensitive and must match exactly
+        - Empty request array returns 400 Bad Request
+        
+        **Response:**
+        - **200 OK**: Returns array of valid purpose names (subset of input)
+        - **400 Bad Request**: When request is empty or no valid purposes found
+      operationId: validateConsentPurposes
+      tags:
+        - Consent Purpose
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-123"
+      requestBody:
+        description: Array of purpose names to validate
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              items:
+                type: string
+              example:
+                - "utility_read"
+                - "taxes_read"
+                - "profile_read"
+            examples:
+              allValid:
+                summary: All purposes are valid
+                value:
+                  - "utility_read"
+                  - "taxes_read"
+              partialValid:
+                summary: Some valid, some invalid
+                value:
+                  - "utility_read"
+                  - "invalid_purpose"
+                  - "taxes_read"
+      responses:
+        "200":
+          description: Successfully validated purposes (returns only valid ones)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+              examples:
+                allValid:
+                  summary: All provided purposes were valid
+                  value:
+                    - "utility_read"
+                    - "taxes_read"
+                partialValid:
+                  summary: Only valid purposes returned
+                  value:
+                    - "utility_read"
+                    - "taxes_read"
+        "400":
+          description: Bad Request - Empty request or no valid purposes found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                emptyRequest:
+                  summary: Empty request array
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request"
+                    details: "at least one purpose name must be provided"
+                noValidPurposes:
+                  summary: No valid purposes found
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request"
+                    details: "no valid purposes found"
+                missingOrgId:
+                  summary: Missing org-id header
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request"
+                    details: "org-id header is required"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - basicAuth: []
   /consent-purposes/{purposeId}:
     get:
       summary: Get a specific consent purpose

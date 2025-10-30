@@ -51,6 +51,7 @@ func SetupRouter(
 		// Consent purpose routes
 		v1.POST("/consent-purposes", purposeHandler.CreateConsentPurposes)
 		v1.GET("/consent-purposes", purposeHandler.ListConsentPurposes)
+		v1.POST("/consent-purposes/validate", purposeHandler.ValidateConsentPurposes)
 		v1.GET("/consent-purposes/:purposeId", purposeHandler.GetConsentPurpose)
 		v1.PUT("/consent-purposes/:purposeId", purposeHandler.UpdateConsentPurpose)
 		v1.DELETE("/consent-purposes/:purposeId", purposeHandler.DeleteConsentPurpose)

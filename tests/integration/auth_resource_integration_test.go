@@ -33,10 +33,9 @@ func TestAuthResourceCreate_Success(t *testing.T) {
 		AuthType:   "user",
 		UserID:     stringPtr("user-123"),
 		AuthStatus: "pending",
-		Resource: map[string]interface{}{
-			"accountId": "ACC-001",
-			"type":      "savings",
-			"scope":     "read_balance",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read", "taxes_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -55,11 +54,11 @@ func TestAuthResourceCreate_Success(t *testing.T) {
 	assert.Equal(t, testAuthResourceOrgID, authResource.OrgID, "Org ID should match")
 	assert.NotZero(t, authResource.UpdatedTime, "Updated time should be set")
 
-	// Verify resource data
-	assert.NotNil(t, authResource.Resource, "Resource should not be nil")
-	assert.Equal(t, "ACC-001", authResource.Resource["accountId"], "Account ID should match")
-	assert.Equal(t, "savings", authResource.Resource["type"], "Type should match")
-	assert.Equal(t, "read_balance", authResource.Resource["scope"], "Scope should match")
+	// Verify approved purpose details
+	assert.NotNil(t, authResource.ApprovedPurposeDetails, "ApprovedPurposeDetails should not be nil")
+	assert.Len(t, authResource.ApprovedPurposeDetails.ApprovedPurposesNames, 2, "Should have 2 approved purposes")
+	assert.Contains(t, authResource.ApprovedPurposeDetails.ApprovedPurposesNames, "utility_read", "Should contain utility_read purpose")
+	assert.Contains(t, authResource.ApprovedPurposeDetails.ApprovedPurposesNames, "taxes_read", "Should contain taxes_read purpose")
 
 	t.Logf("✓ Successfully created auth resource: %s", authResource.AuthID)
 }
@@ -96,9 +95,9 @@ func TestAuthResourceGet_Success(t *testing.T) {
 		AuthType:   "device",
 		UserID:     stringPtr("user-456"),
 		AuthStatus: "active",
-		Resource: map[string]interface{}{
-			"deviceId":   "DEV-001",
-			"deviceType": "mobile",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"profile_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -117,7 +116,8 @@ func TestAuthResourceGet_Success(t *testing.T) {
 	assert.Equal(t, created.AuthType, retrieved.AuthType, "Auth type should match")
 	assert.Equal(t, created.UserID, retrieved.UserID, "User ID should match")
 	assert.Equal(t, created.AuthStatus, retrieved.AuthStatus, "Auth status should match")
-	assert.Equal(t, "DEV-001", retrieved.Resource["deviceId"], "Device ID should match")
+	assert.NotNil(t, retrieved.ApprovedPurposeDetails, "ApprovedPurposeDetails should not be nil")
+	assert.Contains(t, retrieved.ApprovedPurposeDetails.ApprovedPurposesNames, "profile_read", "Should contain profile_read purpose")
 
 	t.Logf("✓ Successfully retrieved auth resource: %s", retrieved.AuthID)
 }
@@ -152,8 +152,9 @@ func TestAuthResourceGetByConsentID_Success(t *testing.T) {
 		AuthType:   "user",
 		UserID:     stringPtr("user-1"),
 		AuthStatus: "pending",
-		Resource: map[string]interface{}{
-			"accountId": "ACC-001",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -161,8 +162,9 @@ func TestAuthResourceGetByConsentID_Success(t *testing.T) {
 		AuthType:   "device",
 		UserID:     stringPtr("user-1"),
 		AuthStatus: "active",
-		Resource: map[string]interface{}{
-			"deviceId": "DEV-001",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"profile_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -170,8 +172,9 @@ func TestAuthResourceGetByConsentID_Success(t *testing.T) {
 		AuthType:   "account",
 		UserID:     stringPtr("user-2"),
 		AuthStatus: "authorized",
-		Resource: map[string]interface{}{
-			"accountId": "ACC-002",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"taxes_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -222,9 +225,9 @@ func TestAuthResourceUpdate_Success(t *testing.T) {
 		AuthType:   "user",
 		UserID:     stringPtr("user-original"),
 		AuthStatus: "pending",
-		Resource: map[string]interface{}{
-			"accountId": "ACC-001",
-			"status":    "new",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -236,10 +239,9 @@ func TestAuthResourceUpdate_Success(t *testing.T) {
 	updateRequest := &models.ConsentAuthResourceUpdateRequest{
 		AuthStatus: "authorized",
 		UserID:     stringPtr("user-updated"),
-		Resource: map[string]interface{}{
-			"accountId": "ACC-002",
-			"status":    "verified",
-			"tier":      "premium",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read", "taxes_read", "profile_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -253,10 +255,12 @@ func TestAuthResourceUpdate_Success(t *testing.T) {
 	assert.Equal(t, "user-updated", *updated.UserID, "User ID should be updated")
 	assert.Greater(t, updated.UpdatedTime, created.UpdatedTime, "Updated time should be greater")
 
-	// Verify resource was updated
-	assert.Equal(t, "ACC-002", updated.Resource["accountId"], "Account ID should be updated")
-	assert.Equal(t, "verified", updated.Resource["status"], "Status should be updated")
-	assert.Equal(t, "premium", updated.Resource["tier"], "New field should be added")
+	// Verify approved purpose details were updated
+	assert.NotNil(t, updated.ApprovedPurposeDetails, "ApprovedPurposeDetails should not be nil")
+	assert.Len(t, updated.ApprovedPurposeDetails.ApprovedPurposesNames, 3, "Should have 3 approved purposes")
+	assert.Contains(t, updated.ApprovedPurposeDetails.ApprovedPurposesNames, "utility_read", "Should contain utility_read purpose")
+	assert.Contains(t, updated.ApprovedPurposeDetails.ApprovedPurposesNames, "taxes_read", "Should contain taxes_read purpose")
+	assert.Contains(t, updated.ApprovedPurposeDetails.ApprovedPurposesNames, "profile_read", "Should contain profile_read purpose")
 
 	// Verify persistence by retrieving again
 	t.Log("Verifying persistence...")
@@ -265,7 +269,8 @@ func TestAuthResourceUpdate_Success(t *testing.T) {
 
 	assert.Equal(t, "authorized", retrieved.AuthStatus, "Persisted status should be updated")
 	assert.Equal(t, "user-updated", *retrieved.UserID, "Persisted user ID should be updated")
-	assert.Equal(t, "premium", retrieved.Resource["tier"], "Persisted resource should include new fields")
+	assert.NotNil(t, retrieved.ApprovedPurposeDetails, "Persisted ApprovedPurposeDetails should not be nil")
+	assert.Len(t, retrieved.ApprovedPurposeDetails.ApprovedPurposesNames, 3, "Persisted purposes should have 3 items")
 
 	t.Logf("✓ Successfully updated auth resource: %s", updated.AuthID)
 }
@@ -285,8 +290,9 @@ func TestAuthResourceUpdate_PartialUpdate(t *testing.T) {
 		AuthType:   "user",
 		UserID:     stringPtr("user-123"),
 		AuthStatus: "pending",
-		Resource: map[string]interface{}{
-			"accountId": "ACC-001",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -305,7 +311,8 @@ func TestAuthResourceUpdate_PartialUpdate(t *testing.T) {
 	// Verify only status changed
 	assert.Equal(t, "active", updated.AuthStatus, "Status should be updated")
 	assert.Equal(t, created.UserID, updated.UserID, "User ID should remain unchanged")
-	assert.Equal(t, "ACC-001", updated.Resource["accountId"], "Resource should remain unchanged")
+	assert.NotNil(t, updated.ApprovedPurposeDetails, "ApprovedPurposeDetails should not be nil")
+	assert.Equal(t, created.ApprovedPurposeDetails.ApprovedPurposesNames, updated.ApprovedPurposeDetails.ApprovedPurposesNames, "Purposes should remain unchanged")
 
 	t.Log("✓ Partial update completed successfully")
 }
@@ -374,9 +381,9 @@ func TestAuthResourceLifecycle_Complete(t *testing.T) {
 		AuthType:   "user",
 		UserID:     stringPtr("user-lifecycle"),
 		AuthStatus: "pending",
-		Resource: map[string]interface{}{
-			"accountId": "ACC-LIFECYCLE",
-			"scope":     "read",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -395,16 +402,18 @@ func TestAuthResourceLifecycle_Complete(t *testing.T) {
 	t.Log("Step 4: Updating auth resource to authorized...")
 	updateRequest := &models.ConsentAuthResourceUpdateRequest{
 		AuthStatus: "authorized",
-		Resource: map[string]interface{}{
-			"accountId": "ACC-LIFECYCLE",
-			"scope":     "read_write",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read", "taxes_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
 	updated, err := env.AuthResourceService.UpdateAuthResource(ctx, created.AuthID, testAuthResourceOrgID, updateRequest)
 	require.NoError(t, err)
 	assert.Equal(t, "authorized", updated.AuthStatus)
-	assert.Equal(t, "read_write", updated.Resource["scope"])
+	assert.NotNil(t, updated.ApprovedPurposeDetails, "ApprovedPurposeDetails should not be nil")
+	assert.Len(t, updated.ApprovedPurposeDetails.ApprovedPurposesNames, 2, "Should have 2 approved purposes")
+	assert.Contains(t, updated.ApprovedPurposeDetails.ApprovedPurposesNames, "taxes_read", "Should contain taxes_read purpose")
 
 	// Step 5: Get all auth resources for consent
 	t.Log("Step 5: Retrieving all auth resources for consent...")

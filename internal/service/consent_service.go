@@ -120,26 +120,26 @@ func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request 
 	// Create authorization resources
 	if len(request.AuthResources) > 0 {
 		for _, authReq := range request.AuthResources {
-			// Marshal resource map to JSON if present
-			var resourceJSON *string
-			if authReq.Resource != nil {
-				resourceBytes, err := json.Marshal(authReq.Resource)
+			// Marshal approved purpose details to JSON if present
+			var approvedPurposeDetailsJSON *string
+			if authReq.ApprovedPurposeDetails != nil {
+				approvedPurposeDetailsBytes, err := json.Marshal(authReq.ApprovedPurposeDetails)
 				if err != nil {
-					return nil, fmt.Errorf("failed to marshal auth resource: %w", err)
+					return nil, fmt.Errorf("failed to marshal approved purpose details: %w", err)
 				}
-				resourceStr := string(resourceBytes)
-				resourceJSON = &resourceStr
+				approvedPurposeDetailsStr := string(approvedPurposeDetailsBytes)
+				approvedPurposeDetailsJSON = &approvedPurposeDetailsStr
 			}
 
 			authResource := &models.ConsentAuthResource{
-				AuthID:      utils.GenerateAuthID(),
-				ConsentID:   consent.ConsentID,
-				AuthType:    authReq.AuthType,
-				UserID:      authReq.UserID,
-				AuthStatus:  authReq.AuthStatus,
-				UpdatedTime: consent.CreatedTime,
-				Resource:    resourceJSON,
-				OrgID:       consent.OrgID,
+				AuthID:                 utils.GenerateAuthID(),
+				ConsentID:              consent.ConsentID,
+				AuthType:               authReq.AuthType,
+				UserID:                 authReq.UserID,
+				AuthStatus:             authReq.AuthStatus,
+				UpdatedTime:            consent.CreatedTime,
+				ApprovedPurposeDetails: approvedPurposeDetailsJSON,
+				OrgID:                  consent.OrgID,
 			}
 
 			if err := s.authResourceDAO.CreateWithTx(ctx, tx, authResource); err != nil {
@@ -341,26 +341,26 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 
 		if len(request.AuthResources) > 0 {
 			for _, authReq := range request.AuthResources {
-				// Marshal resource map to JSON if present
-				var resourceJSON *string
-				if authReq.Resource != nil {
-					resourceBytes, err := json.Marshal(authReq.Resource)
+				// Marshal approved purpose details to JSON if present
+				var approvedPurposeDetailsJSON *string
+				if authReq.ApprovedPurposeDetails != nil {
+					approvedPurposeDetailsBytes, err := json.Marshal(authReq.ApprovedPurposeDetails)
 					if err != nil {
-						return nil, fmt.Errorf("failed to marshal auth resource: %w", err)
+						return nil, fmt.Errorf("failed to marshal approved purpose details: %w", err)
 					}
-					resourceStr := string(resourceBytes)
-					resourceJSON = &resourceStr
+					approvedPurposeDetailsStr := string(approvedPurposeDetailsBytes)
+					approvedPurposeDetailsJSON = &approvedPurposeDetailsStr
 				}
 
 				authResource := &models.ConsentAuthResource{
-					AuthID:      utils.GenerateAuthID(),
-					ConsentID:   consentID,
-					AuthType:    authReq.AuthType,
-					UserID:      authReq.UserID,
-					AuthStatus:  authReq.AuthStatus,
-					UpdatedTime: updatedConsent.UpdatedTime,
-					Resource:    resourceJSON,
-					OrgID:       orgID,
+					AuthID:                 utils.GenerateAuthID(),
+					ConsentID:              consentID,
+					AuthType:               authReq.AuthType,
+					UserID:                 authReq.UserID,
+					AuthStatus:             authReq.AuthStatus,
+					UpdatedTime:            updatedConsent.UpdatedTime,
+					ApprovedPurposeDetails: approvedPurposeDetailsJSON,
+					OrgID:                  orgID,
 				}
 
 				if err := s.authResourceDAO.CreateWithTx(ctx, tx, authResource); err != nil {
@@ -522,7 +522,19 @@ func (s *ConsentService) buildConsentResponse(consent *models.Consent, attribute
 	// Convert auth resources to response format
 	var authResourceResponses []models.ConsentAuthResource
 	if authResources != nil {
-		authResourceResponses = authResources
+		authResourceResponses = make([]models.ConsentAuthResource, len(authResources))
+		for i, ar := range authResources {
+			authResourceResponses[i] = ar
+			// Unmarshal approved purpose details if present
+			if ar.ApprovedPurposeDetails != nil {
+				var approvedPurposeDetails models.ApprovedPurposeDetails
+				if err := json.Unmarshal([]byte(*ar.ApprovedPurposeDetails), &approvedPurposeDetails); err != nil {
+					s.logger.WithError(err).Warn("Failed to unmarshal approved purpose details")
+				} else {
+					authResourceResponses[i].ApprovedPurposeDetailsObj = &approvedPurposeDetails
+				}
+			}
+		}
 	}
 
 	return &models.ConsentResponse{

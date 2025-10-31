@@ -94,11 +94,22 @@ func setupTestEnvironment(t *testing.T) *TestEnvironment {
 // cleanupTestData removes test data from database
 func cleanupTestData(t *testing.T, env *TestEnvironment, consentIDs ...string) {
 	ctx := context.Background()
+
+	// Try to delete with multiple org IDs since tests use different org IDs
+	orgIDs := []string{testOrgID, "test-org-auth-res", "TEST_CLIENT"}
+
 	for _, consentID := range consentIDs {
-		// Delete will cascade to related tables (attributes, audit, auth resources, files)
-		err := env.ConsentDAO.Delete(ctx, consentID, testOrgID)
-		if err != nil {
-			t.Logf("Warning: Failed to cleanup consent %s: %v", consentID, err)
+		deleted := false
+		for _, orgID := range orgIDs {
+			// Delete will cascade to related tables (attributes, audit, auth resources, files)
+			err := env.ConsentDAO.Delete(ctx, consentID, orgID)
+			if err == nil {
+				deleted = true
+				break
+			}
+		}
+		if !deleted {
+			t.Logf("Warning: Failed to cleanup consent %s with any org ID", consentID)
 		}
 	}
 }
@@ -229,19 +240,18 @@ func TestConsentCreate_WithAuthResources(t *testing.T) {
 			AuthType:   "account",
 			UserID:     &userID,
 			AuthStatus: "active",
-			Resource: map[string]interface{}{
-				"accountId":   "ACC-001",
-				"accountType": "savings",
-				"permissions": []string{"read", "write"},
+			ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+				ApprovedPurposesNames:       []string{"utility_read", "taxes_read"},
+				ApprovedAdditionalResources: []interface{}{},
 			},
 		},
 		{
 			AuthType:   "transaction",
 			UserID:     &userID,
 			AuthStatus: "active",
-			Resource: map[string]interface{}{
-				"transactionType": "debit",
-				"limit":           10000,
+			ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+				ApprovedPurposesNames:       []string{"utility_read"},
+				ApprovedAdditionalResources: []interface{}{},
 			},
 		},
 	}
@@ -271,11 +281,22 @@ func TestConsentCreate_WithAuthResources(t *testing.T) {
 	assert.Equal(t, "active", accountAuth.AuthStatus, "Account auth status should be active")
 	assert.Equal(t, &userID, accountAuth.UserID, "User ID should match")
 
+	// Verify approved purpose details for account auth
+	assert.NotNil(t, accountAuth.ApprovedPurposeDetailsObj, "Account auth should have approved purpose details")
+	assert.Len(t, accountAuth.ApprovedPurposeDetailsObj.ApprovedPurposesNames, 2, "Account auth should have 2 approved purposes")
+	assert.Contains(t, accountAuth.ApprovedPurposeDetailsObj.ApprovedPurposesNames, "utility_read", "Should contain utility_read purpose")
+	assert.Contains(t, accountAuth.ApprovedPurposeDetailsObj.ApprovedPurposesNames, "taxes_read", "Should contain taxes_read purpose")
+
 	// Verify transaction auth resource
 	transactionAuth, exists := authTypeMap["transaction"]
 	require.True(t, exists, "Transaction auth resource should exist")
 	assert.Equal(t, "active", transactionAuth.AuthStatus, "Transaction auth status should be active")
 	assert.Equal(t, &userID, transactionAuth.UserID, "User ID should match")
+
+	// Verify approved purpose details for transaction auth
+	assert.NotNil(t, transactionAuth.ApprovedPurposeDetailsObj, "Transaction auth should have approved purpose details")
+	assert.Len(t, transactionAuth.ApprovedPurposeDetailsObj.ApprovedPurposesNames, 1, "Transaction auth should have 1 approved purpose")
+	assert.Contains(t, transactionAuth.ApprovedPurposeDetailsObj.ApprovedPurposesNames, "utility_read", "Should contain utility_read purpose")
 
 	// Cleanup
 	cleanupTestData(t, env, response.ConsentID)
@@ -295,19 +316,18 @@ func TestConsentGet_Success(t *testing.T) {
 			AuthType:   "account",
 			UserID:     &userID,
 			AuthStatus: "active",
-			Resource: map[string]interface{}{
-				"accountId":   "ACC-001",
-				"accountType": "savings",
-				"permissions": []string{"read", "write"},
+			ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+				ApprovedPurposesNames:       []string{"utility_read", "taxes_read"},
+				ApprovedAdditionalResources: []interface{}{},
 			},
 		},
 		{
 			AuthType:   "transaction",
 			UserID:     &userID,
 			AuthStatus: "active",
-			Resource: map[string]interface{}{
-				"transactionType": "debit",
-				"limit":           10000,
+			ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+				ApprovedPurposesNames:       []string{"utility_read"},
+				ApprovedAdditionalResources: []interface{}{},
 			},
 		},
 	}
@@ -653,9 +673,9 @@ func TestConsentUpdate_FullPayload(t *testing.T) {
 			AuthType:   "account",
 			UserID:     stringPtr("user-123"),
 			AuthStatus: "AUTHORIZED",
-			Resource: map[string]interface{}{
-				"accountId": "ACC-001",
-				"type":      "savings",
+			ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+				ApprovedPurposesNames:       []string{"utility_read", "taxes_read"},
+				ApprovedAdditionalResources: []interface{}{},
 			},
 		},
 	}
@@ -665,6 +685,13 @@ func TestConsentUpdate_FullPayload(t *testing.T) {
 	assert.Equal(t, "awaitingAuthorization", created.CurrentStatus, "Initial status should be awaitingAuthorization")
 	assert.Equal(t, "account_access", created.Attributes["purpose"], "Initial attribute should match")
 	assert.Len(t, created.AuthResources, 1, "Should have 1 auth resource")
+
+	// Verify approved purpose details in created consent
+	assert.NotNil(t, created.AuthResources[0].ApprovedPurposeDetailsObj, "Should have approved purpose details")
+	assert.Len(t, created.AuthResources[0].ApprovedPurposeDetailsObj.ApprovedPurposesNames, 2, "Should have 2 approved purposes")
+	assert.Contains(t, created.AuthResources[0].ApprovedPurposeDetailsObj.ApprovedPurposesNames, "utility_read", "Should contain utility_read")
+	assert.Contains(t, created.AuthResources[0].ApprovedPurposeDetailsObj.ApprovedPurposesNames, "taxes_read", "Should contain taxes_read")
+
 	t.Logf("Step 1: Created consent %s", created.ConsentID)
 
 	defer cleanupTestData(t, env, created.ConsentID)
@@ -703,18 +730,18 @@ func TestConsentUpdate_FullPayload(t *testing.T) {
 				AuthType:   "account",
 				UserID:     stringPtr("user-456"),
 				AuthStatus: "ACTIVE",
-				Resource: map[string]interface{}{
-					"accountId": "ACC-002",
-					"type":      "checking",
+				ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+					ApprovedPurposesNames:       []string{"utility_read", "taxes_read"},
+					ApprovedAdditionalResources: []interface{}{},
 				},
 			},
 			{
 				AuthType:   "device",
 				UserID:     stringPtr("user-456"),
 				AuthStatus: "ACTIVE",
-				Resource: map[string]interface{}{
-					"deviceId":   "DEV-001",
-					"deviceType": "mobile",
+				ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+					ApprovedPurposesNames:       []string{"profile_read"},
+					ApprovedAdditionalResources: []interface{}{},
 				},
 			},
 		},
@@ -759,6 +786,17 @@ func TestConsentUpdate_FullPayload(t *testing.T) {
 
 	require.NotNil(t, accountAuth, "Should have account auth resource")
 	require.NotNil(t, deviceAuth, "Should have device auth resource")
+
+	// Verify approved purpose details for account auth
+	assert.NotNil(t, accountAuth.ApprovedPurposeDetailsObj, "Account auth should have approved purpose details")
+	assert.Len(t, accountAuth.ApprovedPurposeDetailsObj.ApprovedPurposesNames, 2, "Account auth should have 2 approved purposes")
+	assert.Contains(t, accountAuth.ApprovedPurposeDetailsObj.ApprovedPurposesNames, "utility_read", "Should contain utility_read")
+	assert.Contains(t, accountAuth.ApprovedPurposeDetailsObj.ApprovedPurposesNames, "taxes_read", "Should contain taxes_read")
+
+	// Verify approved purpose details for device auth
+	assert.NotNil(t, deviceAuth.ApprovedPurposeDetailsObj, "Device auth should have approved purpose details")
+	assert.Len(t, deviceAuth.ApprovedPurposeDetailsObj.ApprovedPurposesNames, 1, "Device auth should have 1 approved purpose")
+	assert.Contains(t, deviceAuth.ApprovedPurposeDetailsObj.ApprovedPurposesNames, "profile_read", "Should contain profile_read")
 
 	assert.Equal(t, "ACTIVE", accountAuth.AuthStatus, "Account auth status should be ACTIVE")
 	assert.Equal(t, "user-456", *accountAuth.UserID, "Account user ID should be updated")

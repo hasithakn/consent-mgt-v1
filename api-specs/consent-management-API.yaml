@@ -1535,9 +1535,8 @@ components:
       type: object
       description: Payload for creating or updating an authorization resource.
       required:
-        - authorizationStatus
-        - authorizationType
-        - userId
+        - type
+        - status
       properties:
         userId:
           description: The unique ID of the user who performed this authorization.
@@ -1551,9 +1550,22 @@ components:
           description: The current status of this specific authorization (e.g., 'created', 'authorised', 'rejected').
           type: string
           example: "created"
-        resource:
-          description: Additional resource data related to the authorization.
+        approvedPurposeDetails:
+          description: Details of approved purposes and additional resources for this authorization.
           type: object
+          properties:
+            approvedPurposesNames:
+              description: Array of approved consent purpose names.
+              type: array
+              items:
+                type: string
+              example: ["utility_read", "taxes_read"]
+            approvedAdditionalResources:
+              description: Array of additional approved resources (flexible structure).
+              type: array
+              items:
+                type: object
+              example: []
     ConsentRevokePayload:
       type: object
       description: The request body for revoking a consent.
@@ -1631,9 +1643,22 @@ components:
           description: The current status of this specific authorization (e.g., 'created', 'authorised', 'rejected').
           type: string
           example: "created"
-        resource:
-          description: Additional resource data related to the authorization.
+        approvedPurposeDetails:
+          description: Details of approved purposes and additional resources for this authorization.
           type: object
+          properties:
+            approvedPurposesNames:
+              description: Array of approved consent purpose names.
+              type: array
+              items:
+                type: string
+              example: ["utility_read", "taxes_read"]
+            approvedAdditionalResources:
+              description: Array of additional approved resources (flexible structure).
+              type: array
+              items:
+                type: object
+              example: []
     ConsentAuthorizationCreateResponse:
       type: object
       description: Represents a detaild authorization object.
@@ -1657,9 +1682,22 @@ components:
         updatedTime:
           type: integer
           format: int32
-        resource:
-          description: Additional resource data related to the authorization.
+        approvedPurposeDetails:
+          description: Details of approved purposes and additional resources for this authorization.
           type: object
+          properties:
+            approvedPurposesNames:
+              description: Array of approved consent purpose names.
+              type: array
+              items:
+                type: string
+              example: ["utility_read", "taxes_read"]
+            approvedAdditionalResources:
+              description: Array of additional approved resources (flexible structure).
+              type: array
+              items:
+                type: object
+              example: []
     ConsentErrorCommon:
       type: object
       description: A standardized error response object.
@@ -2050,9 +2088,22 @@ components:
         updatedTime:
           type: integer
           format: int32
-        resource:
-          description: Additional resource data related to the authorization.
+        approvedPurposeDetails:
+          description: Details of approved purposes and additional resources for this authorization.
           type: object
+          properties:
+            approvedPurposesNames:
+              description: Array of approved consent purpose names.
+              type: array
+              items:
+                type: string
+              example: ["utility_read", "taxes_read"]
+            approvedAdditionalResources:
+              description: Array of additional approved resources (flexible structure).
+              type: array
+              items:
+                type: object
+              example: []
     ValidateRequest:
       type: object
       description: Request payload for validating a consent for a specific action.

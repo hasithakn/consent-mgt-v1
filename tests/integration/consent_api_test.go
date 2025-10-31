@@ -217,8 +217,9 @@ func TestAPI_CreateConsentWithAuthResources(t *testing.T) {
 				UserID: "user-789",
 				Type:   "authorization_code",
 				Status: "authorized",
-				Resource: map[string]interface{}{
-					"scopes": []string{"read", "write"},
+				ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+					ApprovedPurposesNames:       []string{"utility_read", "taxes_read"},
+					ApprovedAdditionalResources: []interface{}{},
 				},
 			},
 		},
@@ -253,6 +254,12 @@ func TestAPI_CreateConsentWithAuthResources(t *testing.T) {
 	assert.NotNil(t, response.Authorizations[0].UserID)
 	assert.Equal(t, "user-789", *response.Authorizations[0].UserID)
 
+	// Verify approved purpose details
+	assert.NotNil(t, response.Authorizations[0].ApprovedPurposeDetails, "ApprovedPurposeDetails should not be nil")
+	assert.Len(t, response.Authorizations[0].ApprovedPurposeDetails.ApprovedPurposesNames, 2, "Should have 2 approved purposes")
+	assert.Contains(t, response.Authorizations[0].ApprovedPurposeDetails.ApprovedPurposesNames, "utility_read", "Should contain utility_read purpose")
+	assert.Contains(t, response.Authorizations[0].ApprovedPurposeDetails.ApprovedPurposesNames, "taxes_read", "Should contain taxes_read purpose")
+
 	// Verify auth resources were created in database
 	ctx := context.Background()
 	authResources, err := env.AuthResourceDAO.GetByConsentID(ctx, response.ID, "TEST_ORG")
@@ -260,6 +267,7 @@ func TestAPI_CreateConsentWithAuthResources(t *testing.T) {
 	assert.Len(t, authResources, 1)
 	assert.Equal(t, "authorization_code", authResources[0].AuthType)
 	assert.Equal(t, "authorized", authResources[0].AuthStatus)
+	assert.NotNil(t, authResources[0].ApprovedPurposeDetails, "Database should have approved purpose details")
 
 	// Cleanup
 	cleanupAPITestData(t, env, response.ID)

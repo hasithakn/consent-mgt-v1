@@ -99,10 +99,10 @@ type ConsentAPIRequest struct {
 
 // AuthorizationAPIRequest represents the API payload for authorization resource (external format)
 type AuthorizationAPIRequest struct {
-	UserID   string                 `json:"userId,omitempty"`
-	Type     string                 `json:"type" binding:"required"`
-	Status   string                 `json:"status" binding:"required"`
-	Resource map[string]interface{} `json:"resource,omitempty"`
+	UserID                 string                  `json:"userId,omitempty"`
+	Type                   string                  `json:"type" binding:"required"`
+	Status                 string                  `json:"status" binding:"required"`
+	ApprovedPurposeDetails *ApprovedPurposeDetails `json:"approvedPurposeDetails,omitempty"`
 }
 
 // ToAuthResourceCreateRequest converts API request format to internal format
@@ -113,19 +113,19 @@ func (req *AuthorizationAPIRequest) ToAuthResourceCreateRequest() *ConsentAuthRe
 	}
 
 	return &ConsentAuthResourceCreateRequest{
-		AuthType:   req.Type,
-		UserID:     userID,
-		AuthStatus: req.Status,
-		Resource:   req.Resource,
+		AuthType:               req.Type,
+		UserID:                 userID,
+		AuthStatus:             req.Status,
+		ApprovedPurposeDetails: req.ApprovedPurposeDetails,
 	}
 }
 
 // AuthorizationAPIUpdateRequest represents the API payload for updating authorization resource (external format)
 type AuthorizationAPIUpdateRequest struct {
-	UserID   string                 `json:"userId,omitempty"`
-	Type     string                 `json:"type,omitempty"`
-	Status   string                 `json:"status,omitempty"`
-	Resource map[string]interface{} `json:"resource,omitempty"`
+	UserID                 string                  `json:"userId,omitempty"`
+	Type                   string                  `json:"type,omitempty"`
+	Status                 string                  `json:"status,omitempty"`
+	ApprovedPurposeDetails *ApprovedPurposeDetails `json:"approvedPurposeDetails,omitempty"`
 }
 
 // ToAuthResourceUpdateRequest converts API update request format to internal format
@@ -136,9 +136,9 @@ func (req *AuthorizationAPIUpdateRequest) ToAuthResourceUpdateRequest() *Consent
 	}
 
 	return &ConsentAuthResourceUpdateRequest{
-		AuthStatus: req.Status,
-		UserID:     userID,
-		Resource:   req.Resource,
+		AuthStatus:             req.Status,
+		UserID:                 userID,
+		ApprovedPurposeDetails: req.ApprovedPurposeDetails,
 	}
 }
 
@@ -265,10 +265,10 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 			}
 
 			createReq.AuthResources[i] = ConsentAuthResourceCreateRequest{
-				AuthType:   auth.Type,
-				UserID:     userID,
-				AuthStatus: auth.Status,
-				Resource:   auth.Resource,
+				AuthType:               auth.Type,
+				UserID:                 userID,
+				AuthStatus:             auth.Status,
+				ApprovedPurposeDetails: auth.ApprovedPurposeDetails,
 			}
 		}
 	}
@@ -299,10 +299,10 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 			}
 
 			updateReq.AuthResources[i] = ConsentAuthResourceCreateRequest{
-				AuthType:   auth.Type,
-				UserID:     userID,
-				AuthStatus: auth.Status,
-				Resource:   auth.Resource,
+				AuthType:               auth.Type,
+				UserID:                 userID,
+				AuthStatus:             auth.Status,
+				ApprovedPurposeDetails: auth.ApprovedPurposeDetails,
 			}
 		}
 	}
@@ -330,12 +330,12 @@ type ConsentAPIResponse struct {
 
 // AuthorizationAPIResponse represents the API response format for authorization resource (external format)
 type AuthorizationAPIResponse struct {
-	ID          string                 `json:"id"`
-	UserID      *string                `json:"userId"`
-	Type        string                 `json:"type"`
-	Status      string                 `json:"status"`
-	UpdatedTime int64                  `json:"updatedTime"`
-	Resource    map[string]interface{} `json:"resource"`
+	ID                     string                  `json:"id"`
+	UserID                 *string                 `json:"userId"`
+	Type                   string                  `json:"type"`
+	Status                 string                  `json:"status"`
+	UpdatedTime            int64                   `json:"updatedTime"`
+	ApprovedPurposeDetails *ApprovedPurposeDetails `json:"approvedPurposeDetails,omitempty"`
 }
 
 // ToAPIResponse converts internal response format to API response format
@@ -373,24 +373,22 @@ func (resp *ConsentResponse) ToAPIResponse() *ConsentAPIResponse {
 	if len(resp.AuthResources) > 0 {
 		apiResp.Authorizations = make([]AuthorizationAPIResponse, len(resp.AuthResources))
 		for i, auth := range resp.AuthResources {
-			// Parse resource JSON string to map
-			var resourceMap map[string]interface{}
-			if auth.Resource != nil && *auth.Resource != "" {
-				if err := json.Unmarshal([]byte(*auth.Resource), &resourceMap); err != nil {
-					// If unmarshal fails, use empty map
-					resourceMap = make(map[string]interface{})
+			// Parse approvedPurposeDetails JSON string to struct
+			var approvedPurposeDetails *ApprovedPurposeDetails
+			if auth.ApprovedPurposeDetails != nil && *auth.ApprovedPurposeDetails != "" {
+				var details ApprovedPurposeDetails
+				if err := json.Unmarshal([]byte(*auth.ApprovedPurposeDetails), &details); err == nil {
+					approvedPurposeDetails = &details
 				}
-			} else {
-				resourceMap = make(map[string]interface{})
 			}
 
 			apiResp.Authorizations[i] = AuthorizationAPIResponse{
-				ID:          auth.AuthID,
-				UserID:      auth.UserID,
-				Type:        auth.AuthType,
-				Status:      auth.AuthStatus,
-				UpdatedTime: auth.UpdatedTime,
-				Resource:    resourceMap,
+				ID:                     auth.AuthID,
+				UserID:                 auth.UserID,
+				Type:                   auth.AuthType,
+				Status:                 auth.AuthStatus,
+				UpdatedTime:            auth.UpdatedTime,
+				ApprovedPurposeDetails: approvedPurposeDetails,
 			}
 		}
 	}

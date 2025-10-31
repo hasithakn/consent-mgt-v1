@@ -24,7 +24,7 @@ func (dao *AuthResourceDAO) Create(ctx context.Context, authResource *models.Con
 	query := `
 		INSERT INTO FS_CONSENT_AUTH_RESOURCE (
 			AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-			UPDATED_TIME, RESOURCE, ORG_ID
+			UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
@@ -37,7 +37,7 @@ func (dao *AuthResourceDAO) Create(ctx context.Context, authResource *models.Con
 		authResource.UserID,
 		authResource.AuthStatus,
 		authResource.UpdatedTime,
-		authResource.Resource,
+		authResource.ApprovedPurposeDetails,
 		authResource.OrgID,
 	)
 
@@ -53,7 +53,7 @@ func (dao *AuthResourceDAO) CreateWithTx(ctx context.Context, tx *database.Trans
 	query := `
 		INSERT INTO FS_CONSENT_AUTH_RESOURCE (
 			AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-			UPDATED_TIME, RESOURCE, ORG_ID
+			UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
@@ -66,7 +66,7 @@ func (dao *AuthResourceDAO) CreateWithTx(ctx context.Context, tx *database.Trans
 		authResource.UserID,
 		authResource.AuthStatus,
 		authResource.UpdatedTime,
-		authResource.Resource,
+		authResource.ApprovedPurposeDetails,
 		authResource.OrgID,
 	)
 
@@ -81,7 +81,7 @@ func (dao *AuthResourceDAO) CreateWithTx(ctx context.Context, tx *database.Trans
 func (dao *AuthResourceDAO) GetByID(ctx context.Context, authID, orgID string) (*models.ConsentAuthResource, error) {
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-		       UPDATED_TIME, RESOURCE, ORG_ID
+		       UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
 		FROM FS_CONSENT_AUTH_RESOURCE
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
@@ -102,7 +102,7 @@ func (dao *AuthResourceDAO) GetByID(ctx context.Context, authID, orgID string) (
 func (dao *AuthResourceDAO) GetByIDWithTx(ctx context.Context, tx *database.Transaction, authID, orgID string) (*models.ConsentAuthResource, error) {
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-		       UPDATED_TIME, RESOURCE, ORG_ID
+		       UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
 		FROM FS_CONSENT_AUTH_RESOURCE
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
@@ -123,7 +123,7 @@ func (dao *AuthResourceDAO) GetByIDWithTx(ctx context.Context, tx *database.Tran
 func (dao *AuthResourceDAO) GetByConsentID(ctx context.Context, consentID, orgID string) ([]models.ConsentAuthResource, error) {
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-		       UPDATED_TIME, RESOURCE, ORG_ID
+		       UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
 		FROM FS_CONSENT_AUTH_RESOURCE
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 		ORDER BY UPDATED_TIME DESC
@@ -142,7 +142,7 @@ func (dao *AuthResourceDAO) GetByConsentID(ctx context.Context, consentID, orgID
 func (dao *AuthResourceDAO) GetByConsentIDWithTx(ctx context.Context, tx *database.Transaction, consentID, orgID string) ([]models.ConsentAuthResource, error) {
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-		       UPDATED_TIME, RESOURCE, ORG_ID
+		       UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
 		FROM FS_CONSENT_AUTH_RESOURCE
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 		ORDER BY UPDATED_TIME DESC
@@ -161,7 +161,7 @@ func (dao *AuthResourceDAO) GetByConsentIDWithTx(ctx context.Context, tx *databa
 func (dao *AuthResourceDAO) Update(ctx context.Context, authResource *models.ConsentAuthResource) error {
 	query := `
 		UPDATE FS_CONSENT_AUTH_RESOURCE
-		SET AUTH_STATUS = ?, USER_ID = ?, RESOURCE = ?, UPDATED_TIME = ?
+		SET AUTH_STATUS = ?, USER_ID = ?, APPROVED_PURPOSE_DETAILS = ?, UPDATED_TIME = ?
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
 
@@ -170,7 +170,7 @@ func (dao *AuthResourceDAO) Update(ctx context.Context, authResource *models.Con
 		query,
 		authResource.AuthStatus,
 		authResource.UserID,
-		authResource.Resource,
+		authResource.ApprovedPurposeDetails,
 		authResource.UpdatedTime,
 		authResource.AuthID,
 		authResource.OrgID,
@@ -196,7 +196,7 @@ func (dao *AuthResourceDAO) Update(ctx context.Context, authResource *models.Con
 func (dao *AuthResourceDAO) UpdateWithTx(ctx context.Context, tx *database.Transaction, authResource *models.ConsentAuthResource) error {
 	query := `
 		UPDATE FS_CONSENT_AUTH_RESOURCE
-		SET AUTH_STATUS = ?, USER_ID = ?, RESOURCE = ?, UPDATED_TIME = ?
+		SET AUTH_STATUS = ?, USER_ID = ?, APPROVED_PURPOSE_DETAILS = ?, UPDATED_TIME = ?
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
 
@@ -205,7 +205,7 @@ func (dao *AuthResourceDAO) UpdateWithTx(ctx context.Context, tx *database.Trans
 		query,
 		authResource.AuthStatus,
 		authResource.UserID,
-		authResource.Resource,
+		authResource.ApprovedPurposeDetails,
 		authResource.UpdatedTime,
 		authResource.AuthID,
 		authResource.OrgID,

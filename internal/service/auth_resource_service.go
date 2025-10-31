@@ -54,27 +54,27 @@ func (s *AuthResourceService) CreateAuthResource(ctx context.Context, consentID,
 		return nil, fmt.Errorf("consent not found: %w", err)
 	}
 
-	// Marshal resource map to JSON if present
-	var resourceJSON *string
-	if request.Resource != nil {
-		resourceBytes, err := json.Marshal(request.Resource)
+	// Marshal approvedPurposeDetails to JSON if present
+	var approvedPurposeDetailsJSON *string
+	if request.ApprovedPurposeDetails != nil {
+		detailsBytes, err := json.Marshal(request.ApprovedPurposeDetails)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal resource: %w", err)
+			return nil, fmt.Errorf("failed to marshal approvedPurposeDetails: %w", err)
 		}
-		resourceStr := string(resourceBytes)
-		resourceJSON = &resourceStr
+		detailsStr := string(detailsBytes)
+		approvedPurposeDetailsJSON = &detailsStr
 	}
 
 	// Build auth resource model
 	authResource := &models.ConsentAuthResource{
-		AuthID:      utils.GenerateAuthID(),
-		ConsentID:   consentID,
-		AuthType:    request.AuthType,
-		UserID:      request.UserID,
-		AuthStatus:  request.AuthStatus,
-		UpdatedTime: utils.GetCurrentTimeMillis(),
-		Resource:    resourceJSON,
-		OrgID:       orgID,
+		AuthID:                 utils.GenerateAuthID(),
+		ConsentID:              consentID,
+		AuthType:               request.AuthType,
+		UserID:                 request.UserID,
+		AuthStatus:             request.AuthStatus,
+		UpdatedTime:            utils.GetCurrentTimeMillis(),
+		ApprovedPurposeDetails: approvedPurposeDetailsJSON,
+		OrgID:                  orgID,
 	}
 
 	// Create auth resource
@@ -165,13 +165,13 @@ func (s *AuthResourceService) UpdateAuthResource(ctx context.Context, authID, or
 		updatedAuthResource.UserID = request.UserID
 	}
 
-	if request.Resource != nil {
-		resourceBytes, err := json.Marshal(request.Resource)
+	if request.ApprovedPurposeDetails != nil {
+		detailsBytes, err := json.Marshal(request.ApprovedPurposeDetails)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal resource: %w", err)
+			return nil, fmt.Errorf("failed to marshal approvedPurposeDetails: %w", err)
 		}
-		resourceStr := string(resourceBytes)
-		updatedAuthResource.Resource = &resourceStr
+		detailsStr := string(detailsBytes)
+		updatedAuthResource.ApprovedPurposeDetails = &detailsStr
 	}
 
 	// Update auth resource
@@ -219,19 +219,22 @@ func (s *AuthResourceService) validateAuthResourceCreateRequest(request *models.
 }
 
 func (s *AuthResourceService) buildAuthResourceResponse(authResource *models.ConsentAuthResource) *models.ConsentAuthResourceResponse {
-	var resourceMap map[string]interface{}
-	if authResource.Resource != nil {
-		json.Unmarshal([]byte(*authResource.Resource), &resourceMap)
+	var approvedPurposeDetails *models.ApprovedPurposeDetails
+	if authResource.ApprovedPurposeDetails != nil {
+		var details models.ApprovedPurposeDetails
+		if err := json.Unmarshal([]byte(*authResource.ApprovedPurposeDetails), &details); err == nil {
+			approvedPurposeDetails = &details
+		}
 	}
 
 	return &models.ConsentAuthResourceResponse{
-		AuthID:      authResource.AuthID,
-		ConsentID:   authResource.ConsentID,
-		AuthType:    authResource.AuthType,
-		UserID:      authResource.UserID,
-		AuthStatus:  authResource.AuthStatus,
-		UpdatedTime: authResource.UpdatedTime,
-		Resource:    resourceMap,
-		OrgID:       authResource.OrgID,
+		AuthID:                 authResource.AuthID,
+		ConsentID:              authResource.ConsentID,
+		AuthType:               authResource.AuthType,
+		UserID:                 authResource.UserID,
+		AuthStatus:             authResource.AuthStatus,
+		UpdatedTime:            authResource.UpdatedTime,
+		ApprovedPurposeDetails: approvedPurposeDetails,
+		OrgID:                  authResource.OrgID,
 	}
 }

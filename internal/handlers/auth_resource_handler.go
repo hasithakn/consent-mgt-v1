@@ -181,18 +181,12 @@ func (h *AuthResourceHandler) UpdateAuthResource(c *gin.Context) {
 
 // toAuthResourceAPIResponse converts internal auth resource response to API format
 func toAuthResourceAPIResponse(authResource *models.ConsentAuthResourceResponse) *models.AuthorizationAPIResponse {
-	// Initialize resource with empty object if nil
-	resource := authResource.Resource
-	if resource == nil {
-		resource = make(map[string]interface{})
-	}
-
 	return &models.AuthorizationAPIResponse{
-		ID:          authResource.AuthID,
-		UserID:      authResource.UserID,
-		Type:        authResource.AuthType,
-		Status:      authResource.AuthStatus,
-		UpdatedTime: authResource.UpdatedTime,
-		Resource:    resource,
+		ID:                     authResource.AuthID,
+		UserID:                 authResource.UserID,
+		Type:                   authResource.AuthType,
+		Status:                 authResource.AuthStatus,
+		UpdatedTime:            authResource.UpdatedTime,
+		ApprovedPurposeDetails: authResource.ApprovedPurposeDetails,
 	}
 }

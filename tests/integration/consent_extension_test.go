@@ -194,7 +194,7 @@ func TestExtension_PreCreateConsent_WithValidPurposes(t *testing.T) {
 
 	// Clean up test data
 	defer func() {
-		_, _ = db.Exec("DELETE FROM CONSENT WHERE ORG_ID = 'TEST_ORG'")
+		_, _ = db.Exec("DELETE FROM FS_CONSENT WHERE ORG_ID = 'TEST_ORG'")
 		_, _ = db.Exec("DELETE FROM CONSENT_PURPOSE WHERE ORG_ID = 'TEST_ORG'")
 	}()
 
@@ -319,7 +319,7 @@ func TestExtension_PreCreateConsent_WithInvalidPurposes(t *testing.T) {
 	router, db, _ := setupExtensionTestEnvironment(t, mockServer)
 
 	defer func() {
-		_, _ = db.Exec("DELETE FROM CONSENT WHERE ORG_ID = 'TEST_ORG'")
+		_, _ = db.Exec("DELETE FROM FS_CONSENT WHERE ORG_ID = 'TEST_ORG'")
 		_, _ = db.Exec("DELETE FROM CONSENT_PURPOSE WHERE ORG_ID = 'TEST_ORG'")
 	}()
 
@@ -378,7 +378,7 @@ func TestExtension_PreCreateConsent_ExtensionError(t *testing.T) {
 	router, db, _ := setupExtensionTestEnvironment(t, mockServer)
 
 	defer func() {
-		_, _ = db.Exec("DELETE FROM CONSENT WHERE ORG_ID = 'TEST_ORG'")
+		_, _ = db.Exec("DELETE FROM FS_CONSENT WHERE ORG_ID = 'TEST_ORG'")
 	}()
 
 	// Create consent via API
@@ -449,7 +449,7 @@ func TestExtension_PreCreateConsent_ModifiedConsentData(t *testing.T) {
 	router, db, _ := setupExtensionTestEnvironment(t, mockServer)
 
 	defer func() {
-		_, _ = db.Exec("DELETE FROM CONSENT WHERE ORG_ID = 'TEST_ORG'")
+		_, _ = db.Exec("DELETE FROM FS_CONSENT WHERE ORG_ID = 'TEST_ORG'")
 	}()
 
 	// Create consent via API
@@ -494,7 +494,7 @@ func TestExtension_PreUpdateConsent_WithValidPurposes(t *testing.T) {
 	router, db, purposeService := setupExtensionTestEnvironment(t, mockServer)
 
 	defer func() {
-		_, _ = db.Exec("DELETE FROM CONSENT WHERE ORG_ID = 'TEST_ORG'")
+		_, _ = db.Exec("DELETE FROM FS_CONSENT WHERE ORG_ID = 'TEST_ORG'")
 		_, _ = db.Exec("DELETE FROM CONSENT_PURPOSE WHERE ORG_ID = 'TEST_ORG'")
 	}()
 
@@ -638,7 +638,7 @@ func TestExtension_PreUpdateConsent_WithInvalidPurposes(t *testing.T) {
 	router, db, _ := setupExtensionTestEnvironment(t, mockServer)
 
 	defer func() {
-		_, _ = db.Exec("DELETE FROM CONSENT WHERE ORG_ID = 'TEST_ORG'")
+		_, _ = db.Exec("DELETE FROM FS_CONSENT WHERE ORG_ID = 'TEST_ORG'")
 		_, _ = db.Exec("DELETE FROM CONSENT_PURPOSE WHERE ORG_ID = 'TEST_ORG'")
 	}()
 

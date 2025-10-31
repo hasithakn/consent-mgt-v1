@@ -22,7 +22,7 @@ func TestConsentPurposeMapping_CreateWithPurposes(t *testing.T) {
 	router, db, purposeService := setupExtensionTestEnvironment(t, mockServer)
 
 	defer func() {
-		_, _ = db.Exec("DELETE FROM CONSENT WHERE ORG_ID = 'TEST_ORG'")
+		_, _ = db.Exec("DELETE FROM FS_CONSENT WHERE ORG_ID = 'TEST_ORG'")
 		_, _ = db.Exec("DELETE FROM CONSENT_PURPOSE WHERE ORG_ID = 'TEST_ORG'")
 	}()
 
@@ -118,7 +118,7 @@ func TestConsentPurposeMapping_UpdateWithPurposes(t *testing.T) {
 	router, db, purposeService := setupExtensionTestEnvironment(t, mockServer)
 
 	defer func() {
-		_, _ = db.Exec("DELETE FROM CONSENT WHERE ORG_ID = 'TEST_ORG'")
+		_, _ = db.Exec("DELETE FROM FS_CONSENT WHERE ORG_ID = 'TEST_ORG'")
 		_, _ = db.Exec("DELETE FROM CONSENT_PURPOSE WHERE ORG_ID = 'TEST_ORG'")
 	}()
 
@@ -256,7 +256,7 @@ func TestConsentPurposeMapping_MultipleConsents(t *testing.T) {
 	router, db, purposeService := setupExtensionTestEnvironment(t, mockServer)
 
 	defer func() {
-		_, _ = db.Exec("DELETE FROM CONSENT WHERE ORG_ID = 'TEST_ORG'")
+		_, _ = db.Exec("DELETE FROM FS_CONSENT WHERE ORG_ID = 'TEST_ORG'")
 		_, _ = db.Exec("DELETE FROM CONSENT_PURPOSE WHERE ORG_ID = 'TEST_ORG'")
 	}()
 

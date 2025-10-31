@@ -58,8 +58,9 @@ func TestAPI_CreateAuthResource(t *testing.T) {
 		UserID: "user123",
 		Type:   "account",
 		Status: "authorized",
-		Resource: map[string]interface{}{
-			"accountId": "ACC-123",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read", "taxes_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -75,6 +76,10 @@ func TestAPI_CreateAuthResource(t *testing.T) {
 	env.Router.ServeHTTP(authRecorder, authReqHTTP)
 
 	// Assert response
+	if authRecorder.Code != http.StatusCreated {
+		t.Logf("Response Status: %d", authRecorder.Code)
+		t.Logf("Response Body: %s", authRecorder.Body.String())
+	}
 	assert.Equal(t, http.StatusCreated, authRecorder.Code, "Expected 201 Created status")
 
 	var authResponse models.AuthorizationAPIResponse
@@ -87,8 +92,10 @@ func TestAPI_CreateAuthResource(t *testing.T) {
 	assert.Equal(t, "user123", *authResponse.UserID)
 	assert.Equal(t, "account", authResponse.Type)
 	assert.Equal(t, "authorized", authResponse.Status)
-	assert.NotNil(t, authResponse.Resource)
-	assert.Equal(t, "ACC-123", authResponse.Resource["accountId"])
+	assert.NotNil(t, authResponse.ApprovedPurposeDetails)
+	assert.Equal(t, 2, len(authResponse.ApprovedPurposeDetails.ApprovedPurposesNames))
+	assert.Contains(t, authResponse.ApprovedPurposeDetails.ApprovedPurposesNames, "utility_read")
+	assert.Contains(t, authResponse.ApprovedPurposeDetails.ApprovedPurposesNames, "taxes_read")
 
 	// Cleanup
 	cleanupAPITestData(t, env, consentResponse.ID)
@@ -103,8 +110,9 @@ func TestAPI_CreateAuthResourceConsentNotFound(t *testing.T) {
 		UserID: "user123",
 		Type:   "account",
 		Status: "authorized",
-		Resource: map[string]interface{}{
-			"accountId": "ACC-123",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -245,9 +253,9 @@ func TestAPI_GetAuthResource(t *testing.T) {
 		UserID: "user456",
 		Type:   "payment",
 		Status: "pending",
-		Resource: map[string]interface{}{
-			"paymentId": "PAY-456",
-			"amount":    "100.00",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read", "taxes_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -290,9 +298,10 @@ func TestAPI_GetAuthResource(t *testing.T) {
 	assert.Equal(t, "user456", *authGetResponse.UserID)
 	assert.Equal(t, "payment", authGetResponse.Type)
 	assert.Equal(t, "pending", authGetResponse.Status)
-	assert.NotNil(t, authGetResponse.Resource)
-	assert.Equal(t, "PAY-456", authGetResponse.Resource["paymentId"])
-	assert.Equal(t, "100.00", authGetResponse.Resource["amount"])
+	assert.NotNil(t, authGetResponse.ApprovedPurposeDetails)
+	assert.Equal(t, 2, len(authGetResponse.ApprovedPurposeDetails.ApprovedPurposesNames))
+	assert.Contains(t, authGetResponse.ApprovedPurposeDetails.ApprovedPurposesNames, "utility_read")
+	assert.Contains(t, authGetResponse.ApprovedPurposeDetails.ApprovedPurposesNames, "taxes_read")
 
 	// Cleanup
 	cleanupAPITestData(t, env, consentResponse.ID)
@@ -449,8 +458,9 @@ func TestAPI_GetAuthResourceInvalidConsentID(t *testing.T) {
 		UserID: "user123",
 		Type:   "account",
 		Status: "authorized",
-		Resource: map[string]interface{}{
-			"accountId": "ACC-123",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -564,8 +574,9 @@ func TestAPI_UpdateAuthResource(t *testing.T) {
 		UserID: "user123",
 		Type:   "account",
 		Status: "awaitingAuthorization",
-		Resource: map[string]interface{}{
-			"accountId": "ACC-123",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -591,9 +602,9 @@ func TestAPI_UpdateAuthResource(t *testing.T) {
 	updateReq := &models.AuthorizationAPIUpdateRequest{
 		UserID: "user456",
 		Status: "authorized",
-		Resource: map[string]interface{}{
-			"accountId":   "ACC-456",
-			"permissions": []string{"read", "write"},
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read", "taxes_read", "profile_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 
@@ -624,8 +635,9 @@ func TestAPI_UpdateAuthResource(t *testing.T) {
 	assert.Equal(t, "user456", *authUpdateResponse.UserID)
 	assert.Equal(t, "account", authUpdateResponse.Type) // Type should not change
 	assert.Equal(t, "authorized", authUpdateResponse.Status)
-	assert.NotNil(t, authUpdateResponse.Resource)
-	assert.Equal(t, "ACC-456", authUpdateResponse.Resource["accountId"])
+	assert.NotNil(t, authUpdateResponse.ApprovedPurposeDetails)
+	assert.Equal(t, 3, len(authUpdateResponse.ApprovedPurposeDetails.ApprovedPurposesNames))
+	assert.Contains(t, authUpdateResponse.ApprovedPurposeDetails.ApprovedPurposesNames, "profile_read")
 
 	// Cleanup
 	cleanupAPITestData(t, env, consentResponse.ID)
@@ -698,8 +710,9 @@ func TestAPI_UpdateAuthResourceInvalidConsentID(t *testing.T) {
 		UserID: "user123",
 		Type:   "account",
 		Status: "authorized",
-		Resource: map[string]interface{}{
-			"accountId": "ACC-123",
+		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
+			ApprovedPurposesNames:       []string{"utility_read"},
+			ApprovedAdditionalResources: []interface{}{},
 		},
 	}
 

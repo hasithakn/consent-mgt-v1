@@ -3,6 +3,7 @@ package dao
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"github.com/wso2/consent-management-api/internal/database"
@@ -95,6 +96,14 @@ func (dao *AuthResourceDAO) GetByID(ctx context.Context, authID, orgID string) (
 		return nil, fmt.Errorf("failed to get auth resource: %w", err)
 	}
 
+	// After loading a single resource
+	if authResource.ApprovedPurposeDetails != nil && *authResource.ApprovedPurposeDetails != "" {
+		var details models.ApprovedPurposeDetails
+		if err := json.Unmarshal([]byte(*authResource.ApprovedPurposeDetails), &details); err == nil {
+			authResource.ApprovedPurposeDetailsObj = &details
+		}
+	}
+
 	return &authResource, nil
 }
 
@@ -116,6 +125,14 @@ func (dao *AuthResourceDAO) GetByIDWithTx(ctx context.Context, tx *database.Tran
 		return nil, fmt.Errorf("failed to get auth resource: %w", err)
 	}
 
+	// After loading a single resource
+	if authResource.ApprovedPurposeDetails != nil && *authResource.ApprovedPurposeDetails != "" {
+		var details models.ApprovedPurposeDetails
+		if err := json.Unmarshal([]byte(*authResource.ApprovedPurposeDetails), &details); err == nil {
+			authResource.ApprovedPurposeDetailsObj = &details
+		}
+	}
+
 	return &authResource, nil
 }
 
@@ -135,6 +152,16 @@ func (dao *AuthResourceDAO) GetByConsentID(ctx context.Context, consentID, orgID
 		return nil, fmt.Errorf("failed to get auth resources by consent ID: %w", err)
 	}
 
+	// After loading multiple resources
+	for i := range authResources {
+		if authResources[i].ApprovedPurposeDetails != nil && *authResources[i].ApprovedPurposeDetails != "" {
+			var details models.ApprovedPurposeDetails
+			if err := json.Unmarshal([]byte(*authResources[i].ApprovedPurposeDetails), &details); err == nil {
+				authResources[i].ApprovedPurposeDetailsObj = &details
+			}
+		}
+	}
+
 	return authResources, nil
 }
 
@@ -152,6 +179,16 @@ func (dao *AuthResourceDAO) GetByConsentIDWithTx(ctx context.Context, tx *databa
 	err := tx.SelectContext(ctx, &authResources, query, consentID, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get auth resources by consent ID: %w", err)
+	}
+
+	// After loading multiple resources
+	for i := range authResources {
+		if authResources[i].ApprovedPurposeDetails != nil && *authResources[i].ApprovedPurposeDetails != "" {
+			var details models.ApprovedPurposeDetails
+			if err := json.Unmarshal([]byte(*authResources[i].ApprovedPurposeDetails), &details); err == nil {
+				authResources[i].ApprovedPurposeDetailsObj = &details
+			}
+		}
 	}
 
 	return authResources, nil

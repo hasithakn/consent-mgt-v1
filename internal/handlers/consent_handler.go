@@ -76,8 +76,9 @@ func (h *ConsentHandler) CreateConsent(c *gin.Context) {
 		return
 	}
 
-	// Call pre-create consent extension if configured
-	if h.extensionClient != nil {
+	// Call pre-create consent extension if configured and enabled
+	cfg := config.Get()
+	if cfg != nil && cfg.Extension.Enabled && h.extensionClient != nil {
 		// Extract request headers to pass to extension
 		headers := make(map[string]string)
 		for key, values := range c.Request.Header {
@@ -222,8 +223,9 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 		return
 	}
 
-	// Call pre-update consent extension if configured
-	if h.extensionClient != nil {
+	// Call pre-update consent extension if configured and enabled
+	cfg := config.Get()
+	if cfg != nil && cfg.Extension.Enabled && h.extensionClient != nil {
 		// Extract request headers to pass to extension
 		headers := make(map[string]string)
 		for key, values := range c.Request.Header {

@@ -27,7 +27,7 @@ func SetupRouter(
 		}
 
 		// Extract and set client ID
-		clientID := c.GetHeader("client-id")
+		clientID := c.GetHeader("tpp-client-id")
 		if clientID != "" {
 			utils.SetContextValue(c, "clientID", clientID)
 		}

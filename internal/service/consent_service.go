@@ -120,9 +120,13 @@ func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request 
 	// Create authorization resources
 	if len(request.AuthResources) > 0 {
 		for _, authReq := range request.AuthResources {
-			// Marshal approved purpose details to JSON if present
+			// Marshal approved purpose details to JSON if present, else set to empty struct
 			var approvedPurposeDetailsJSON *string
-			if authReq.ApprovedPurposeDetails != nil {
+			if authReq.ApprovedPurposeDetails == nil {
+				emptyDetailsBytes, _ := json.Marshal(models.ApprovedPurposeDetails{})
+				emptyDetailsStr := string(emptyDetailsBytes)
+				approvedPurposeDetailsJSON = &emptyDetailsStr
+			} else {
 				approvedPurposeDetailsBytes, err := json.Marshal(authReq.ApprovedPurposeDetails)
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal approved purpose details: %w", err)
@@ -150,7 +154,7 @@ func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request 
 
 	// Link consent purposes if provided
 	if len(purposeNames) > 0 {
-		// Get purpose IDs by names
+		// Get purpose ID's by names
 		purposeIDMap, err := s.consentPurposeDAO.GetIDsByNames(ctx, purposeNames, orgID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get purpose IDs: %w", err)
@@ -341,9 +345,13 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 
 		if len(request.AuthResources) > 0 {
 			for _, authReq := range request.AuthResources {
-				// Marshal approved purpose details to JSON if present
+				// Marshal approved purpose details to JSON if present, else set to empty struct
 				var approvedPurposeDetailsJSON *string
-				if authReq.ApprovedPurposeDetails != nil {
+				if authReq.ApprovedPurposeDetails == nil {
+					emptyDetailsBytes, _ := json.Marshal(models.ApprovedPurposeDetails{})
+					emptyDetailsStr := string(emptyDetailsBytes)
+					approvedPurposeDetailsJSON = &emptyDetailsStr
+				} else {
 					approvedPurposeDetailsBytes, err := json.Marshal(authReq.ApprovedPurposeDetails)
 					if err != nil {
 						return nil, fmt.Errorf("failed to marshal approved purpose details: %w", err)

@@ -16,7 +16,7 @@ database:
   connMaxLifetime: 5m
 
 extension:
-  enabled: true
+  enabled: false
   baseUrl: http://localhost:3001/api/services
   timeout: 30s
   retryAttempts: 3

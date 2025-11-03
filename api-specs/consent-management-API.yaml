@@ -1613,9 +1613,23 @@ components:
           type: integer
           format: int32
           example: 0
-        requestPayload:
-          description: The original consent initiation request payload from the TPP.
-          type: object
+        consentPurpose:
+          description: Array of consent purposes for this consent.
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Purpose name
+                example: "utility_read"
+              value:
+                description: Purpose value
+                oneOf:
+                  - type: string
+                  - type: object
+                  - type: array
+                example: "utility:read"
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
@@ -1756,9 +1770,23 @@ components:
           type: integer
           format: int32
           example: 0
-        requestPayload:
-          description: The original consent initiation request payload from the TPP.
-          type: object
+        consentPurpose:
+          description: Array of consent purposes for this consent.
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Purpose name
+                example: "utility_read"
+              value:
+                description: Purpose value
+                oneOf:
+                  - type: string
+                  - type: object
+                  - type: array
+                example: "utility:read"
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
@@ -1778,9 +1806,23 @@ components:
           description: Consent Id
           type: string
           example: "consent_id"
-        requestPayload:
-          description: The original consent initiation request payload from the TPP.
-          type: object
+        consentPurpose:
+          description: Array of consent purposes for this consent.
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Purpose name
+                example: "utility_read"
+              value:
+                description: Purpose value
+                oneOf:
+                  - type: string
+                  - type: object
+                  - type: array
+                example: "utility:read"
         createdTime:
           type: integer
           format: int32
@@ -1828,7 +1870,7 @@ components:
           items:
             $ref: "#/components/schemas/ConsentAuthorizationCreateResponse"
         modifiedResponse:
-          description: Optional field used to provide an alternative payload that overrides the original `requestPayload` during consent processing.
+          description: Optional field used to provide an alternative payload that overrides the original `consentPurpose` during consent processing.
           type: object
     ConsentRetrievalResponse:
       description: The response body returned after successfully initiating a new consent.
@@ -1837,9 +1879,23 @@ components:
           description: Consent Id
           type: string
           example: "consent_id"
-        requestPayload:
-          description: The original consent initiation request payload from the TPP.
-          type: object
+        consentPurpose:
+          description: Array of consent purposes for this consent.
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Purpose name
+                example: "utility_read"
+              value:
+                description: Purpose value
+                oneOf:
+                  - type: string
+                  - type: object
+                  - type: array
+                example: "utility:read"
         createdTime:
           type: integer
           format: int32
@@ -1891,7 +1947,7 @@ components:
           description: File content
           type: string
         modifiedResponse:
-          description: Optional field used to provide an alternative payload that overrides the original `requestPayload` during consent processing.
+          description: Optional field used to provide an alternative payload that overrides the original `consentPurpose` during consent processing.
           type: object
     ConsentFileUploadResponse:
       type: object
@@ -1937,9 +1993,23 @@ components:
           description: Consent Id
           type: string
           example: "consent_id"
-        requestPayload:
-          description: The original consent initiation request payload from the TPP.
-          type: object
+        consentPurpose:
+          description: Array of consent purposes for this consent.
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Purpose name
+                example: "utility_read"
+              value:
+                description: Purpose value
+                oneOf:
+                  - type: string
+                  - type: object
+                  - type: array
+                example: "utility:read"
         createdTime:
           type: integer
           format: int32
@@ -1987,7 +2057,7 @@ components:
           items:
             $ref: "#/components/schemas/ConsentAuthorizationCreateResponse"
         modifiedResponse:
-          description: Optional field used to provide an alternative payload that overrides the original `requestPayload` during consent processing.
+          description: Optional field used to provide an alternative payload that overrides the original `consentPurpose` during consent processing.
           type: object
     ConsentDetail:
       type: object
@@ -1997,9 +2067,23 @@ components:
           description: Consent Id
           type: string
           example: "consent_id"
-        requestPayload:
-          description: The original consent initiation request payload from the TPP.
-          type: object
+        consentPurpose:
+          description: Array of consent purposes for this consent.
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Purpose name
+                example: "utility_read"
+              value:
+                description: Purpose value
+                oneOf:
+                  - type: string
+                  - type: object
+                  - type: array
+                example: "utility:read"
         createdTime:
           type: integer
           format: int32
@@ -2181,21 +2265,8 @@ components:
         errorMessage:
           description: Human-readable error message if validation failed.
           type: string
-          example: "Consent is not in active state"
-        httpCode:
-          description: The HTTP status code that should be returned to the client (as string).
-          type: string
-          example: "401"
-        consentInformation:
-          description: Full consent details if validation succeeded, or partial details if failed.
-          type: object
-          additionalProperties: true
-          example:
-            consentId: "CNT_123456"
-            status: "AUTHORIZED"
-            type: "accounts"
-            validityTime: 1768401854787
-    ConsentAttributeSearchResponse:
+          example: "Consent validation failed"
+    ConsentIdsResponse:
       type: object
       description: Response payload containing consent IDs matching the attribute search criteria.
       properties:
@@ -2209,6 +2280,8 @@ components:
           description: The number of consent IDs returned.
           type: integer
           example: 3
+    ConsentAttributeSearchResponse:
+      $ref: "#/components/schemas/ConsentIdsResponse"
     ConsentPurposeCreateRequest:
       type: object
       required:

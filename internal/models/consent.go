@@ -10,7 +10,7 @@ import (
 // Consent represents the FS_CONSENT table
 type Consent struct {
 	ConsentID                  string `db:"CONSENT_ID" json:"consentId"`
-	Receipt                    JSON   `db:"RECEIPT" json:"receipt"`
+	ConsentPurposes            JSON   `db:"CONSENT_PURPOSES" json:"consentPurposes"`
 	CreatedTime                int64  `db:"CREATED_TIME" json:"createdTime"`
 	UpdatedTime                int64  `db:"UPDATED_TIME" json:"updatedTime"`
 	ClientID                   string `db:"CLIENT_ID" json:"clientId"`
@@ -84,6 +84,12 @@ func (j *JSON) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ConsentPurposeItem represents a single consent purpose with name and value
+type ConsentPurposeItem struct {
+	Name  string      `json:"name"`
+	Value interface{} `json:"value"` // Can be string, object, or array
+}
+
 // ConsentAPIRequest represents the API payload for creating a consent (external format)
 type ConsentAPIRequest struct {
 	Type                       string                    `json:"type" binding:"required"`
@@ -92,7 +98,7 @@ type ConsentAPIRequest struct {
 	RecurringIndicator         *bool                     `json:"recurringIndicator,omitempty"`
 	Frequency                  *int                      `json:"frequency,omitempty"`
 	DataAccessValidityDuration *int64                    `json:"dataAccessValidityDuration,omitempty"`
-	RequestPayload             map[string]interface{}    `json:"requestPayload" binding:"required"`
+	ConsentPurpose             []ConsentPurposeItem      `json:"consentPurpose,omitempty"`
 	Attributes                 map[string]string         `json:"attributes,omitempty"`
 	Authorizations             []AuthorizationAPIRequest `json:"authorizations,omitempty"`
 }
@@ -150,14 +156,14 @@ type ConsentAPIUpdateRequest struct {
 	RecurringIndicator         *bool                     `json:"recurringIndicator,omitempty"`
 	Frequency                  *int                      `json:"frequency,omitempty"`
 	DataAccessValidityDuration *int64                    `json:"dataAccessValidityDuration,omitempty"`
-	RequestPayload             map[string]interface{}    `json:"requestPayload,omitempty"`
+	ConsentPurpose             []ConsentPurposeItem      `json:"consentPurpose,omitempty"`
 	Attributes                 map[string]string         `json:"attributes,omitempty"`
 	Authorizations             []AuthorizationAPIRequest `json:"authorizations,omitempty"`
 }
 
 // ConsentCreateRequest represents the internal request payload for creating a consent
 type ConsentCreateRequest struct {
-	Receipt                    map[string]interface{}             `json:"receipt" binding:"required"`
+	ConsentPurpose             []ConsentPurposeItem               `json:"consentPurpose" binding:"required"`
 	ConsentType                string                             `json:"consentType" binding:"required"`
 	CurrentStatus              string                             `json:"currentStatus" binding:"required"`
 	ConsentFrequency           *int                               `json:"consentFrequency,omitempty"`
@@ -170,7 +176,7 @@ type ConsentCreateRequest struct {
 
 // ConsentUpdateRequest represents the request payload for updating a consent
 type ConsentUpdateRequest struct {
-	Receipt                    map[string]interface{}             `json:"receipt,omitempty"`
+	ConsentPurpose             []ConsentPurposeItem               `json:"consentPurpose,omitempty"`
 	ConsentType                string                             `json:"consentType,omitempty"`
 	CurrentStatus              string                             `json:"currentStatus,omitempty"`
 	ConsentFrequency           *int                               `json:"consentFrequency,omitempty"`
@@ -184,7 +190,7 @@ type ConsentUpdateRequest struct {
 // ConsentResponse represents the response after consent creation/retrieval
 type ConsentResponse struct {
 	ConsentID                  string                 `json:"consentId"`
-	Receipt                    map[string]interface{} `json:"receipt"`
+	ConsentPurpose             []ConsentPurposeItem   `json:"consentPurpose,omitempty"`
 	CreatedTime                int64                  `json:"createdTime"`
 	UpdatedTime                int64                  `json:"updatedTime"`
 	ClientID                   string                 `json:"clientId"`
@@ -245,7 +251,7 @@ func (c *Consent) GetUpdatedTime() time.Time {
 // ToConsentCreateRequest converts API request format to internal format
 func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, error) {
 	createReq := &ConsentCreateRequest{
-		Receipt:                    req.RequestPayload,
+		ConsentPurpose:             req.ConsentPurpose,
 		ConsentType:                req.Type,
 		CurrentStatus:              req.Status,
 		Attributes:                 req.Attributes,
@@ -279,7 +285,7 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 // ToConsentUpdateRequest converts API update request format to internal format
 func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequest, error) {
 	updateReq := &ConsentUpdateRequest{
-		Receipt:                    req.RequestPayload,
+		ConsentPurpose:             req.ConsentPurpose,
 		ConsentType:                req.Type,
 		CurrentStatus:              req.Status,
 		Attributes:                 req.Attributes,
@@ -313,7 +319,7 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 // ConsentAPIResponse represents the API response format for consent (external format)
 type ConsentAPIResponse struct {
 	ID                         string                     `json:"id"`
-	RequestPayload             map[string]interface{}     `json:"requestPayload"`
+	ConsentPurpose             []ConsentPurposeItem       `json:"consentPurpose,omitempty"`
 	CreatedTime                int64                      `json:"createdTime"`
 	UpdatedTime                int64                      `json:"updatedTime"`
 	ClientID                   string                     `json:"clientId"`
@@ -340,12 +346,6 @@ type AuthorizationAPIResponse struct {
 
 // ToAPIResponse converts internal response format to API response format
 func (resp *ConsentResponse) ToAPIResponse() *ConsentAPIResponse {
-	// Initialize RequestPayload with empty object if nil
-	requestPayload := resp.Receipt
-	if requestPayload == nil {
-		requestPayload = make(map[string]interface{})
-	}
-
 	// Initialize Attributes with empty object if nil
 	attributes := resp.Attributes
 	if attributes == nil {
@@ -354,7 +354,7 @@ func (resp *ConsentResponse) ToAPIResponse() *ConsentAPIResponse {
 
 	apiResp := &ConsentAPIResponse{
 		ID:                         resp.ConsentID,
-		RequestPayload:             requestPayload,
+		ConsentPurpose:             resp.ConsentPurpose,
 		CreatedTime:                resp.CreatedTime,
 		UpdatedTime:                resp.UpdatedTime,
 		ClientID:                   resp.ClientID,

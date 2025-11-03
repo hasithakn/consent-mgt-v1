@@ -116,22 +116,20 @@ func cleanupTestData(t *testing.T, env *TestEnvironment, consentIDs ...string) {
 
 // createTestConsentRequest creates a sample consent request for testing
 func createTestConsentRequest() *models.ConsentCreateRequest {
-	receiptData := map[string]interface{}{
-		"version":    "1.0",
-		"purpose":    "Account Information Access",
-		"expiryDate": "2025-12-31",
-		"data": map[string]interface{}{
-			"accountType": "savings",
-			"permissions": []string{"read_balance", "read_transactions"},
-		},
-	}
-
 	validityTime := utils.DaysFromNow(90) // 90 days from now
 	frequency := 1
 	recurring := false
 
 	return &models.ConsentCreateRequest{
-		Receipt:            receiptData,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "version", Value: "1.0"},
+			{Name: "purpose", Value: "Account Information Access"},
+			{Name: "expiryDate", Value: "2025-12-31"},
+			{Name: "data", Value: map[string]interface{}{
+				"accountType": "savings",
+				"permissions": []string{"read_balance", "read_transactions"},
+			}},
+		},
 		ConsentType:        "accounts",
 		CurrentStatus:      "awaitingAuthorization",
 		ValidityTime:       &validityTime,
@@ -167,7 +165,7 @@ func TestConsentCreate_Success(t *testing.T) {
 	assert.Equal(t, "awaitingAuthorization", response.CurrentStatus, "Initial status should be awaitingAuthorization")
 	assert.NotZero(t, response.CreatedTime, "Created time should be set")
 	assert.NotZero(t, response.UpdatedTime, "Updated time should be set")
-	assert.NotNil(t, response.Receipt, "Receipt should not be nil")
+	assert.NotNil(t, response.ConsentPurpose, "ConsentPurpose should not be nil")
 	assert.Equal(t, request.Attributes, response.Attributes, "Attributes should match")
 
 	t.Logf("Successfully created consent: %s", response.ConsentID)
@@ -180,8 +178,8 @@ func TestConsentCreate_WithMinimalData(t *testing.T) {
 	ctx := context.Background()
 
 	request := &models.ConsentCreateRequest{
-		Receipt: map[string]interface{}{
-			"data": "minimal consent",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "account_access", Value: "minimal consent"},
 		},
 		ConsentType:   "payments",
 		CurrentStatus: "AUTHORIZED",
@@ -209,8 +207,8 @@ func TestConsentCreate_InvalidStatus(t *testing.T) {
 	ctx := context.Background()
 
 	request := &models.ConsentCreateRequest{
-		Receipt: map[string]interface{}{
-			"data": "test consent",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "account_access", Value: "test consent"},
 		},
 		ConsentType:   "accounts",
 		CurrentStatus: "INVALID_STATUS", // Invalid status
@@ -629,7 +627,9 @@ func TestConsentJSON_Serialization(t *testing.T) {
 	}
 
 	request := &models.ConsentCreateRequest{
-		Receipt:       receiptData,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "complex_receipt", Value: receiptData},
+		},
 		ConsentType:   "financial",
 		CurrentStatus: "AUTHORIZED",
 	}
@@ -638,19 +638,19 @@ func TestConsentJSON_Serialization(t *testing.T) {
 	response, err := env.ConsentService.CreateConsent(ctx, request, "test-client-json", testOrgID)
 	require.NoError(t, err, "Failed to create consent with complex JSON")
 
-	defer cleanupTestData(t, env, response.ConsentID) // Verify JSON structure is preserved
-	assert.NotNil(t, response.Receipt, "Receipt should not be nil")
+	defer cleanupTestData(t, env, response.ConsentID)
+	// Verify ConsentPurpose structure is preserved
+	assert.NotNil(t, response.ConsentPurpose, "ConsentPurpose should not be nil")
 
-	receiptJSON, err := json.Marshal(response.Receipt)
-	require.NoError(t, err, "Failed to marshal receipt")
+	purposeJSON, err := json.Marshal(response.ConsentPurpose)
+	require.NoError(t, err, "Failed to marshal consent purpose")
 
-	var deserializedReceipt map[string]interface{}
-	err = json.Unmarshal(receiptJSON, &deserializedReceipt)
-	require.NoError(t, err, "Failed to unmarshal receipt")
+	var deserializedPurpose []models.ConsentPurposeItem
+	err = json.Unmarshal(purposeJSON, &deserializedPurpose)
+	require.NoError(t, err, "Failed to unmarshal consent purpose")
 
-	assert.Equal(t, "2.0", deserializedReceipt["version"], "Version should be preserved")
-	assert.NotNil(t, deserializedReceipt["metadata"], "Metadata should be preserved")
-	assert.NotNil(t, deserializedReceipt["permissions"], "Permissions should be preserved")
+	// Verify purpose items are preserved
+	assert.Greater(t, len(deserializedPurpose), 0, "Should have at least one purpose item")
 
 	t.Logf("Successfully verified JSON serialization for consent: %s", response.ConsentID)
 }
@@ -699,22 +699,20 @@ func TestConsentUpdate_FullPayload(t *testing.T) {
 	// Step 2: Update consent with full payload
 	t.Log("Step 2: Updating consent with full payload...")
 
-	newReceipt := map[string]interface{}{
-		"version":    "2.0",
-		"purpose":    "Enhanced Account Access",
-		"expiryDate": "2026-12-31",
-		"data": map[string]interface{}{
-			"accountType": "checking",
-			"permissions": []string{"read_balance", "read_transactions", "initiate_payment"},
-		},
-	}
-
 	newValidityTime := utils.DaysFromNow(180) // Extend to 180 days
 	newFrequency := 2
 	newRecurring := true
 
 	updateRequest := &models.ConsentUpdateRequest{
-		Receipt:            newReceipt,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "version", Value: "2.0"},
+			{Name: "purpose", Value: "Enhanced Account Access"},
+			{Name: "expiryDate", Value: "2026-12-31"},
+			{Name: "data", Value: map[string]interface{}{
+				"accountType": "checking",
+				"permissions": []string{"read_balance", "read_transactions", "initiate_payment"},
+			}},
+		},
 		CurrentStatus:      "ACTIVE",
 		ConsentFrequency:   &newFrequency,
 		ValidityTime:       &newValidityTime,
@@ -760,10 +758,22 @@ func TestConsentUpdate_FullPayload(t *testing.T) {
 	assert.Equal(t, newRecurring, *updated.RecurringIndicator, "Recurring indicator should be updated")
 	assert.Greater(t, updated.UpdatedTime, created.UpdatedTime, "Updated time should be greater")
 
-	// Verify receipt
-	assert.NotNil(t, updated.Receipt, "Receipt should not be nil")
-	assert.Equal(t, "2.0", updated.Receipt["version"], "Receipt version should be updated")
-	assert.Equal(t, "Enhanced Account Access", updated.Receipt["purpose"], "Receipt purpose should be updated")
+	// Verify ConsentPurpose
+	assert.NotNil(t, updated.ConsentPurpose, "ConsentPurpose should not be nil")
+	assert.Greater(t, len(updated.ConsentPurpose), 0, "ConsentPurpose should have items")
+
+	// Find version and purpose in ConsentPurpose array
+	var foundVersion, foundPurpose bool
+	for _, item := range updated.ConsentPurpose {
+		if item.Name == "version" && item.Value == "2.0" {
+			foundVersion = true
+		}
+		if item.Name == "purpose" && item.Value == "Enhanced Account Access" {
+			foundPurpose = true
+		}
+	}
+	assert.True(t, foundVersion, "ConsentPurpose should contain version 2.0")
+	assert.True(t, foundPurpose, "ConsentPurpose should contain Enhanced Account Access")
 
 	// Verify attributes
 	assert.Equal(t, "enhanced_access", updated.Attributes["purpose"], "Purpose attribute should be updated")
@@ -834,10 +844,8 @@ func TestConsentUpdate_FullPayload(t *testing.T) {
 	assert.Equal(t, "ACTIVE", retrieved.CurrentStatus, "Retrieved status should be ACTIVE")
 	assert.Equal(t, "enhanced_access", retrieved.Attributes["purpose"], "Retrieved attributes should persist")
 	assert.Len(t, retrieved.AuthResources, 2, "Retrieved consent should have 2 auth resources")
-	assert.NotNil(t, retrieved.Receipt, "Retrieved receipt should not be nil")
-	if retrieved.Receipt != nil {
-		assert.Equal(t, "2.0", retrieved.Receipt["version"], "Retrieved receipt version should persist")
-	}
+	assert.NotNil(t, retrieved.ConsentPurpose, "Retrieved ConsentPurpose should not be nil")
+	assert.Greater(t, len(retrieved.ConsentPurpose), 0, "Retrieved ConsentPurpose should have items")
 	t.Logf("Step 5: Retrieved consent verified")
 
 	t.Log("✓ Full payload update test completed successfully")
@@ -874,10 +882,10 @@ func TestConsentUpdate_PartialUpdate(t *testing.T) {
 	assert.Equal(t, created.ConsentType, updated.ConsentType, "Consent type should remain same")
 	assert.Equal(t, created.Attributes["purpose"], updated.Attributes["purpose"], "Attributes should remain same")
 
-	// Verify receipt remains unchanged
-	originalReceipt, _ := json.Marshal(created.Receipt)
-	updatedReceipt, _ := json.Marshal(updated.Receipt)
-	assert.JSONEq(t, string(originalReceipt), string(updatedReceipt), "Receipt should remain unchanged")
+	// Verify ConsentPurpose remains unchanged
+	originalPurpose, _ := json.Marshal(created.ConsentPurpose)
+	updatedPurpose, _ := json.Marshal(updated.ConsentPurpose)
+	assert.JSONEq(t, string(originalPurpose), string(updatedPurpose), "ConsentPurpose should remain unchanged")
 
 	t.Log("✓ Partial update test completed successfully")
 }

@@ -24,7 +24,7 @@ func NewConsentDAO(db *database.DB) *ConsentDAO {
 func (dao *ConsentDAO) Create(ctx context.Context, consent *models.Consent) error {
 	query := `
 		INSERT INTO FS_CONSENT (
-			CONSENT_ID, RECEIPT, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
+			CONSENT_ID, CONSENT_PURPOSES, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
 			CONSENT_TYPE, CURRENT_STATUS, CONSENT_FREQUENCY, VALIDITY_TIME,
 			RECURRING_INDICATOR, DATA_ACCESS_VALIDITY_DURATION, ORG_ID
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -34,7 +34,7 @@ func (dao *ConsentDAO) Create(ctx context.Context, consent *models.Consent) erro
 		ctx,
 		query,
 		consent.ConsentID,
-		consent.Receipt,
+		consent.ConsentPurposes,
 		consent.CreatedTime,
 		consent.UpdatedTime,
 		consent.ClientID,
@@ -58,7 +58,7 @@ func (dao *ConsentDAO) Create(ctx context.Context, consent *models.Consent) erro
 func (dao *ConsentDAO) CreateWithTx(ctx context.Context, tx *database.Transaction, consent *models.Consent) error {
 	query := `
 		INSERT INTO FS_CONSENT (
-			CONSENT_ID, RECEIPT, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
+			CONSENT_ID, CONSENT_PURPOSES, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
 			CONSENT_TYPE, CURRENT_STATUS, CONSENT_FREQUENCY, VALIDITY_TIME,
 			RECURRING_INDICATOR, DATA_ACCESS_VALIDITY_DURATION, ORG_ID
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -68,7 +68,7 @@ func (dao *ConsentDAO) CreateWithTx(ctx context.Context, tx *database.Transactio
 		ctx,
 		query,
 		consent.ConsentID,
-		consent.Receipt,
+		consent.ConsentPurposes,
 		consent.CreatedTime,
 		consent.UpdatedTime,
 		consent.ClientID,
@@ -91,7 +91,7 @@ func (dao *ConsentDAO) CreateWithTx(ctx context.Context, tx *database.Transactio
 // GetByID retrieves a consent by ID and organization ID
 func (dao *ConsentDAO) GetByID(ctx context.Context, consentID, orgID string) (*models.Consent, error) {
 	query := `
-		SELECT CONSENT_ID, RECEIPT, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
+		SELECT CONSENT_ID, CONSENT_PURPOSES, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
 		       CONSENT_TYPE, CURRENT_STATUS, CONSENT_FREQUENCY, VALIDITY_TIME,
 		       RECURRING_INDICATOR, DATA_ACCESS_VALIDITY_DURATION, ORG_ID
 		FROM FS_CONSENT
@@ -113,7 +113,7 @@ func (dao *ConsentDAO) GetByID(ctx context.Context, consentID, orgID string) (*m
 // GetByIDWithTx retrieves a consent by ID using a transaction
 func (dao *ConsentDAO) GetByIDWithTx(ctx context.Context, tx *database.Transaction, consentID, orgID string) (*models.Consent, error) {
 	query := `
-		SELECT CONSENT_ID, RECEIPT, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
+		SELECT CONSENT_ID, CONSENT_PURPOSES, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
 		       CONSENT_TYPE, CURRENT_STATUS, CONSENT_FREQUENCY, VALIDITY_TIME,
 		       RECURRING_INDICATOR, DATA_ACCESS_VALIDITY_DURATION, ORG_ID
 		FROM FS_CONSENT
@@ -136,7 +136,7 @@ func (dao *ConsentDAO) GetByIDWithTx(ctx context.Context, tx *database.Transacti
 func (dao *ConsentDAO) Update(ctx context.Context, consent *models.Consent) error {
 	query := `
 		UPDATE FS_CONSENT
-		SET RECEIPT = ?, UPDATED_TIME = ?, CURRENT_STATUS = ?,
+		SET CONSENT_PURPOSES = ?, UPDATED_TIME = ?, CURRENT_STATUS = ?,
 		    CONSENT_FREQUENCY = ?, VALIDITY_TIME = ?, RECURRING_INDICATOR = ?,
 		    DATA_ACCESS_VALIDITY_DURATION = ?
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
@@ -145,7 +145,7 @@ func (dao *ConsentDAO) Update(ctx context.Context, consent *models.Consent) erro
 	result, err := dao.db.ExecContext(
 		ctx,
 		query,
-		consent.Receipt,
+		consent.ConsentPurposes,
 		consent.UpdatedTime,
 		consent.CurrentStatus,
 		consent.ConsentFrequency,
@@ -176,7 +176,7 @@ func (dao *ConsentDAO) Update(ctx context.Context, consent *models.Consent) erro
 func (dao *ConsentDAO) UpdateWithTx(ctx context.Context, tx *database.Transaction, consent *models.Consent) error {
 	query := `
 		UPDATE FS_CONSENT
-		SET RECEIPT = ?, UPDATED_TIME = ?, CURRENT_STATUS = ?,
+		SET CONSENT_PURPOSES = ?, UPDATED_TIME = ?, CURRENT_STATUS = ?,
 		    CONSENT_FREQUENCY = ?, VALIDITY_TIME = ?, RECURRING_INDICATOR = ?,
 		    DATA_ACCESS_VALIDITY_DURATION = ?
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
@@ -185,7 +185,7 @@ func (dao *ConsentDAO) UpdateWithTx(ctx context.Context, tx *database.Transactio
 	result, err := tx.ExecContext(
 		ctx,
 		query,
-		consent.Receipt,
+		consent.ConsentPurposes,
 		consent.UpdatedTime,
 		consent.CurrentStatus,
 		consent.ConsentFrequency,
@@ -363,9 +363,9 @@ func (dao *ConsentDAO) Search(ctx context.Context, params *models.ConsentSearchP
 
 	// Build the main query
 	query := fmt.Sprintf(`
-		SELECT DISTINCT c.CONSENT_ID, c.RECEIPT, c.CREATED_TIME, c.UPDATED_TIME, c.CLIENT_ID,
+		SELECT DISTINCT c.CONSENT_ID, c.CONSENT_PURPOSES, c.CREATED_TIME, c.UPDATED_TIME, c.CLIENT_ID,
 		       c.CONSENT_TYPE, c.CURRENT_STATUS, c.CONSENT_FREQUENCY, c.VALIDITY_TIME,
-		       c.RECURRING_INDICATOR, c.ORG_ID
+		       c.RECURRING_INDICATOR, c.DATA_ACCESS_VALIDITY_DURATION, c.ORG_ID
 		FROM FS_CONSENT c%s
 		WHERE %s
 		ORDER BY c.CREATED_TIME DESC
@@ -396,7 +396,7 @@ func (dao *ConsentDAO) Search(ctx context.Context, params *models.ConsentSearchP
 // GetByClientID retrieves all consents for a specific client
 func (dao *ConsentDAO) GetByClientID(ctx context.Context, clientID, orgID string) ([]models.Consent, error) {
 	query := `
-		SELECT CONSENT_ID, RECEIPT, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
+		SELECT CONSENT_ID, CONSENT_PURPOSES, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
 		       CONSENT_TYPE, CURRENT_STATUS, CONSENT_FREQUENCY, VALIDITY_TIME,
 		       RECURRING_INDICATOR, DATA_ACCESS_VALIDITY_DURATION, ORG_ID
 		FROM FS_CONSENT
@@ -437,7 +437,7 @@ type QueryBuilder struct {
 func (dao *ConsentDAO) NewQueryBuilder() *QueryBuilder {
 	return &QueryBuilder{
 		baseQuery: `
-			SELECT CONSENT_ID, RECEIPT, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
+			SELECT CONSENT_ID, CONSENT_PURPOSES, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
 			       CONSENT_TYPE, CURRENT_STATUS, CONSENT_FREQUENCY, VALIDITY_TIME,
 			       RECURRING_INDICATOR, DATA_ACCESS_VALIDITY_DURATION, ORG_ID
 			FROM FS_CONSENT

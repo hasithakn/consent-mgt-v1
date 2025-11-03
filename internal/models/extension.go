@@ -89,9 +89,12 @@ func (c *ConsentCreateRequest) ToConsentInitiationData() ConsentInitiationData {
 		Attributes:                 attrs,
 	}
 
-	// Convert receipt to request payload
-	if c.Receipt != nil {
-		initData.RequestPayload = c.Receipt
+	// Convert consent purposes to request payload for extension compatibility
+	// Extension API expects requestPayload map, so convert ConsentPurpose array to map
+	if c.ConsentPurpose != nil && len(c.ConsentPurpose) > 0 {
+		purposesMap := make(map[string]interface{})
+		purposesMap["consentPurpose"] = c.ConsentPurpose
+		initData.RequestPayload = purposesMap
 	}
 
 	// Convert authorizations
@@ -135,7 +138,27 @@ func (d *DetailedConsentResourceData) ToConsentCreateRequest() *ConsentCreateReq
 		ConsentFrequency:           d.Frequency,
 		DataAccessValidityDuration: d.DataAccessValidityDuration,
 		Attributes:                 attrs,
-		Receipt:                    d.RequestPayload,
+	}
+
+	// Extract consentPurpose from RequestPayload for backward compatibility
+	if d.RequestPayload != nil {
+		if purposes, ok := d.RequestPayload["consentPurpose"]; ok {
+			if purposeArray, ok := purposes.([]interface{}); ok {
+				req.ConsentPurpose = make([]ConsentPurposeItem, len(purposeArray))
+				for i, p := range purposeArray {
+					if purposeMap, ok := p.(map[string]interface{}); ok {
+						item := ConsentPurposeItem{}
+						if name, ok := purposeMap["name"].(string); ok {
+							item.Name = name
+						}
+						if value, ok := purposeMap["value"]; ok {
+							item.Value = value
+						}
+						req.ConsentPurpose[i] = item
+					}
+				}
+			}
+		}
 	}
 
 	// Convert authorizations
@@ -204,9 +227,12 @@ func (c *ConsentUpdateRequest) ToConsentInitiationData() ConsentInitiationData {
 		Attributes:                 attrs,
 	}
 
-	// Convert receipt to request payload
-	if c.Receipt != nil {
-		initData.RequestPayload = c.Receipt
+	// Convert consent purposes to request payload for extension compatibility
+	// Extension API expects requestPayload map, so convert ConsentPurpose array to map
+	if c.ConsentPurpose != nil && len(c.ConsentPurpose) > 0 {
+		purposesMap := make(map[string]interface{})
+		purposesMap["consentPurpose"] = c.ConsentPurpose
+		initData.RequestPayload = purposesMap
 	}
 
 	// Convert authorizations
@@ -250,7 +276,27 @@ func (d *DetailedConsentResourceData) ToConsentUpdateRequest() *ConsentUpdateReq
 		ConsentFrequency:           d.Frequency,
 		DataAccessValidityDuration: d.DataAccessValidityDuration,
 		Attributes:                 attrs,
-		Receipt:                    d.RequestPayload,
+	}
+
+	// Extract consentPurpose from RequestPayload
+	if d.RequestPayload != nil {
+		if purposes, ok := d.RequestPayload["consentPurpose"]; ok {
+			if purposeArray, ok := purposes.([]interface{}); ok {
+				req.ConsentPurpose = make([]ConsentPurposeItem, len(purposeArray))
+				for i, p := range purposeArray {
+					if purposeMap, ok := p.(map[string]interface{}); ok {
+						item := ConsentPurposeItem{}
+						if name, ok := purposeMap["name"].(string); ok {
+							item.Name = name
+						}
+						if value, ok := purposeMap["value"]; ok {
+							item.Value = value
+						}
+						req.ConsentPurpose[i] = item
+					}
+				}
+			}
+		}
 	}
 
 	// Convert authorizations

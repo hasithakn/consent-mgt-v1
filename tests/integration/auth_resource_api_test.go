@@ -2,6 +2,7 @@ package integration
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -18,6 +19,21 @@ func TestAPI_CreateAuthResource(t *testing.T) {
 	env := setupAPITestEnvironment(t)
 	defer func() {}()
 
+	ctx := context.Background()
+	
+	// Create test purpose first
+	desc := "Auth resource API test - create"
+	purpose := &models.ConsentPurpose{
+		ID:          "PURPOSE-auth-create",
+		Name:        "auth_create_test",
+		Description: &desc,
+		OrgID:       "TEST_ORG",
+	}
+	
+	err := env.ConsentPurposeDAO.Create(ctx, purpose)
+	require.NoError(t, err)
+	defer env.ConsentPurposeDAO.Delete(ctx, purpose.ID, "TEST_ORG")
+
 	// Step 1: Create a consent first
 	validityTime := int64(7776000)
 	frequency := 1
@@ -29,8 +45,11 @@ func TestAPI_CreateAuthResource(t *testing.T) {
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
-		RequestPayload: map[string]interface{}{
-			"data": "Test consent for authorization",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{
+				Name:  "auth_create_test",
+				Value: "Test consent for authorization",
+			},
 		},
 	}
 
@@ -135,6 +154,21 @@ func TestAPI_CreateAuthResourceInvalidRequest(t *testing.T) {
 	env := setupAPITestEnvironment(t)
 	defer func() {}()
 
+	ctx := context.Background()
+	
+	// Create test purpose first
+	desc := "Auth resource API test - invalid request"
+	purpose := &models.ConsentPurpose{
+		ID:          "PURPOSE-auth-invalid",
+		Name:        "auth_invalid_test",
+		Description: &desc,
+		OrgID:       "TEST_ORG",
+	}
+	
+	err := env.ConsentPurposeDAO.Create(ctx, purpose)
+	require.NoError(t, err)
+	defer env.ConsentPurposeDAO.Delete(ctx, purpose.ID, "TEST_ORG")
+
 	// Step 1: Create a consent first
 	validityTime := int64(7776000)
 	frequency := 1
@@ -146,8 +180,8 @@ func TestAPI_CreateAuthResourceInvalidRequest(t *testing.T) {
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
-		RequestPayload: map[string]interface{}{
-			"data": "Test consent",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "auth_invalid_test", Value: "Test consent"},
 		},
 	}
 
@@ -214,6 +248,21 @@ func TestAPI_GetAuthResource(t *testing.T) {
 	env := setupAPITestEnvironment(t)
 	defer func() {}()
 
+	ctx := context.Background()
+	
+	// Create test purpose first
+	desc := "Auth resource API test - get"
+	purpose := &models.ConsentPurpose{
+		ID:          "PURPOSE-auth-get",
+		Name:        "auth_get_test",
+		Description: &desc,
+		OrgID:       "TEST_ORG",
+	}
+	
+	err := env.ConsentPurposeDAO.Create(ctx, purpose)
+	require.NoError(t, err)
+	defer env.ConsentPurposeDAO.Delete(ctx, purpose.ID, "TEST_ORG")
+
 	// Step 1: Create a consent
 	validityTime := int64(7776000)
 	frequency := 1
@@ -225,8 +274,8 @@ func TestAPI_GetAuthResource(t *testing.T) {
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
-		RequestPayload: map[string]interface{}{
-			"data": "Test consent for GET auth",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "auth_get_test", Value: "Test consent for GET auth"},
 		},
 	}
 
@@ -311,6 +360,21 @@ func TestAPI_GetAuthResourceNotFound(t *testing.T) {
 	env := setupAPITestEnvironment(t)
 	defer func() {}()
 
+	ctx := context.Background()
+	
+	// Create test purpose first
+	desc := "Auth resource API test - not found"
+	purpose := &models.ConsentPurpose{
+		ID:          "PURPOSE-auth-notfound",
+		Name:        "auth_notfound_test",
+		Description: &desc,
+		OrgID:       "TEST_ORG",
+	}
+	
+	err := env.ConsentPurposeDAO.Create(ctx, purpose)
+	require.NoError(t, err)
+	defer env.ConsentPurposeDAO.Delete(ctx, purpose.ID, "TEST_ORG")
+
 	// Step 1: Create a consent
 	validityTime := int64(7776000)
 	frequency := 1
@@ -322,8 +386,8 @@ func TestAPI_GetAuthResourceNotFound(t *testing.T) {
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
-		RequestPayload: map[string]interface{}{
-			"data": "Test consent",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "auth_notfound_test", Value: "Test consent"},
 		},
 	}
 
@@ -364,6 +428,21 @@ func TestAPI_GetAuthResourceInvalidID(t *testing.T) {
 	env := setupAPITestEnvironment(t)
 	defer func() {}()
 
+	ctx := context.Background()
+	
+	// Create test purpose first
+	desc := "Auth resource API test - invalid ID"
+	purpose := &models.ConsentPurpose{
+		ID:          "PURPOSE-auth-invalidid",
+		Name:        "auth_invalidid_test",
+		Description: &desc,
+		OrgID:       "TEST_ORG",
+	}
+	
+	err := env.ConsentPurposeDAO.Create(ctx, purpose)
+	require.NoError(t, err)
+	defer env.ConsentPurposeDAO.Delete(ctx, purpose.ID, "TEST_ORG")
+
 	// Step 1: Create a consent
 	validityTime := int64(7776000)
 	frequency := 1
@@ -375,8 +454,8 @@ func TestAPI_GetAuthResourceInvalidID(t *testing.T) {
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
-		RequestPayload: map[string]interface{}{
-			"data": "Test consent",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "auth_invalidid_test", Value: "Test consent"},
 		},
 	}
 
@@ -418,6 +497,21 @@ func TestAPI_GetAuthResourceInvalidConsentID(t *testing.T) {
 	env := setupAPITestEnvironment(t)
 	defer func() {}()
 
+	ctx := context.Background()
+	
+	// Create test purpose first
+	desc := "Auth resource API test - invalid consent ID"
+	purpose := &models.ConsentPurpose{
+		ID:          "PURPOSE-auth-invalidconsent",
+		Name:        "auth_invalidconsent_test",
+		Description: &desc,
+		OrgID:       "TEST_ORG",
+	}
+	
+	err := env.ConsentPurposeDAO.Create(ctx, purpose)
+	require.NoError(t, err)
+	defer env.ConsentPurposeDAO.Delete(ctx, purpose.ID, "TEST_ORG")
+
 	// Step 1: Create a consent
 	validityTime := int64(7776000)
 	frequency := 1
@@ -429,8 +523,8 @@ func TestAPI_GetAuthResourceInvalidConsentID(t *testing.T) {
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
-		RequestPayload: map[string]interface{}{
-			"data": "Test consent for invalid consent ID test",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "auth_invalidconsent_test", Value: "Test consent for invalid consent ID test"},
 		},
 	}
 
@@ -534,6 +628,21 @@ func TestAPI_UpdateAuthResource(t *testing.T) {
 	env := setupAPITestEnvironment(t)
 	defer func() {}()
 
+	ctx := context.Background()
+	
+	// Create test purpose first
+	desc := "Auth resource API test - update"
+	purpose := &models.ConsentPurpose{
+		ID:          "PURPOSE-auth-update",
+		Name:        "auth_update_test",
+		Description: &desc,
+		OrgID:       "TEST_ORG",
+	}
+	
+	err := env.ConsentPurposeDAO.Create(ctx, purpose)
+	require.NoError(t, err)
+	defer env.ConsentPurposeDAO.Delete(ctx, purpose.ID, "TEST_ORG")
+
 	// Step 1: Create a consent
 	validityTime := int64(7776000)
 	frequency := 1
@@ -545,8 +654,8 @@ func TestAPI_UpdateAuthResource(t *testing.T) {
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
-		RequestPayload: map[string]interface{}{
-			"data": "Test consent for update",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "auth_update_test", Value: "Test consent for update"},
 		},
 	}
 
@@ -671,6 +780,21 @@ func TestAPI_UpdateAuthResourceInvalidConsentID(t *testing.T) {
 	env := setupAPITestEnvironment(t)
 	defer func() {}()
 
+	ctx := context.Background()
+	
+	// Create test purpose first
+	desc := "Auth resource API test - invalid consent ID update"
+	purpose := &models.ConsentPurpose{
+		ID:          "PURPOSE-auth-update-invalid",
+		Name:        "auth_update_invalid_test",
+		Description: &desc,
+		OrgID:       "TEST_ORG",
+	}
+	
+	err := env.ConsentPurposeDAO.Create(ctx, purpose)
+	require.NoError(t, err)
+	defer env.ConsentPurposeDAO.Delete(ctx, purpose.ID, "TEST_ORG")
+
 	// Step 1: Create a consent
 	validityTime := int64(7776000)
 	frequency := 1
@@ -682,8 +806,8 @@ func TestAPI_UpdateAuthResourceInvalidConsentID(t *testing.T) {
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
-		RequestPayload: map[string]interface{}{
-			"data": "Test consent",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "auth_update_invalid_test", Value: "Test consent"},
 		},
 	}
 

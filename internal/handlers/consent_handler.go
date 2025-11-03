@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -28,26 +27,6 @@ func NewConsentHandler(consentService *service.ConsentService, consentPurposeSer
 		consentPurposeService: consentPurposeService,
 		extensionClient:       extensionClient,
 	}
-}
-
-// validateResolvedConsentPurposes validates that all resolved consent purposes exist in the organization
-func (h *ConsentHandler) validateResolvedConsentPurposes(ctx context.Context, purposeNames []string, orgID string) error {
-	if len(purposeNames) == 0 {
-		return nil
-	}
-
-	// Check each purpose name exists in the organization
-	for _, purposeName := range purposeNames {
-		exists, err := h.consentPurposeService.ExistsByName(ctx, purposeName, orgID)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return fmt.Errorf("consent purpose '%s' does not exist in organization", purposeName)
-		}
-	}
-
-	return nil
 }
 
 // CreateConsent handles POST /consents
@@ -118,36 +97,29 @@ func (h *ConsentHandler) CreateConsent(c *gin.Context) {
 			if modifiedRequest != nil {
 				request = modifiedRequest
 			}
-
-			// Validate resolved consent purposes if provided
-			if len(extResponse.Data.ResolvedConsentPurposes) > 0 {
-				if err := h.validateResolvedConsentPurposes(c.Request.Context(), extResponse.Data.ResolvedConsentPurposes, orgID); err != nil {
-					utils.SendBadRequestError(c, "Invalid consent purposes from extension", err.Error())
-					return
-				}
-
-				// Store resolved consent purposes if provided (to be used after consent creation)
-				utils.SetContextValue(c, "resolvedConsentPurposes", extResponse.Data.ResolvedConsentPurposes)
-			}
 		}
 	}
 
-	// Create consent with purposes if resolved from extension
-	var consent *models.ConsentResponse
-
-	if resolvedPurposesRaw, exists := c.Get("resolvedConsentPurposes"); exists {
-		if purposeNames, ok := resolvedPurposesRaw.([]string); ok && len(purposeNames) > 0 {
-			consent, err = h.consentService.CreateConsentWithPurposes(c.Request.Context(), request, clientID, orgID, purposeNames)
-		} else {
-			consent, err = h.consentService.CreateConsent(c.Request.Context(), request, clientID, orgID)
+	// Extract purpose names from the request's ConsentPurpose array
+	var purposeNames []string
+	if request.ConsentPurpose != nil && len(request.ConsentPurpose) > 0 {
+		purposeNames = make([]string, len(request.ConsentPurpose))
+		for i, purpose := range request.ConsentPurpose {
+			purposeNames[i] = purpose.Name
 		}
+	}
+
+	// Create consent with purpose validation
+	var consent *models.ConsentResponse
+	if len(purposeNames) > 0 {
+		consent, err = h.consentService.CreateConsentWithPurposes(c.Request.Context(), request, clientID, orgID, purposeNames)
 	} else {
 		consent, err = h.consentService.CreateConsent(c.Request.Context(), request, clientID, orgID)
 	}
 
 	if err != nil {
 		// Check if it's a validation error
-		if strings.Contains(err.Error(), "must be") || strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
+		if strings.Contains(err.Error(), "must be") || strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "not found") {
 			utils.SendBadRequestError(c, "Failed to create consent", err.Error())
 			return
 		}
@@ -265,29 +237,22 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 			if modifiedRequest != nil {
 				updateRequest = modifiedRequest
 			}
-
-			// Validate resolved consent purposes if provided
-			if len(extResponse.Data.ResolvedConsentPurposes) > 0 {
-				if err := h.validateResolvedConsentPurposes(c.Request.Context(), extResponse.Data.ResolvedConsentPurposes, orgID); err != nil {
-					utils.SendBadRequestError(c, "Invalid consent purposes from extension", err.Error())
-					return
-				}
-
-				// Store resolved consent purposes if provided (to be used after consent update)
-				utils.SetContextValue(c, "resolvedConsentPurposes", extResponse.Data.ResolvedConsentPurposes)
-			}
 		}
 	}
 
-	// Update consent with purposes if resolved from extension
-	var updatedConsent *models.ConsentResponse
-
-	if resolvedPurposesRaw, exists := c.Get("resolvedConsentPurposes"); exists {
-		if purposeNames, ok := resolvedPurposesRaw.([]string); ok {
-			updatedConsent, err = h.consentService.UpdateConsentWithPurposes(c.Request.Context(), consentID, orgID, updateRequest, purposeNames)
-		} else {
-			updatedConsent, err = h.consentService.UpdateConsent(c.Request.Context(), consentID, orgID, updateRequest)
+	// Extract purpose names from the request's ConsentPurpose array
+	var purposeNames []string
+	if updateRequest.ConsentPurpose != nil && len(updateRequest.ConsentPurpose) > 0 {
+		purposeNames = make([]string, len(updateRequest.ConsentPurpose))
+		for i, purpose := range updateRequest.ConsentPurpose {
+			purposeNames[i] = purpose.Name
 		}
+	}
+
+	// Update consent with purposes from request body
+	var updatedConsent *models.ConsentResponse
+	if len(purposeNames) > 0 {
+		updatedConsent, err = h.consentService.UpdateConsentWithPurposes(c.Request.Context(), consentID, orgID, updateRequest, purposeNames)
 	} else {
 		updatedConsent, err = h.consentService.UpdateConsent(c.Request.Context(), consentID, orgID, updateRequest)
 	}
@@ -508,17 +473,17 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 		ConsentInformation: map[string]interface{}{
 			"consentId":                  consent.ConsentID,
 			"status":                     consent.CurrentStatus,
-			"consentType":                consent.ConsentType,
-			"clientId":                   consent.ClientID,
-			"validityTime":               consent.ValidityTime,
-			"receipt":                    consent.Receipt,
-			"createdTime":                consent.CreatedTime,
-			"updatedTime":                consent.UpdatedTime,
-			"consentFrequency":           consent.ConsentFrequency,
-			"recurringIndicator":         consent.RecurringIndicator,
-			"dataAccessValidityDuration": consent.DataAccessValidityDuration,
-			"attributes":                 consent.Attributes,
-			"authResources":              consent.AuthResources,
+		"consentType":                consent.ConsentType,
+		"clientId":                   consent.ClientID,
+		"validityTime":               consent.ValidityTime,
+		"consentPurpose":             consent.ConsentPurpose,
+		"createdTime":                consent.CreatedTime,
+		"updatedTime":                consent.UpdatedTime,
+		"consentFrequency":           consent.ConsentFrequency,
+		"recurringIndicator":         consent.RecurringIndicator,
+		"dataAccessValidityDuration": consent.DataAccessValidityDuration,
+		"attributes":                 consent.Attributes,
+		"authResources":              consent.AuthResources,
 		},
 	}
 	c.JSON(200, response)

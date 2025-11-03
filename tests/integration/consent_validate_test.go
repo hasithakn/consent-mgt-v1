@@ -86,7 +86,7 @@ func setupValidateTestEnvironment(t *testing.T) (*gin.Engine, *service.ConsentSe
 	v1 := testRouter.Group("/api/v1")
 	{
 		v1.POST("/validate", consentHandler.Validate)
-		
+
 		// Also add consent routes for setup
 		consents := v1.Group("/consents")
 		{
@@ -107,12 +107,12 @@ func TestValidateConsent_Success(t *testing.T) {
 	// Create a test consent with active status
 	cfg := config.Get()
 	activeStatus := cfg.Consent.StatusMappings.ActiveStatus
-	
+
 	validityTime := time.Now().Add(24 * time.Hour).UnixNano() / int64(time.Millisecond)
-	
+
 	createRequest := &models.ConsentCreateRequest{
-		Receipt: map[string]interface{}{
-			"test": "data",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test", Value: "data"},
 		},
 		ConsentType:   "ACCOUNT_ACCESS",
 		CurrentStatus: activeStatus,
@@ -172,7 +172,7 @@ func TestValidateConsent_Success(t *testing.T) {
 	assert.Empty(t, response.ErrorCode, "Expected no error code")
 	assert.Empty(t, response.ErrorMessage, "Expected no error message")
 	assert.NotNil(t, response.ConsentInformation, "Expected consent information")
-	
+
 	// Verify consent information contains all fields
 	assert.Equal(t, consent.ConsentID, response.ConsentInformation["consentId"])
 	assert.Equal(t, activeStatus, response.ConsentInformation["status"])
@@ -192,10 +192,10 @@ func TestValidateConsent_InvalidStatus(t *testing.T) {
 	// Create a test consent with revoked status
 	cfg := config.Get()
 	revokedStatus := cfg.Consent.StatusMappings.RevokedStatus
-	
+
 	createRequest := &models.ConsentCreateRequest{
-		Receipt: map[string]interface{}{
-			"test": "data",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test", Value: "data"},
 		},
 		ConsentType:   "ACCOUNT_ACCESS",
 		CurrentStatus: revokedStatus,
@@ -252,13 +252,13 @@ func TestValidateConsent_ExpiredConsent(t *testing.T) {
 	// Create a test consent with active status but expired validityTime
 	cfg := config.Get()
 	activeStatus := cfg.Consent.StatusMappings.ActiveStatus
-	
+
 	// Set validity time to 1 hour ago
 	expiredTime := time.Now().Add(-1 * time.Hour).UnixNano() / int64(time.Millisecond)
-	
+
 	createRequest := &models.ConsentCreateRequest{
-		Receipt: map[string]interface{}{
-			"test": "data",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test", Value: "data"},
 		},
 		ConsentType:   "ACCOUNT_ACCESS",
 		CurrentStatus: activeStatus,
@@ -313,7 +313,7 @@ func TestValidateConsent_ExpiredConsent(t *testing.T) {
 	updatedConsent, err := consentService.GetConsent(context.Background(), consent.ConsentID, "TEST_ORG")
 	require.NoError(t, err)
 	assert.Equal(t, cfg.Consent.StatusMappings.ExpiredStatus, updatedConsent.CurrentStatus, "Expected consent status to be updated to expired")
-	
+
 	t.Logf("Consent status updated to: %s", updatedConsent.CurrentStatus)
 }
 

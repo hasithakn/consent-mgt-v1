@@ -57,16 +57,16 @@ func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request 
 		return nil, err
 	}
 
-	// Convert receipt map to JSON
-	receiptJSON, err := json.Marshal(request.Receipt)
+	// Convert consent purpose array to JSON
+	consentPurposeJSON, err := json.Marshal(request.ConsentPurpose)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal receipt: %w", err)
+		return nil, fmt.Errorf("failed to marshal consent purpose: %w", err)
 	}
 
 	// Build consent model
 	consent := &models.Consent{
 		ConsentID:                  utils.GenerateConsentID(),
-		Receipt:                    models.JSON(receiptJSON),
+		ConsentPurposes:            models.JSON(consentPurposeJSON),
 		ClientID:                   clientID,
 		ConsentType:                request.ConsentType,
 		CurrentStatus:              request.CurrentStatus,
@@ -260,12 +260,12 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 	updatedConsent := *existingConsent
 	updatedConsent.UpdatedTime = utils.GetCurrentTimeMillis()
 
-	if request.Receipt != nil {
-		receiptJSON, err := json.Marshal(request.Receipt)
+	if request.ConsentPurpose != nil && len(request.ConsentPurpose) > 0 {
+		consentPurposeJSON, err := json.Marshal(request.ConsentPurpose)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal receipt: %w", err)
+			return nil, fmt.Errorf("failed to marshal consent purpose: %w", err)
 		}
-		updatedConsent.Receipt = models.JSON(receiptJSON)
+		updatedConsent.ConsentPurposes = models.JSON(consentPurposeJSON)
 	}
 
 	if request.ConsentType != "" {
@@ -508,8 +508,8 @@ func (s *ConsentService) validateConsentCreateRequest(request *models.ConsentCre
 	if err := utils.ValidateStatus(request.CurrentStatus); err != nil {
 		return err
 	}
-	if request.Receipt == nil {
-		return fmt.Errorf("receipt is required")
+	if request.ConsentPurpose == nil || len(request.ConsentPurpose) == 0 {
+		return fmt.Errorf("consentPurpose is required")
 	}
 	// Validate DataAccessValidityDuration if provided (must be non-negative)
 	if request.DataAccessValidityDuration != nil && *request.DataAccessValidityDuration < 0 {
@@ -519,11 +519,12 @@ func (s *ConsentService) validateConsentCreateRequest(request *models.ConsentCre
 }
 
 func (s *ConsentService) buildConsentResponse(consent *models.Consent, attributes map[string]string, authResources []models.ConsentAuthResource) *models.ConsentResponse {
-	var receiptMap map[string]interface{}
-	if len(consent.Receipt) > 0 {
-		if err := json.Unmarshal(consent.Receipt, &receiptMap); err != nil {
-			s.logger.WithError(err).Warn("Failed to unmarshal receipt")
-			receiptMap = nil
+	// Unmarshal consent purposes from JSON
+	var consentPurpose []models.ConsentPurposeItem
+	if len(consent.ConsentPurposes) > 0 {
+		if err := json.Unmarshal(consent.ConsentPurposes, &consentPurpose); err != nil {
+			s.logger.WithError(err).Warn("Failed to unmarshal consent purposes")
+			consentPurpose = nil
 		}
 	}
 
@@ -547,7 +548,7 @@ func (s *ConsentService) buildConsentResponse(consent *models.Consent, attribute
 
 	return &models.ConsentResponse{
 		ConsentID:                  consent.ConsentID,
-		Receipt:                    receiptMap,
+		ConsentPurpose:             consentPurpose,
 		CreatedTime:                consent.CreatedTime,
 		UpdatedTime:                consent.UpdatedTime,
 		ClientID:                   consent.ClientID,

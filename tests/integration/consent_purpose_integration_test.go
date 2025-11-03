@@ -316,7 +316,7 @@ func TestConsentPurposeMapping_LinkAndUnlink(t *testing.T) {
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		ConsentFrequency:   &frequency,
-		Receipt:            models.JSON(receipt),
+		ConsentPurposes:            models.JSON(receipt),
 	}
 
 	err := env.ConsentDAO.Create(ctx, consent)
@@ -394,7 +394,7 @@ func TestConsentPurposeMapping_CascadeDelete(t *testing.T) {
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		ConsentFrequency:   &frequency,
-		Receipt:            models.JSON(receipt),
+		ConsentPurposes:            models.JSON(receipt),
 	}
 
 	err := env.ConsentDAO.Create(ctx, consent)
@@ -534,7 +534,7 @@ func TestConsentPurposeLifecycle_Complete(t *testing.T) {
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		ConsentFrequency:   &frequency,
-		Receipt:            models.JSON(receipt),
+		ConsentPurposes:            models.JSON(receipt),
 	}
 	err = env.ConsentDAO.Create(ctx, consent)
 	require.NoError(t, err)

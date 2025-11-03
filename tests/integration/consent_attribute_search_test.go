@@ -100,7 +100,9 @@ func TestSearchConsentsByAttribute_ByKeyOnly(t *testing.T) {
 
 	// Create test consents with attributes
 	consent1Request := &models.ConsentCreateRequest{
-		Receipt:       map[string]interface{}{"test": "data1"},
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test", Value: "data1"},
+		},
 		ConsentType:   "ACCOUNT_ACCESS",
 		CurrentStatus: "AUTHORIZED",
 		Attributes: map[string]string{
@@ -110,7 +112,9 @@ func TestSearchConsentsByAttribute_ByKeyOnly(t *testing.T) {
 	}
 
 	consent2Request := &models.ConsentCreateRequest{
-		Receipt:       map[string]interface{}{"test": "data2"},
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test", Value: "data2"},
+		},
 		ConsentType:   "PAYMENT",
 		CurrentStatus: "AUTHORIZED",
 		Attributes: map[string]string{
@@ -120,7 +124,9 @@ func TestSearchConsentsByAttribute_ByKeyOnly(t *testing.T) {
 	}
 
 	consent3Request := &models.ConsentCreateRequest{
-		Receipt:       map[string]interface{}{"test": "data3"},
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test", Value: "data3"},
+		},
 		ConsentType:   "ACCOUNT_ACCESS",
 		CurrentStatus: "AUTHORIZED",
 		Attributes: map[string]string{
@@ -170,7 +176,9 @@ func TestSearchConsentsByAttribute_ByKeyAndValue(t *testing.T) {
 
 	// Create test consents
 	consent1Request := &models.ConsentCreateRequest{
-		Receipt:       map[string]interface{}{"test": "data1"},
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test", Value: "data1"},
+		},
 		ConsentType:   "ACCOUNT_ACCESS",
 		CurrentStatus: "AUTHORIZED",
 		Attributes: map[string]string{
@@ -180,7 +188,9 @@ func TestSearchConsentsByAttribute_ByKeyAndValue(t *testing.T) {
 	}
 
 	consent2Request := &models.ConsentCreateRequest{
-		Receipt:       map[string]interface{}{"test": "data2"},
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test", Value: "data2"},
+		},
 		ConsentType:   "PAYMENT",
 		CurrentStatus: "AUTHORIZED",
 		Attributes: map[string]string{
@@ -190,7 +200,9 @@ func TestSearchConsentsByAttribute_ByKeyAndValue(t *testing.T) {
 	}
 
 	consent3Request := &models.ConsentCreateRequest{
-		Receipt:       map[string]interface{}{"test": "data3"},
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test", Value: "data3"},
+		},
 		ConsentType:   "ACCOUNT_ACCESS",
 		CurrentStatus: "AUTHORIZED",
 		Attributes: map[string]string{
@@ -238,7 +250,9 @@ func TestSearchConsentsByAttribute_NoResults(t *testing.T) {
 
 	// Create a test consent with different attributes
 	consentRequest := &models.ConsentCreateRequest{
-		Receipt:       map[string]interface{}{"test": "data"},
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test", Value: "data"},
+		},
 		ConsentType:   "ACCOUNT_ACCESS",
 		CurrentStatus: "AUTHORIZED",
 		Attributes: map[string]string{
@@ -295,7 +309,9 @@ func TestSearchConsentsByAttribute_OrganizationIsolation(t *testing.T) {
 
 	// Create consent for ORG1
 	consent1Request := &models.ConsentCreateRequest{
-		Receipt:       map[string]interface{}{"test": "data1"},
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test", Value: "data1"},
+		},
 		ConsentType:   "ACCOUNT_ACCESS",
 		CurrentStatus: "AUTHORIZED",
 		Attributes: map[string]string{
@@ -332,7 +348,9 @@ func TestSearchConsentsByAttribute_EmptyValue(t *testing.T) {
 
 	// Create consent
 	consentRequest := &models.ConsentCreateRequest{
-		Receipt:       map[string]interface{}{"test": "data"},
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test", Value: "data"},
+		},
 		ConsentType:   "ACCOUNT_ACCESS",
 		CurrentStatus: "AUTHORIZED",
 		Attributes: map[string]string{

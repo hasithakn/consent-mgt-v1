@@ -236,10 +236,10 @@ func BuildExtensionRequest(consent *models.Consent, additionalData map[string]in
 		Data:        additionalData,
 	}
 
-	// Convert Receipt JSON to map
-	if consent.Receipt != nil {
+	// Convert ConsentPurposes JSON to map
+	if consent.ConsentPurposes != nil {
 		var receiptMap map[string]interface{}
-		if err := json.Unmarshal(consent.Receipt, &receiptMap); err == nil {
+		if err := json.Unmarshal(consent.ConsentPurposes, &receiptMap); err == nil {
 			req.Receipt = receiptMap
 		}
 	}

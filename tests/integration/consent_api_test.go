@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -161,7 +163,7 @@ func TestAPI_CreateConsent(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 	ValidityTime:       &validityTime,
 	RecurringIndicator: &recurringIndicator,
 	Frequency:          &frequency,
@@ -204,7 +206,7 @@ func TestAPI_CreateConsent(t *testing.T) {
 	assert.NotEmpty(t, response.ID, "Consent ID should not be empty")
 	assert.Equal(t, "accounts", response.Type)
 	assert.Equal(t, "TEST_CLIENT", response.ClientID)
-	assert.Equal(t, "awaitingAuthorization", response.Status)
+	assert.Equal(t, "CREATED", response.Status)
 	assert.NotNil(t, response.ConsentPurpose)
 	assert.NotNil(t, response.Attributes)
 	assert.NotNil(t, response.Authorizations) // Should be empty array
@@ -243,7 +245,7 @@ func TestAPI_CreateConsentWithAuthResources(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "payments",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -324,7 +326,7 @@ func TestAPI_CreateConsentInvalidRequest(t *testing.T) {
 	}{
 		{
 			name:           "Missing consent type",
-			requestBody:    `{"requestPayload": {"data": "test"}, "status": "awaitingAuthorization"}`,
+			requestBody:    `{"requestPayload": {"data": "test"}, "status": "CREATED"}`,
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
@@ -334,7 +336,7 @@ func TestAPI_CreateConsentInvalidRequest(t *testing.T) {
 		},
 		{
 			name:           "Missing requestPayload",
-			requestBody:    `{"type": "accounts", "status": "awaitingAuthorization"}`,
+			requestBody:    `{"type": "accounts", "status": "CREATED"}`,
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
@@ -402,7 +404,7 @@ func TestAPI_GetConsent(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -453,7 +455,7 @@ func TestAPI_GetConsent(t *testing.T) {
 	assert.Equal(t, createResponse.ID, getResponse.ID)
 	assert.Equal(t, "accounts", getResponse.Type)
 	assert.Equal(t, "TEST_CLIENT", getResponse.ClientID)
-	assert.Equal(t, "awaitingAuthorization", getResponse.Status)
+	assert.Equal(t, "CREATED", getResponse.Status)
 	assert.NotNil(t, getResponse.ConsentPurpose)
 	assert.NotNil(t, getResponse.Attributes)
 	assert.Equal(t, "get-endpoint", getResponse.Attributes["test"])
@@ -537,7 +539,7 @@ func TestAPI_UpdateConsent(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -575,7 +577,7 @@ func TestAPI_UpdateConsent(t *testing.T) {
 	newRecurringIndicator := true
 
 	updateReq := &models.ConsentAPIUpdateRequest{
-		Status:             "AUTHORIZED",
+		Status:             "ACTIVE",
 		ValidityTime:       &newValidityTime,
 		RecurringIndicator: &newRecurringIndicator,
 		Frequency:          &newFrequency,
@@ -609,7 +611,7 @@ func TestAPI_UpdateConsent(t *testing.T) {
 
 	// Verify response data
 	assert.Equal(t, createResponse.ID, updateResponse.ID)
-	assert.Equal(t, "AUTHORIZED", updateResponse.Status)
+	assert.Equal(t, "ACTIVE", updateResponse.Status)
 	assert.NotNil(t, updateResponse.ValidityTime)
 	assert.Equal(t, newValidityTime, *updateResponse.ValidityTime)
 	assert.NotNil(t, updateResponse.Frequency)
@@ -661,7 +663,7 @@ func TestAPI_UpdateConsentType(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -717,7 +719,7 @@ func TestAPI_UpdateConsentType(t *testing.T) {
 	// Verify the type was updated
 	assert.Equal(t, createResponse.ID, updateResponse.ID)
 	assert.Equal(t, "payments", updateResponse.Type, "Consent type should be updated to payments")
-	assert.Equal(t, "awaitingAuthorization", updateResponse.Status, "Status should remain unchanged")
+	assert.Equal(t, "CREATED", updateResponse.Status, "Status should remain unchanged")
 
 	// Cleanup
 	cleanupAPITestData(t, env, createResponse.ID)
@@ -733,7 +735,7 @@ func TestAPI_UpdateConsentNotFound(t *testing.T) {
 	recurringIndicator := false
 
 	updateReq := &models.ConsentAPIUpdateRequest{
-		Status:             "AUTHORIZED",
+		Status:             "ACTIVE",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -788,7 +790,7 @@ func TestAPI_UpdateConsentInvalidStatus(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -879,7 +881,7 @@ func TestAPI_CreateConsent_WithDataAccessValidityDuration(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:                       "accounts",
-		Status:                     "awaitingAuthorization",
+		Status:                     "CREATED",
 		ValidityTime:               &validityTime,
 		RecurringIndicator:         &recurringIndicator,
 		Frequency:                  &frequency,
@@ -947,7 +949,7 @@ func TestAPI_CreateConsent_WithoutDataAccessValidityDuration(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -1013,7 +1015,7 @@ func TestAPI_CreateConsent_WithNegativeDataAccessValidityDuration(t *testing.T) 
 
 	createReq := &models.ConsentAPIRequest{
 		Type:                       "accounts",
-		Status:                     "awaitingAuthorization",
+		Status:                     "CREATED",
 		ValidityTime:               &validityTime,
 		RecurringIndicator:         &recurringIndicator,
 		Frequency:                  &frequency,
@@ -1060,10 +1062,11 @@ func TestAPI_GetConsent_ReturnsDataAccessValidityDuration(t *testing.T) {
 
 	ctx := context.Background()
 	
-	// Create test purpose first
+	// Create test purpose first with unique ID
+	purposeID := fmt.Sprintf("PURPOSE-api-get-validity-%d", time.Now().UnixNano())
 	desc := "API test for GET with data access validity duration"
 	purpose := &models.ConsentPurpose{
-		ID:          "PURPOSE-api-get-validity",
+		ID:          purposeID,
 		Name:        "api_get_validity_test",
 		Description: &desc,
 		OrgID:       "TEST_ORG",
@@ -1081,7 +1084,7 @@ func TestAPI_GetConsent_ReturnsDataAccessValidityDuration(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:                       "accounts",
-		Status:                     "awaitingAuthorization",
+		Status:                     "CREATED",
 		ValidityTime:               &validityTime,
 		RecurringIndicator:         &recurringIndicator,
 		Frequency:                  &frequency,
@@ -1159,7 +1162,7 @@ func TestAPI_UpdateConsent_AddDataAccessValidityDuration(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -1250,7 +1253,7 @@ func TestAPI_UpdateConsent_ChangeDataAccessValidityDuration(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:                       "accounts",
-		Status:                     "awaitingAuthorization",
+		Status:                     "CREATED",
 		ValidityTime:               &validityTime,
 		RecurringIndicator:         &recurringIndicator,
 		Frequency:                  &frequency,
@@ -1342,7 +1345,7 @@ func TestAPI_UpdateConsent_NegativeDataAccessValidityDuration(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,

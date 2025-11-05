@@ -12,15 +12,15 @@ func mockConfig() *config.Config {
 		Consent: config.ConsentConfig{
 			AllowedStatuses: []string{
 				"CREATED",
-				"awaitingAuthorization",
-				"AUTHORIZED",
+				"CREATED",
+				"ACTIVE",
 				"ACTIVE",
 				"REJECTED",
 				"REVOKED",
 				"EXPIRED",
 			},
 			StatusMappings: config.ConsentStatusMappings{
-				ActiveStatus:   "AUTHORIZED",
+				ActiveStatus:   "ACTIVE",
 				ExpiredStatus:  "EXPIRED",
 				RevokedStatus:  "REVOKED",
 				CreatedStatus:  "CREATED",
@@ -37,8 +37,8 @@ func TestValidateStatus_ValidStatuses(t *testing.T) {
 
 	validStatuses := []string{
 		"CREATED",
-		"awaitingAuthorization",
-		"AUTHORIZED",
+		"CREATED",
+		"ACTIVE",
 		"ACTIVE",
 		"REJECTED",
 		"REVOKED",

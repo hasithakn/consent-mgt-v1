@@ -131,7 +131,7 @@ func createTestConsentRequest() *models.ConsentCreateRequest {
 			}},
 		},
 		ConsentType:        "accounts",
-		CurrentStatus:      "awaitingAuthorization",
+		CurrentStatus:      "CREATED",
 		ValidityTime:       &validityTime,
 		ConsentFrequency:   &frequency,
 		RecurringIndicator: &recurring,
@@ -162,7 +162,7 @@ func TestConsentCreate_Success(t *testing.T) {
 	assert.Equal(t, testClientID, response.ClientID, "Client ID should match")
 	assert.Equal(t, request.ConsentType, response.ConsentType, "Consent type should match")
 	assert.Equal(t, testOrgID, response.OrgID, "Org ID should match")
-	assert.Equal(t, "awaitingAuthorization", response.CurrentStatus, "Initial status should be awaitingAuthorization")
+	assert.Equal(t, "CREATED", response.CurrentStatus, "Initial status should be awaitingAuthorization")
 	assert.NotZero(t, response.CreatedTime, "Created time should be set")
 	assert.NotZero(t, response.UpdatedTime, "Updated time should be set")
 	assert.NotNil(t, response.ConsentPurpose, "ConsentPurpose should not be nil")
@@ -182,7 +182,7 @@ func TestConsentCreate_WithMinimalData(t *testing.T) {
 			{Name: "account_access", Value: "minimal consent"},
 		},
 		ConsentType:   "payments",
-		CurrentStatus: "AUTHORIZED",
+		CurrentStatus: "ACTIVE",
 	}
 
 	// Create consent
@@ -192,7 +192,7 @@ func TestConsentCreate_WithMinimalData(t *testing.T) {
 	require.NoError(t, err, "Failed to create minimal consent")
 	require.NotNil(t, response, "Response should not be nil")
 	assert.NotEmpty(t, response.ConsentID, "Consent ID should be generated")
-	assert.Equal(t, "AUTHORIZED", response.CurrentStatus, "Status should be AUTHORIZED")
+	assert.Equal(t, "ACTIVE", response.CurrentStatus, "Status should be AUTHORIZED")
 
 	// Cleanup
 	cleanupTestData(t, env, response.ConsentID)
@@ -261,7 +261,7 @@ func TestConsentCreate_WithAuthResources(t *testing.T) {
 	require.NoError(t, err, "Failed to create consent with auth resources")
 	require.NotNil(t, response, "Response should not be nil")
 	assert.NotEmpty(t, response.ConsentID, "Consent ID should not be empty")
-	assert.Equal(t, "awaitingAuthorization", response.CurrentStatus, "Status should be awaitingAuthorization")
+	assert.Equal(t, "CREATED", response.CurrentStatus, "Status should be awaitingAuthorization")
 
 	// Verify auth resources were created
 	require.NotNil(t, response.AuthResources, "Auth resources should not be nil")
@@ -544,7 +544,7 @@ func TestConsentLifecycle_Complete(t *testing.T) {
 	request := createTestConsentRequest()
 	createResponse, err := env.ConsentService.CreateConsent(ctx, request, testClientID, testOrgID)
 	require.NoError(t, err, "Step 1: Failed to create consent")
-	assert.Equal(t, "awaitingAuthorization", createResponse.CurrentStatus, "Initial status should be awaitingAuthorization")
+	assert.Equal(t, "CREATED", createResponse.CurrentStatus, "Initial status should be awaitingAuthorization")
 	t.Logf("Step 1: Created consent %s with status %s", createResponse.ConsentID, createResponse.CurrentStatus)
 
 	defer cleanupTestData(t, env, createResponse.ConsentID)
@@ -631,7 +631,7 @@ func TestConsentJSON_Serialization(t *testing.T) {
 			{Name: "complex_receipt", Value: receiptData},
 		},
 		ConsentType:   "financial",
-		CurrentStatus: "AUTHORIZED",
+		CurrentStatus: "ACTIVE",
 	}
 
 	// Create consent
@@ -672,7 +672,7 @@ func TestConsentUpdate_FullPayload(t *testing.T) {
 		{
 			AuthType:   "account",
 			UserID:     stringPtr("user-123"),
-			AuthStatus: "AUTHORIZED",
+			AuthStatus: "ACTIVE",
 			ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
 				ApprovedPurposesNames:       []string{"utility_read", "taxes_read"},
 				ApprovedAdditionalResources: []interface{}{},
@@ -682,7 +682,7 @@ func TestConsentUpdate_FullPayload(t *testing.T) {
 
 	created, err := env.ConsentService.CreateConsent(ctx, createRequest, testClientID, testOrgID)
 	require.NoError(t, err, "Step 1: Should create consent successfully")
-	assert.Equal(t, "awaitingAuthorization", created.CurrentStatus, "Initial status should be awaitingAuthorization")
+	assert.Equal(t, "CREATED", created.CurrentStatus, "Initial status should be awaitingAuthorization")
 	assert.Equal(t, "account_access", created.Attributes["purpose"], "Initial attribute should match")
 	assert.Len(t, created.AuthResources, 1, "Should have 1 auth resource")
 
@@ -831,7 +831,7 @@ func TestConsentUpdate_FullPayload(t *testing.T) {
 		}
 	}
 	require.NotNil(t, updateAudit, "Should have audit record for status update")
-	assert.Equal(t, "awaitingAuthorization", *updateAudit.PreviousStatus, "Previous status should be awaitingAuthorization")
+	assert.Equal(t, "CREATED", *updateAudit.PreviousStatus, "Previous status should be awaitingAuthorization")
 	assert.Equal(t, "ACTIVE", updateAudit.CurrentStatus, "Current status should be ACTIVE")
 	t.Logf("Step 4: Status audit verified - %d records found", len(auditRecords))
 

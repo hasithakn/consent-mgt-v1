@@ -60,7 +60,7 @@ func TestConsentPurposeMapping_CreateWithPurposes(t *testing.T) {
 			Data: &models.PreProcessConsentCreationResponseData{
 				ConsentResource: models.DetailedConsentResourceData{
 					Type:           "accounts",
-					Status:         "awaitingAuthorization",
+					Status:         "CREATED",
 					RequestPayload: requestPayload,
 				},
 				ResolvedConsentPurposes: []string{"AccountData", "TransactionHistory"},
@@ -74,7 +74,7 @@ func TestConsentPurposeMapping_CreateWithPurposes(t *testing.T) {
 	// Create consent via API
 	body := map[string]interface{}{
 		"type":   "accounts",
-		"status": "awaitingAuthorization",
+		"status": "CREATED",
 		"requestPayload": map[string]interface{}{
 			"Data": map[string]interface{}{
 				"Permissions": []string{"ReadAccountsBasic"},
@@ -154,7 +154,7 @@ func TestConsentPurposeMapping_UpdateWithPurposes(t *testing.T) {
 				Data: &models.PreProcessConsentCreationResponseData{
 					ConsentResource: models.DetailedConsentResourceData{
 						Type:           "accounts",
-						Status:         "awaitingAuthorization",
+						Status:         "CREATED",
 						RequestPayload: extRequest.Data.ConsentInitiationData.RequestPayload,
 					},
 					ResolvedConsentPurposes: []string{"InitialPurpose"},
@@ -168,7 +168,7 @@ func TestConsentPurposeMapping_UpdateWithPurposes(t *testing.T) {
 
 	createBody := map[string]interface{}{
 		"type":   "accounts",
-		"status": "awaitingAuthorization",
+		"status": "CREATED",
 		"requestPayload": map[string]interface{}{
 			"Data": map[string]interface{}{
 				"Permissions": []string{"ReadAccountsBasic"},
@@ -212,7 +212,7 @@ func TestConsentPurposeMapping_UpdateWithPurposes(t *testing.T) {
 				Data: &models.PreProcessConsentUpdateResponseData{
 					ConsentResource: models.DetailedConsentResourceData{
 						Type:   "accounts",
-						Status: "AUTHORIZED",
+						Status: "ACTIVE",
 					},
 					ResolvedConsentPurposes: []string{"UpdatedPurpose"},
 				},
@@ -224,7 +224,7 @@ func TestConsentPurposeMapping_UpdateWithPurposes(t *testing.T) {
 	})
 
 	updateBody := map[string]interface{}{
-		"status": "AUTHORIZED",
+		"status": "ACTIVE",
 	}
 	bodyBytes, _ = json.Marshal(updateBody)
 
@@ -283,7 +283,7 @@ func TestConsentPurposeMapping_MultipleConsents(t *testing.T) {
 			Data: &models.PreProcessConsentCreationResponseData{
 				ConsentResource: models.DetailedConsentResourceData{
 					Type:           "accounts",
-					Status:         "awaitingAuthorization",
+					Status:         "CREATED",
 					RequestPayload: extRequest.Data.ConsentInitiationData.RequestPayload,
 				},
 				ResolvedConsentPurposes: []string{"SharedPurpose"},
@@ -299,7 +299,7 @@ func TestConsentPurposeMapping_MultipleConsents(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		body := map[string]interface{}{
 			"type":   "accounts",
-			"status": "awaitingAuthorization",
+			"status": "CREATED",
 			"requestPayload": map[string]interface{}{
 				"Data": map[string]interface{}{
 					"Permissions": []string{"ReadAccountsBasic"},

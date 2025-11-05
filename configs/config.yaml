@@ -44,17 +44,14 @@ consent:
   # List of allowed consent statuses
   allowedStatuses:
     - CREATED
-    - awaitingAuthorization
-    - AUTHORIZED
     - ACTIVE
     - REJECTED
     - REVOKED
     - EXPIRED
-  
   # Status mappings for specific consent lifecycle states
   statusMappings:
     # Status representing an active/authorized consent
-    activeStatus: AUTHORIZED
+    activeStatus: ACTIVE
     # Status representing an expired consent
     expiredStatus: EXPIRED
     # Status representing a revoked consent

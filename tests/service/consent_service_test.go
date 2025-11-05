@@ -41,15 +41,15 @@ func TestConsentStatusValidation(t *testing.T) {
 		Consent: config.ConsentConfig{
 			AllowedStatuses: []string{
 				"CREATED",
-				"awaitingAuthorization",
-				"AUTHORIZED",
+				"CREATED",
+				"ACTIVE",
 				"ACTIVE",
 				"REJECTED",
 				"REVOKED",
 				"EXPIRED",
 			},
 			StatusMappings: config.ConsentStatusMappings{
-				ActiveStatus:   "AUTHORIZED",
+				ActiveStatus:   "ACTIVE",
 				ExpiredStatus:  "EXPIRED",
 				RevokedStatus:  "REVOKED",
 				CreatedStatus:  "CREATED",
@@ -61,7 +61,7 @@ func TestConsentStatusValidation(t *testing.T) {
 
 	validStatuses := []string{
 		"CREATED",
-		"AUTHORIZED",
+		"ACTIVE",
 		"ACTIVE",
 		"REJECTED",
 		"REVOKED",
@@ -86,7 +86,7 @@ func TestConsentStatusValidation(t *testing.T) {
 func TestAuditRecordCreation(t *testing.T) {
 	consentID := "CONSENT-123"
 	orgID := "ORG-001"
-	previousStatus := "authorized"
+	previousStatus := "ACTIVE"
 	currentStatus := "revoked"
 	reason := "User requested revocation"
 	actionBy := "user-001"
@@ -115,15 +115,15 @@ func TestAuditRecordCreation(t *testing.T) {
 
 // TestBuildConsentObject tests consent object creation from request
 func TestBuildConsentObject(t *testing.T) {
-	receiptData := map[string]interface{}{
-		"consentId": "test-123",
-		"data":      "sample",
+	consentPurpose := []models.ConsentPurposeItem{
+		{Name: "data_access", Value: "Read account data"},
+		{Name: "transaction_access", Value: "Read transaction history"},
 	}
 
 	request := &models.ConsentCreateRequest{
-		Receipt:            receiptData,
+		ConsentPurpose:     consentPurpose,
 		ConsentType:        "accounts",
-		CurrentStatus:      "authorized",
+		CurrentStatus:      "ACTIVE",
 		ConsentFrequency:   nil,
 		ValidityTime:       nil,
 		RecurringIndicator: nil,
@@ -134,14 +134,14 @@ func TestBuildConsentObject(t *testing.T) {
 	consentID := utils.GenerateConsentID()
 	currentTime := utils.GetCurrentTimeMillis()
 
-	// Convert receipt to JSON for consent model
-	receiptJSON, err := json.Marshal(request.Receipt)
+	// Convert consentPurpose to JSON for consent model
+	consentPurposeJSON, err := json.Marshal(request.ConsentPurpose)
 	assert.NoError(t, err)
 
 	// Build consent object (clientID comes from context, not request)
 	consent := &models.Consent{
 		ConsentID:          consentID,
-		Receipt:            receiptJSON,
+		ConsentPurposes:    consentPurposeJSON,
 		CreatedTime:        currentTime,
 		UpdatedTime:        currentTime,
 		ClientID:           clientID,
@@ -159,7 +159,7 @@ func TestBuildConsentObject(t *testing.T) {
 	assert.Equal(t, clientID, consent.ClientID)
 	assert.Equal(t, request.ConsentType, consent.ConsentType)
 	assert.Equal(t, orgID, consent.OrgID)
-	assert.Equal(t, "authorized", consent.CurrentStatus)
+	assert.Equal(t, "ACTIVE", consent.CurrentStatus)
 	assert.NotZero(t, consent.CreatedTime)
 	assert.NotZero(t, consent.UpdatedTime)
 }

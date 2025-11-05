@@ -104,7 +104,7 @@ func TestSearchConsentsByAttribute_ByKeyOnly(t *testing.T) {
 			{Name: "test", Value: "data1"},
 		},
 		ConsentType:   "ACCOUNT_ACCESS",
-		CurrentStatus: "AUTHORIZED",
+		CurrentStatus: "ACTIVE",
 		Attributes: map[string]string{
 			"source":      "mobile-app",
 			"environment": "production",
@@ -116,7 +116,7 @@ func TestSearchConsentsByAttribute_ByKeyOnly(t *testing.T) {
 			{Name: "test", Value: "data2"},
 		},
 		ConsentType:   "PAYMENT",
-		CurrentStatus: "AUTHORIZED",
+		CurrentStatus: "ACTIVE",
 		Attributes: map[string]string{
 			"source":  "web-app",
 			"channel": "online",
@@ -128,7 +128,7 @@ func TestSearchConsentsByAttribute_ByKeyOnly(t *testing.T) {
 			{Name: "test", Value: "data3"},
 		},
 		ConsentType:   "ACCOUNT_ACCESS",
-		CurrentStatus: "AUTHORIZED",
+		CurrentStatus: "ACTIVE",
 		Attributes: map[string]string{
 			"channel": "mobile",
 		},
@@ -180,7 +180,7 @@ func TestSearchConsentsByAttribute_ByKeyAndValue(t *testing.T) {
 			{Name: "test", Value: "data1"},
 		},
 		ConsentType:   "ACCOUNT_ACCESS",
-		CurrentStatus: "AUTHORIZED",
+		CurrentStatus: "ACTIVE",
 		Attributes: map[string]string{
 			"source":      "mobile-app",
 			"environment": "production",
@@ -192,7 +192,7 @@ func TestSearchConsentsByAttribute_ByKeyAndValue(t *testing.T) {
 			{Name: "test", Value: "data2"},
 		},
 		ConsentType:   "PAYMENT",
-		CurrentStatus: "AUTHORIZED",
+		CurrentStatus: "ACTIVE",
 		Attributes: map[string]string{
 			"source":      "mobile-app",
 			"environment": "staging",
@@ -204,7 +204,7 @@ func TestSearchConsentsByAttribute_ByKeyAndValue(t *testing.T) {
 			{Name: "test", Value: "data3"},
 		},
 		ConsentType:   "ACCOUNT_ACCESS",
-		CurrentStatus: "AUTHORIZED",
+		CurrentStatus: "ACTIVE",
 		Attributes: map[string]string{
 			"source": "web-app",
 		},
@@ -254,7 +254,7 @@ func TestSearchConsentsByAttribute_NoResults(t *testing.T) {
 			{Name: "test", Value: "data"},
 		},
 		ConsentType:   "ACCOUNT_ACCESS",
-		CurrentStatus: "AUTHORIZED",
+		CurrentStatus: "ACTIVE",
 		Attributes: map[string]string{
 			"source": "mobile-app",
 		},
@@ -313,7 +313,7 @@ func TestSearchConsentsByAttribute_OrganizationIsolation(t *testing.T) {
 			{Name: "test", Value: "data1"},
 		},
 		ConsentType:   "ACCOUNT_ACCESS",
-		CurrentStatus: "AUTHORIZED",
+		CurrentStatus: "ACTIVE",
 		Attributes: map[string]string{
 			"source": "mobile-app",
 		},
@@ -352,7 +352,7 @@ func TestSearchConsentsByAttribute_EmptyValue(t *testing.T) {
 			{Name: "test", Value: "data"},
 		},
 		ConsentType:   "ACCOUNT_ACCESS",
-		CurrentStatus: "AUTHORIZED",
+		CurrentStatus: "ACTIVE",
 		Attributes: map[string]string{
 			"source": "mobile-app",
 		},

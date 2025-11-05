@@ -226,11 +226,15 @@ func TestExtension_PreCreateConsent_WithValidPurposes(t *testing.T) {
 
 	requestBody := map[string]interface{}{
 		"type":                       "accounts",
-		"status":                     "awaitingAuthorization",
+		"status":                     "CREATED",
 		"validityTime":               validityTime,
 		"recurringIndicator":         recurringIndicator,
 		"frequency":                  frequency,
 		"dataAccessValidityDuration": dataAccessValidityDuration,
+		"consentPurpose": []map[string]interface{}{
+			{"name": "ReadAccountsBasic", "value": "account:read:basic"},
+			{"name": "ReadAccountsDetail", "value": "account:read:detail"},
+		},
 		"requestPayload": map[string]interface{}{
 			"Data": map[string]interface{}{
 				"Permissions": []string{
@@ -325,8 +329,11 @@ func TestExtension_PreCreateConsent_WithInvalidPurposes(t *testing.T) {
 
 	// Create consent via API
 	requestBody := map[string]interface{}{
-		"type":           "accounts",
-		"status":         "awaitingAuthorization",
+		"type":   "accounts",
+		"status": "CREATED",
+		"consentPurpose": []map[string]interface{}{
+			{"name": "test_purpose", "value": "test"},
+		},
 		"requestPayload": map[string]interface{}{"data": "test"},
 	}
 	body, _ := json.Marshal(requestBody)
@@ -383,8 +390,11 @@ func TestExtension_PreCreateConsent_ExtensionError(t *testing.T) {
 
 	// Create consent via API
 	requestBody := map[string]interface{}{
-		"type":           "accounts",
-		"status":         "awaitingAuthorization",
+		"type":   "accounts",
+		"status": "CREATED",
+		"consentPurpose": []map[string]interface{}{
+			{"name": "test_purpose", "value": "test"},
+		},
 		"requestPayload": map[string]interface{}{"data": "test"},
 	}
 	body, _ := json.Marshal(requestBody)
@@ -454,8 +464,11 @@ func TestExtension_PreCreateConsent_ModifiedConsentData(t *testing.T) {
 
 	// Create consent via API
 	requestBody := map[string]interface{}{
-		"type":           "accounts",
-		"status":         "awaitingAuthorization",
+		"type":   "accounts",
+		"status": "CREATED",
+		"consentPurpose": []map[string]interface{}{
+			{"name": "test_purpose", "value": "test"},
+		},
 		"requestPayload": map[string]interface{}{"data": "test"},
 	}
 	body, _ := json.Marshal(requestBody)
@@ -475,7 +488,7 @@ func TestExtension_PreCreateConsent_ModifiedConsentData(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify modified data
-	assert.Equal(t, "awaitingAuthorization", response["status"], "Status should be preserved")
+	assert.Equal(t, "CREATED", response["status"], "Status should be preserved")
 	assert.Equal(t, float64(7200), response["validityTime"], "ValidityTime should be added by extension")
 	assert.Equal(t, true, response["recurringIndicator"], "RecurringIndicator should be added by extension")
 
@@ -524,7 +537,7 @@ func TestExtension_PreUpdateConsent_WithValidPurposes(t *testing.T) {
 			Data: &models.PreProcessConsentCreationResponseData{
 				ConsentResource: models.DetailedConsentResourceData{
 					Type:           "accounts",
-					Status:         "awaitingAuthorization",
+					Status:         "CREATED",
 					RequestPayload: requestPayload,
 				},
 				ResolvedConsentPurposes: []string{},
@@ -538,7 +551,7 @@ func TestExtension_PreUpdateConsent_WithValidPurposes(t *testing.T) {
 	// Create initial consent
 	createBody := map[string]interface{}{
 		"type":   "accounts",
-		"status": "awaitingAuthorization",
+		"status": "CREATED",
 		"requestPayload": map[string]interface{}{
 			"Data": map[string]interface{}{
 				"Permissions": []string{"ReadAccountsBasic"},
@@ -575,7 +588,7 @@ func TestExtension_PreUpdateConsent_WithValidPurposes(t *testing.T) {
 				Data: &models.PreProcessConsentUpdateResponseData{
 					ConsentResource: models.DetailedConsentResourceData{
 						Type:   "accounts",
-						Status: "AUTHORIZED",
+						Status: "ACTIVE",
 					},
 					ResolvedConsentPurposes: []string{"DataSharing"},
 				},
@@ -588,7 +601,7 @@ func TestExtension_PreUpdateConsent_WithValidPurposes(t *testing.T) {
 
 	// Update consent
 	updateBody := map[string]interface{}{
-		"status": "AUTHORIZED",
+		"status": "ACTIVE",
 	}
 	body, _ = json.Marshal(updateBody)
 
@@ -604,7 +617,7 @@ func TestExtension_PreUpdateConsent_WithValidPurposes(t *testing.T) {
 	var updateResponse map[string]interface{}
 	json.Unmarshal(w.Body.Bytes(), &updateResponse)
 
-	assert.Equal(t, "AUTHORIZED", updateResponse["status"])
+	assert.Equal(t, "ACTIVE", updateResponse["status"])
 	t.Logf("✓ Pre-update extension successfully validated purposes and consent updated")
 }
 
@@ -624,7 +637,7 @@ func TestExtension_PreUpdateConsent_WithInvalidPurposes(t *testing.T) {
 			"data": map[string]interface{}{
 				"consentResource": map[string]interface{}{
 					"type":           "accounts",
-					"status":         "awaitingAuthorization",
+					"status":         "CREATED",
 					"requestPayload": map[string]interface{}{"Data": map[string]interface{}{"Permissions": []string{"ReadAccountsBasic"}}},
 				},
 				"resolvedConsentPurposes": []string{},
@@ -645,7 +658,7 @@ func TestExtension_PreUpdateConsent_WithInvalidPurposes(t *testing.T) {
 	// Create initial consent
 	createBody := map[string]interface{}{
 		"type":   "accounts",
-		"status": "awaitingAuthorization",
+		"status": "CREATED",
 		"requestPayload": map[string]interface{}{
 			"Data": map[string]interface{}{
 				"Permissions": []string{"ReadAccountsBasic"},

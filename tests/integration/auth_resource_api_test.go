@@ -41,7 +41,7 @@ func TestAPI_CreateAuthResource(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -176,7 +176,7 @@ func TestAPI_CreateAuthResourceInvalidRequest(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -270,7 +270,7 @@ func TestAPI_GetAuthResource(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -382,7 +382,7 @@ func TestAPI_GetAuthResourceNotFound(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -450,7 +450,7 @@ func TestAPI_GetAuthResourceInvalidID(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -519,7 +519,7 @@ func TestAPI_GetAuthResourceInvalidConsentID(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -650,7 +650,7 @@ func TestAPI_UpdateAuthResource(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
@@ -682,7 +682,7 @@ func TestAPI_UpdateAuthResource(t *testing.T) {
 	authReq := &models.AuthorizationAPIRequest{
 		UserID: "user123",
 		Type:   "account",
-		Status: "awaitingAuthorization",
+		Status: "CREATED",
 		ApprovedPurposeDetails: &models.ApprovedPurposeDetails{
 			ApprovedPurposesNames:       []string{"utility_read"},
 			ApprovedAdditionalResources: []interface{}{},
@@ -802,7 +802,7 @@ func TestAPI_UpdateAuthResourceInvalidConsentID(t *testing.T) {
 
 	createReq := &models.ConsentAPIRequest{
 		Type:               "accounts",
-		Status:             "awaitingAuthorization",
+		Status:             "CREATED",
 		ValidityTime:       &validityTime,
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,

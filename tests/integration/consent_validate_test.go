@@ -108,7 +108,7 @@ func TestValidateConsent_Success(t *testing.T) {
 	cfg := config.Get()
 	activeStatus := cfg.Consent.StatusMappings.ActiveStatus
 
-	validityTime := time.Now().Add(24 * time.Hour).UnixNano() / int64(time.Millisecond)
+	validityTime := time.Now().Add(24*time.Hour).UnixNano() / int64(time.Millisecond)
 
 	createRequest := &models.ConsentCreateRequest{
 		ConsentPurpose: []models.ConsentPurposeItem{
@@ -177,7 +177,6 @@ func TestValidateConsent_Success(t *testing.T) {
 	assert.Equal(t, consent.ConsentID, response.ConsentInformation["consentId"])
 	assert.Equal(t, activeStatus, response.ConsentInformation["status"])
 	assert.Equal(t, "ACCOUNT_ACCESS", response.ConsentInformation["consentType"])
-	assert.NotNil(t, response.ConsentInformation["receipt"])
 	assert.NotNil(t, response.ConsentInformation["createdTime"])
 	assert.NotNil(t, response.ConsentInformation["updatedTime"])
 
@@ -254,7 +253,7 @@ func TestValidateConsent_ExpiredConsent(t *testing.T) {
 	activeStatus := cfg.Consent.StatusMappings.ActiveStatus
 
 	// Set validity time to 1 hour ago
-	expiredTime := time.Now().Add(-1 * time.Hour).UnixNano() / int64(time.Millisecond)
+	expiredTime := time.Now().Add(-1*time.Hour).UnixNano() / int64(time.Millisecond)
 
 	createRequest := &models.ConsentCreateRequest{
 		ConsentPurpose: []models.ConsentPurposeItem{

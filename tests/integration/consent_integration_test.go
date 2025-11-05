@@ -387,12 +387,15 @@ func TestConsentRevoke_Success(t *testing.T) {
 	defer cleanupTestData(t, env, createResponse.ConsentID)
 
 	// Now revoke it
-	reason := "Integration test revocation"
-	actionBy := "test-user"
-	err = env.ConsentService.RevokeConsent(ctx, createResponse.ConsentID, orgID, reason, actionBy)
+	revokeRequest := &models.ConsentRevokeRequest{
+		ActionBy:         "test-user",
+		RevocationReason: "Integration test revocation",
+	}
+	revokeResponse, err := env.ConsentService.RevokeConsent(ctx, createResponse.ConsentID, orgID, revokeRequest)
 
 	// Assertions
 	require.NoError(t, err, "Failed to revoke consent")
+	require.NotNil(t, revokeResponse, "Revoke response should not be nil")
 
 	// Verify the consent is revoked by retrieving it
 	revokedConsent, err := env.ConsentService.GetConsent(ctx, createResponse.ConsentID, orgID)
@@ -411,10 +414,10 @@ func TestConsentRevoke_Success(t *testing.T) {
 		if audit.CurrentStatus == "REVOKED" {
 			hasRevokeAudit = true
 			if audit.Reason != nil {
-				assert.Equal(t, reason, *audit.Reason, "Revoke reason should match")
+				assert.Equal(t, "Integration test revocation", *audit.Reason, "Revoke reason should match")
 			}
 			if audit.ActionBy != nil {
-				assert.Equal(t, actionBy, *audit.ActionBy, "ActionBy should match")
+				assert.Equal(t, "test-user", *audit.ActionBy, "ActionBy should match")
 			}
 		}
 	}
@@ -568,7 +571,11 @@ func TestConsentLifecycle_Complete(t *testing.T) {
 	t.Logf("Step 3: Found %d consent(s) in search", len(searchResults))
 
 	// Step 4: Revoke consent
-	err = env.ConsentService.RevokeConsent(ctx, createResponse.ConsentID, testOrgID, "Lifecycle test", "test-admin")
+	revokeReq := &models.ConsentRevokeRequest{
+		ActionBy:         "test-admin",
+		RevocationReason: "Lifecycle test",
+	}
+	_, err = env.ConsentService.RevokeConsent(ctx, createResponse.ConsentID, testOrgID, revokeReq)
 	require.NoError(t, err, "Step 4: Failed to revoke consent")
 	t.Logf("Step 4: Revoked consent %s", createResponse.ConsentID)
 

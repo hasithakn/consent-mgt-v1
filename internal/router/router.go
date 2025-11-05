@@ -60,11 +60,16 @@ func SetupRouter(
 		consents := v1.Group("/consents")
 		{
 			consents.POST("", consentHandler.CreateConsent)
+			
+			// Attribute search endpoint (must be before /:consentId)
+			consents.GET("/attributes", consentHandler.SearchConsentsByAttribute)
+			
+			// Specific paths before parameterized paths
+			consents.PUT("/:consentId/revoke", consentHandler.RevokeConsent)
+			
+			// General consent operations
 			consents.GET("/:consentId", consentHandler.GetConsent)
 			consents.PUT("/:consentId", consentHandler.UpdateConsent)
-
-			// Attribute search endpoint
-			consents.GET("/attributes", consentHandler.SearchConsentsByAttribute)
 
 			// Authorization resource routes under consent
 			consents.POST("/:consentId/authorizations", authResourceHandler.CreateAuthResource)

@@ -95,6 +95,7 @@ func setupAPITestEnvironment(t *testing.T) *TestAPIEnvironment {
 		consents := v1.Group("/consents")
 		{
 			consents.POST("", consentHandler.CreateConsent)
+			consents.PUT("/:consentId/revoke", consentHandler.RevokeConsent)
 			consents.GET("/:consentId", consentHandler.GetConsent)
 			consents.PUT("/:consentId", consentHandler.UpdateConsent)
 

@@ -519,3 +519,42 @@ func (h *ConsentHandler) SearchConsentsByAttribute(c *gin.Context) {
 
 	utils.SendOKResponse(c, response)
 }
+
+// RevokeConsent handles PUT /consents/:consentId/revoke
+func (h *ConsentHandler) RevokeConsent(c *gin.Context) {
+	// Get consentId from path parameter
+	consentID := c.Param("consentId")
+	if consentID == "" {
+		utils.SendBadRequestError(c, "Invalid request", "consentId is required")
+		return
+	}
+
+	// Parse request body
+	var request models.ConsentRevokeRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		utils.SendBadRequestError(c, "Invalid request body", err.Error())
+		return
+	}
+
+	// Get orgID from context
+	orgID := utils.GetOrgIDFromContext(c)
+
+	// Validate required fields
+	if err := utils.ValidateRequired("actionBy", request.ActionBy); err != nil {
+		utils.SendValidationError(c, err.Error())
+		return
+	}
+
+	// Call the service to revoke the consent
+	response, err := h.consentService.RevokeConsent(c.Request.Context(), consentID, orgID, &request)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			utils.SendNotFoundError(c, "Consent not found")
+			return
+		}
+		utils.SendInternalServerError(c, "Failed to revoke consent", err.Error())
+		return
+	}
+
+	utils.SendOKResponse(c, response)
+}

@@ -431,16 +431,17 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 }
 
 // RevokeConsent revokes a consent
-func (s *ConsentService) RevokeConsent(ctx context.Context, consentID, orgID, reason, actionBy string) error {
+// RevokeConsent revokes a consent and returns the revocation details
+func (s *ConsentService) RevokeConsent(ctx context.Context, consentID, orgID string, request *models.ConsentRevokeRequest) (*models.ConsentRevokeResponse, error) {
 	tx, err := s.db.BeginTx(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
 	consent, err := s.consentDAO.GetByIDWithTx(ctx, tx, consentID, orgID)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve consent: %w", err)
+		return nil, fmt.Errorf("failed to retrieve consent: %w", err)
 	}
 
 	previousStatus := consent.CurrentStatus
@@ -448,7 +449,7 @@ func (s *ConsentService) RevokeConsent(ctx context.Context, consentID, orgID, re
 	currentTime := utils.GetCurrentTimeMillis()
 
 	if err := s.consentDAO.UpdateStatusWithTx(ctx, tx, consentID, orgID, newStatus, currentTime); err != nil {
-		return fmt.Errorf("failed to update status: %w", err)
+		return nil, fmt.Errorf("failed to update status: %w", err)
 	}
 
 	audit := &models.ConsentStatusAudit{
@@ -456,17 +457,28 @@ func (s *ConsentService) RevokeConsent(ctx context.Context, consentID, orgID, re
 		ConsentID:      consentID,
 		CurrentStatus:  newStatus,
 		ActionTime:     currentTime,
-		ActionBy:       &actionBy,
+		ActionBy:       &request.ActionBy,
 		PreviousStatus: &previousStatus,
-		Reason:         &reason,
+		Reason:         &request.RevocationReason,
 		OrgID:          orgID,
 	}
 
 	if err := s.statusAuditDAO.CreateWithTx(ctx, tx, audit); err != nil {
-		return fmt.Errorf("failed to create audit record: %w", err)
+		return nil, fmt.Errorf("failed to create audit record: %w", err)
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	// Build response
+	response := &models.ConsentRevokeResponse{
+		ActionTime:       currentTime / 1000, // Convert milliseconds to seconds
+		ActionBy:         request.ActionBy,
+		RevocationReason: request.RevocationReason,
+	}
+
+	return response, nil
 }
 
 // SearchConsents searches for consents

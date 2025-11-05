@@ -234,8 +234,8 @@ type ConsentSearchMetadata struct {
 
 // ConsentRevokeRequest represents the request to revoke a consent
 type ConsentRevokeRequest struct {
-	Reason   string `json:"reason,omitempty"`
-	ActionBy string `json:"actionBy,omitempty"`
+	ActionBy         string `json:"actionBy" binding:"required"`
+	RevocationReason string `json:"revocationReason,omitempty"`
 }
 
 // GetCreatedTime returns the created time as a time.Time
@@ -419,4 +419,11 @@ type ValidateResponse struct {
 	ErrorMessage       string                 `json:"errorMessage,omitempty"`
 	HTTPCode           string                 `json:"httpCode,omitempty"`
 	ConsentInformation map[string]interface{} `json:"consentInformation"`
+}
+
+// ConsentRevokeResponse represents the response after revoking a consent
+type ConsentRevokeResponse struct {
+	ActionTime       int64  `json:"actionTime"`
+	ActionBy         string `json:"actionBy"`
+	RevocationReason string `json:"revocationReason,omitempty"`
 }

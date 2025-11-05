@@ -383,14 +383,14 @@ paths:
           schema:
             type: string
       requestBody:
-        description: The payload containing the consent data.
+        description: The payload containing the revocation data.
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/ConsentRevokePayload"
       responses:
-        "201":
+        "200":
           description: Successfully revoked the consent.
           content:
             application/json:
@@ -1569,19 +1569,17 @@ components:
     ConsentRevokePayload:
       type: object
       description: The request body for revoking a consent.
+      required:
+        - actionBy
       properties:
         actionBy:
-          description: Identifier of the user or system performing the delete/revoke action.
+          description: Identifier of the user or system performing the revoke action.
           type: string
           example: "admin@wso2.com"
         revocationReason:
           description: The reason for revoking the consent.
           type: string
           example: "Admin revoke"
-        revokedConsentStatus:
-          description: The status to set for the consent upon revocation.
-          type: string
-          example: "revoked"
     ConsentCreatePayload:
       type: object
       description: The request body for initiating a new consent.
@@ -1963,28 +1961,21 @@ components:
           description: Optional field used to provide an alternative payload that overrides the response paylaod.
     ConsentRevokedResponse:
       type: object
-      description: The response body returned after successfully initiating a new consent.
+      description: The response body returned after successfully revoking a consent.
       properties:
-        currentStatus:
-          description: The status of the consent after the change.
-          type: string
-          example: "revoked"
         actionTime:
-          description: The Unix timestamp when the action occurred.
+          description: The Unix timestamp (in seconds) when the revocation occurred.
           type: integer
+          format: int64
           example: 1758829540
-        reason:
-          description: The reason provided for the status change.
+        actionBy:
+          description: The user or system that performed the revoke action.
+          type: string
+          example: "admin@wso2.com"
+        revocationReason:
+          description: The reason provided for revoking the consent.
           type: string
           example: "Admin revoke"
-        actionBy:
-          description: The user or system that performed the action.
-          type: string
-          example: "admin@carbon.super"
-        previousStatus:
-          description: The status of the consent before the change.
-          type: string
-          example: "authorised"
     ConsentCreatedResponse:
       type: object
       description: The response body returned after successfully initiating a new consent.

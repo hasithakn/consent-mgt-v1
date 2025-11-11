@@ -26,7 +26,7 @@ func (dao *ConsentAttributeDAO) Create(ctx context.Context, consentID, orgID str
 	}
 
 	query := `
-		INSERT INTO FS_CONSENT_ATTRIBUTE (CONSENT_ID, ATT_KEY, ATT_VALUE, ORG_ID)
+		INSERT INTO CONSENT_ATTRIBUTE (CONSENT_ID, ATT_KEY, ATT_VALUE, ORG_ID)
 		VALUES (?, ?, ?, ?)
 	`
 
@@ -47,7 +47,7 @@ func (dao *ConsentAttributeDAO) CreateWithTx(ctx context.Context, tx *database.T
 	}
 
 	query := `
-		INSERT INTO FS_CONSENT_ATTRIBUTE (CONSENT_ID, ATT_KEY, ATT_VALUE, ORG_ID)
+		INSERT INTO CONSENT_ATTRIBUTE (CONSENT_ID, ATT_KEY, ATT_VALUE, ORG_ID)
 		VALUES (?, ?, ?, ?)
 	`
 
@@ -65,7 +65,7 @@ func (dao *ConsentAttributeDAO) CreateWithTx(ctx context.Context, tx *database.T
 func (dao *ConsentAttributeDAO) GetByConsentID(ctx context.Context, consentID, orgID string) (map[string]string, error) {
 	query := `
 		SELECT ATT_KEY, ATT_VALUE
-		FROM FS_CONSENT_ATTRIBUTE
+		FROM CONSENT_ATTRIBUTE
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 	`
 
@@ -88,7 +88,7 @@ func (dao *ConsentAttributeDAO) GetByConsentID(ctx context.Context, consentID, o
 func (dao *ConsentAttributeDAO) GetByConsentIDWithTx(ctx context.Context, tx *database.Transaction, consentID, orgID string) (map[string]string, error) {
 	query := `
 		SELECT ATT_KEY, ATT_VALUE
-		FROM FS_CONSENT_ATTRIBUTE
+		FROM CONSENT_ATTRIBUTE
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 	`
 
@@ -111,7 +111,7 @@ func (dao *ConsentAttributeDAO) GetByConsentIDWithTx(ctx context.Context, tx *da
 func (dao *ConsentAttributeDAO) GetByKey(ctx context.Context, consentID, orgID, key string) (string, error) {
 	query := `
 		SELECT ATT_VALUE
-		FROM FS_CONSENT_ATTRIBUTE
+		FROM CONSENT_ATTRIBUTE
 		WHERE CONSENT_ID = ? AND ORG_ID = ? AND ATT_KEY = ?
 	`
 
@@ -152,7 +152,7 @@ func (dao *ConsentAttributeDAO) UpdateWithTx(ctx context.Context, tx *database.T
 // UpdateAttribute updates a single attribute
 func (dao *ConsentAttributeDAO) UpdateAttribute(ctx context.Context, consentID, orgID, key, value string) error {
 	query := `
-		INSERT INTO FS_CONSENT_ATTRIBUTE (CONSENT_ID, ATT_KEY, ATT_VALUE, ORG_ID)
+		INSERT INTO CONSENT_ATTRIBUTE (CONSENT_ID, ATT_KEY, ATT_VALUE, ORG_ID)
 		VALUES (?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE ATT_VALUE = ?
 	`
@@ -167,7 +167,7 @@ func (dao *ConsentAttributeDAO) UpdateAttribute(ctx context.Context, consentID, 
 
 // DeleteByConsentID deletes all attributes for a consent
 func (dao *ConsentAttributeDAO) DeleteByConsentID(ctx context.Context, consentID, orgID string) error {
-	query := `DELETE FROM FS_CONSENT_ATTRIBUTE WHERE CONSENT_ID = ? AND ORG_ID = ?`
+	query := `DELETE FROM CONSENT_ATTRIBUTE WHERE CONSENT_ID = ? AND ORG_ID = ?`
 
 	_, err := dao.db.ExecContext(ctx, query, consentID, orgID)
 	if err != nil {
@@ -179,7 +179,7 @@ func (dao *ConsentAttributeDAO) DeleteByConsentID(ctx context.Context, consentID
 
 // DeleteByConsentIDWithTx deletes all attributes for a consent using a transaction
 func (dao *ConsentAttributeDAO) DeleteByConsentIDWithTx(ctx context.Context, tx *database.Transaction, consentID, orgID string) error {
-	query := `DELETE FROM FS_CONSENT_ATTRIBUTE WHERE CONSENT_ID = ? AND ORG_ID = ?`
+	query := `DELETE FROM CONSENT_ATTRIBUTE WHERE CONSENT_ID = ? AND ORG_ID = ?`
 
 	_, err := tx.ExecContext(ctx, query, consentID, orgID)
 	if err != nil {
@@ -191,7 +191,7 @@ func (dao *ConsentAttributeDAO) DeleteByConsentIDWithTx(ctx context.Context, tx 
 
 // DeleteAttribute deletes a specific attribute by key
 func (dao *ConsentAttributeDAO) DeleteAttribute(ctx context.Context, consentID, orgID, key string) error {
-	query := `DELETE FROM FS_CONSENT_ATTRIBUTE WHERE CONSENT_ID = ? AND ORG_ID = ? AND ATT_KEY = ?`
+	query := `DELETE FROM CONSENT_ATTRIBUTE WHERE CONSENT_ID = ? AND ORG_ID = ? AND ATT_KEY = ?`
 
 	result, err := dao.db.ExecContext(ctx, query, consentID, orgID, key)
 	if err != nil {
@@ -212,7 +212,7 @@ func (dao *ConsentAttributeDAO) DeleteAttribute(ctx context.Context, consentID, 
 
 // Exists checks if attributes exist for a consent
 func (dao *ConsentAttributeDAO) Exists(ctx context.Context, consentID, orgID string) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM FS_CONSENT_ATTRIBUTE WHERE CONSENT_ID = ? AND ORG_ID = ?)`
+	query := `SELECT EXISTS(SELECT 1 FROM CONSENT_ATTRIBUTE WHERE CONSENT_ID = ? AND ORG_ID = ?)`
 
 	var exists bool
 	err := dao.db.GetContext(ctx, &exists, query, consentID, orgID)
@@ -225,7 +225,7 @@ func (dao *ConsentAttributeDAO) Exists(ctx context.Context, consentID, orgID str
 
 // AttributeExists checks if a specific attribute exists
 func (dao *ConsentAttributeDAO) AttributeExists(ctx context.Context, consentID, orgID, key string) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM FS_CONSENT_ATTRIBUTE WHERE CONSENT_ID = ? AND ORG_ID = ? AND ATT_KEY = ?)`
+	query := `SELECT EXISTS(SELECT 1 FROM CONSENT_ATTRIBUTE WHERE CONSENT_ID = ? AND ORG_ID = ? AND ATT_KEY = ?)`
 
 	var exists bool
 	err := dao.db.GetContext(ctx, &exists, query, consentID, orgID, key)
@@ -240,7 +240,7 @@ func (dao *ConsentAttributeDAO) AttributeExists(ctx context.Context, consentID, 
 func (dao *ConsentAttributeDAO) FindConsentIDsByAttributeKey(ctx context.Context, key, orgID string) ([]string, error) {
 	query := `
 		SELECT DISTINCT CONSENT_ID
-		FROM FS_CONSENT_ATTRIBUTE
+		FROM CONSENT_ATTRIBUTE
 		WHERE ATT_KEY = ? AND ORG_ID = ?
 		ORDER BY CONSENT_ID
 	`
@@ -258,7 +258,7 @@ func (dao *ConsentAttributeDAO) FindConsentIDsByAttributeKey(ctx context.Context
 func (dao *ConsentAttributeDAO) FindConsentIDsByAttribute(ctx context.Context, key, value, orgID string) ([]string, error) {
 	query := `
 		SELECT DISTINCT CONSENT_ID
-		FROM FS_CONSENT_ATTRIBUTE
+		FROM CONSENT_ATTRIBUTE
 		WHERE ATT_KEY = ? AND ATT_VALUE = ? AND ORG_ID = ?
 		ORDER BY CONSENT_ID
 	`

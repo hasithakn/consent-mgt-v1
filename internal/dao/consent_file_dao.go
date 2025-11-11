@@ -22,7 +22,7 @@ func NewConsentFileDAO(db *database.DB) *ConsentFileDAO {
 // Upload inserts a new consent file (BLOB data)
 func (dao *ConsentFileDAO) Upload(ctx context.Context, file *models.ConsentFile) error {
 	query := `
-		INSERT INTO FS_CONSENT_FILE (CONSENT_ID, CONSENT_FILE, ORG_ID)
+    	INSERT INTO CONSENT_FILE (CONSENT_ID, CONSENT_FILE, ORG_ID)
 		VALUES (?, ?, ?)
 	`
 
@@ -44,7 +44,7 @@ func (dao *ConsentFileDAO) Upload(ctx context.Context, file *models.ConsentFile)
 // UploadWithTx inserts a new consent file using a transaction
 func (dao *ConsentFileDAO) UploadWithTx(ctx context.Context, tx *database.Transaction, file *models.ConsentFile) error {
 	query := `
-		INSERT INTO FS_CONSENT_FILE (CONSENT_ID, CONSENT_FILE, ORG_ID)
+    	INSERT INTO CONSENT_FILE (CONSENT_ID, CONSENT_FILE, ORG_ID)
 		VALUES (?, ?, ?)
 	`
 
@@ -67,7 +67,7 @@ func (dao *ConsentFileDAO) UploadWithTx(ctx context.Context, tx *database.Transa
 func (dao *ConsentFileDAO) Get(ctx context.Context, consentID, orgID string) (*models.ConsentFile, error) {
 	query := `
 		SELECT CONSENT_ID, CONSENT_FILE, ORG_ID
-		FROM FS_CONSENT_FILE
+		FROM CONSENT_FILE
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 	`
 
@@ -87,7 +87,7 @@ func (dao *ConsentFileDAO) Get(ctx context.Context, consentID, orgID string) (*m
 func (dao *ConsentFileDAO) GetWithTx(ctx context.Context, tx *database.Transaction, consentID, orgID string) (*models.ConsentFile, error) {
 	query := `
 		SELECT CONSENT_ID, CONSENT_FILE, ORG_ID
-		FROM FS_CONSENT_FILE
+		FROM CONSENT_FILE
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 	`
 
@@ -107,7 +107,7 @@ func (dao *ConsentFileDAO) GetWithTx(ctx context.Context, tx *database.Transacti
 func (dao *ConsentFileDAO) GetMetadata(ctx context.Context, consentID, orgID string) (*models.ConsentFileResponse, error) {
 	query := `
 		SELECT CONSENT_ID, LENGTH(CONSENT_FILE) as file_size, ORG_ID
-		FROM FS_CONSENT_FILE
+		FROM CONSENT_FILE
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 	`
 
@@ -137,7 +137,7 @@ func (dao *ConsentFileDAO) GetMetadata(ctx context.Context, consentID, orgID str
 // Update updates an existing consent file
 func (dao *ConsentFileDAO) Update(ctx context.Context, file *models.ConsentFile) error {
 	query := `
-		UPDATE FS_CONSENT_FILE
+		UPDATE CONSENT_FILE
 		SET CONSENT_FILE = ?
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 	`
@@ -169,7 +169,7 @@ func (dao *ConsentFileDAO) Update(ctx context.Context, file *models.ConsentFile)
 // UpdateWithTx updates an existing consent file using a transaction
 func (dao *ConsentFileDAO) UpdateWithTx(ctx context.Context, tx *database.Transaction, file *models.ConsentFile) error {
 	query := `
-		UPDATE FS_CONSENT_FILE
+		UPDATE CONSENT_FILE
 		SET CONSENT_FILE = ?
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 	`
@@ -200,7 +200,7 @@ func (dao *ConsentFileDAO) UpdateWithTx(ctx context.Context, tx *database.Transa
 
 // Delete deletes a consent file
 func (dao *ConsentFileDAO) Delete(ctx context.Context, consentID, orgID string) error {
-	query := `DELETE FROM FS_CONSENT_FILE WHERE CONSENT_ID = ? AND ORG_ID = ?`
+	query := `DELETE FROM CONSENT_FILE WHERE CONSENT_ID = ? AND ORG_ID = ?`
 
 	result, err := dao.db.ExecContext(ctx, query, consentID, orgID)
 	if err != nil {
@@ -221,7 +221,7 @@ func (dao *ConsentFileDAO) Delete(ctx context.Context, consentID, orgID string) 
 
 // DeleteWithTx deletes a consent file using a transaction
 func (dao *ConsentFileDAO) DeleteWithTx(ctx context.Context, tx *database.Transaction, consentID, orgID string) error {
-	query := `DELETE FROM FS_CONSENT_FILE WHERE CONSENT_ID = ? AND ORG_ID = ?`
+	query := `DELETE FROM CONSENT_FILE WHERE CONSENT_ID = ? AND ORG_ID = ?`
 
 	result, err := tx.ExecContext(ctx, query, consentID, orgID)
 	if err != nil {
@@ -242,7 +242,7 @@ func (dao *ConsentFileDAO) DeleteWithTx(ctx context.Context, tx *database.Transa
 
 // Exists checks if a consent file exists
 func (dao *ConsentFileDAO) Exists(ctx context.Context, consentID, orgID string) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM FS_CONSENT_FILE WHERE CONSENT_ID = ? AND ORG_ID = ?)`
+	query := `SELECT EXISTS(SELECT 1 FROM CONSENT_FILE WHERE CONSENT_ID = ? AND ORG_ID = ?)`
 
 	var exists bool
 	err := dao.db.GetContext(ctx, &exists, query, consentID, orgID)
@@ -257,7 +257,7 @@ func (dao *ConsentFileDAO) Exists(ctx context.Context, consentID, orgID string) 
 func (dao *ConsentFileDAO) GetFileSize(ctx context.Context, consentID, orgID string) (int, error) {
 	query := `
 		SELECT LENGTH(CONSENT_FILE) as file_size
-		FROM FS_CONSENT_FILE
+		FROM CONSENT_FILE
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 	`
 
@@ -276,7 +276,7 @@ func (dao *ConsentFileDAO) GetFileSize(ctx context.Context, consentID, orgID str
 // UpsertFile inserts or updates a consent file (insert if not exists, update if exists)
 func (dao *ConsentFileDAO) UpsertFile(ctx context.Context, file *models.ConsentFile) error {
 	query := `
-		INSERT INTO FS_CONSENT_FILE (CONSENT_ID, CONSENT_FILE, ORG_ID)
+		INSERT INTO CONSENT_FILE (CONSENT_ID, CONSENT_FILE, ORG_ID)
 		VALUES (?, ?, ?)
 		ON DUPLICATE KEY UPDATE CONSENT_FILE = VALUES(CONSENT_FILE)
 	`
@@ -299,7 +299,7 @@ func (dao *ConsentFileDAO) UpsertFile(ctx context.Context, file *models.ConsentF
 // UpsertFileWithTx inserts or updates a consent file using a transaction
 func (dao *ConsentFileDAO) UpsertFileWithTx(ctx context.Context, tx *database.Transaction, file *models.ConsentFile) error {
 	query := `
-		INSERT INTO FS_CONSENT_FILE (CONSENT_ID, CONSENT_FILE, ORG_ID)
+		INSERT INTO CONSENT_FILE (CONSENT_ID, CONSENT_FILE, ORG_ID)
 		VALUES (?, ?, ?)
 		ON DUPLICATE KEY UPDATE CONSENT_FILE = VALUES(CONSENT_FILE)
 	`
@@ -323,7 +323,7 @@ func (dao *ConsentFileDAO) UpsertFileWithTx(ctx context.Context, tx *database.Tr
 func (dao *ConsentFileDAO) ListByOrgID(ctx context.Context, orgID string, limit, offset int) ([]models.ConsentFileResponse, error) {
 	query := `
 		SELECT CONSENT_ID, LENGTH(CONSENT_FILE) as file_size, ORG_ID
-		FROM FS_CONSENT_FILE
+		FROM CONSENT_FILE
 		WHERE ORG_ID = ?
 		ORDER BY CONSENT_ID
 		LIMIT ? OFFSET ?

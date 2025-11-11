@@ -6,7 +6,7 @@ type ApprovedPurposeDetails struct {
 	ApprovedAdditionalResources []interface{} `json:"approvedAdditionalResources"`
 }
 
-// ConsentAuthResource represents the FS_CONSENT_AUTH_RESOURCE table
+// ConsentAuthResource represents the CONSENT_AUTH_RESOURCE table
 type ConsentAuthResource struct {
 	AuthID                    string                  `db:"AUTH_ID" json:"authId"`
 	ConsentID                 string                  `db:"CONSENT_ID" json:"consentId"`

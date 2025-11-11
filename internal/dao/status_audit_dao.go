@@ -22,7 +22,7 @@ func NewStatusAuditDAO(db *database.DB) *StatusAuditDAO {
 // Create inserts a new status audit record
 func (dao *StatusAuditDAO) Create(ctx context.Context, audit *models.ConsentStatusAudit) error {
 	query := `
-		INSERT INTO FS_CONSENT_STATUS_AUDIT (
+		INSERT INTO CONSENT_STATUS_AUDIT (
 			STATUS_AUDIT_ID, CONSENT_ID, CURRENT_STATUS, ACTION_TIME,
 			REASON, ACTION_BY, PREVIOUS_STATUS, ORG_ID
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -51,7 +51,7 @@ func (dao *StatusAuditDAO) Create(ctx context.Context, audit *models.ConsentStat
 // CreateWithTx inserts a new status audit record using a transaction
 func (dao *StatusAuditDAO) CreateWithTx(ctx context.Context, tx *database.Transaction, audit *models.ConsentStatusAudit) error {
 	query := `
-		INSERT INTO FS_CONSENT_STATUS_AUDIT (
+		INSERT INTO CONSENT_STATUS_AUDIT (
 			STATUS_AUDIT_ID, CONSENT_ID, CURRENT_STATUS, ACTION_TIME,
 			REASON, ACTION_BY, PREVIOUS_STATUS, ORG_ID
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -82,7 +82,7 @@ func (dao *StatusAuditDAO) GetByID(ctx context.Context, statusAuditID, orgID str
 	query := `
 		SELECT STATUS_AUDIT_ID, CONSENT_ID, CURRENT_STATUS, ACTION_TIME,
 		       REASON, ACTION_BY, PREVIOUS_STATUS, ORG_ID
-		FROM FS_CONSENT_STATUS_AUDIT
+		FROM CONSENT_STATUS_AUDIT
 		WHERE STATUS_AUDIT_ID = ? AND ORG_ID = ?
 	`
 
@@ -103,7 +103,7 @@ func (dao *StatusAuditDAO) GetByConsentID(ctx context.Context, consentID, orgID 
 	query := `
 		SELECT STATUS_AUDIT_ID, CONSENT_ID, CURRENT_STATUS, ACTION_TIME,
 		       REASON, ACTION_BY, PREVIOUS_STATUS, ORG_ID
-		FROM FS_CONSENT_STATUS_AUDIT
+		FROM CONSENT_STATUS_AUDIT
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 		ORDER BY ACTION_TIME DESC
 	`
@@ -122,7 +122,7 @@ func (dao *StatusAuditDAO) GetByConsentIDWithTx(ctx context.Context, tx *databas
 	query := `
 		SELECT STATUS_AUDIT_ID, CONSENT_ID, CURRENT_STATUS, ACTION_TIME,
 		       REASON, ACTION_BY, PREVIOUS_STATUS, ORG_ID
-		FROM FS_CONSENT_STATUS_AUDIT
+		FROM CONSENT_STATUS_AUDIT
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 		ORDER BY ACTION_TIME DESC
 	`
@@ -141,7 +141,7 @@ func (dao *StatusAuditDAO) GetLatestByConsentID(ctx context.Context, consentID, 
 	query := `
 		SELECT STATUS_AUDIT_ID, CONSENT_ID, CURRENT_STATUS, ACTION_TIME,
 		       REASON, ACTION_BY, PREVIOUS_STATUS, ORG_ID
-		FROM FS_CONSENT_STATUS_AUDIT
+		FROM CONSENT_STATUS_AUDIT
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 		ORDER BY ACTION_TIME DESC
 		LIMIT 1
@@ -161,7 +161,7 @@ func (dao *StatusAuditDAO) GetLatestByConsentID(ctx context.Context, consentID, 
 
 // Delete deletes a status audit record
 func (dao *StatusAuditDAO) Delete(ctx context.Context, statusAuditID, orgID string) error {
-	query := `DELETE FROM FS_CONSENT_STATUS_AUDIT WHERE STATUS_AUDIT_ID = ? AND ORG_ID = ?`
+	query := `DELETE FROM CONSENT_STATUS_AUDIT WHERE STATUS_AUDIT_ID = ? AND ORG_ID = ?`
 
 	result, err := dao.db.ExecContext(ctx, query, statusAuditID, orgID)
 	if err != nil {
@@ -182,7 +182,7 @@ func (dao *StatusAuditDAO) Delete(ctx context.Context, statusAuditID, orgID stri
 
 // DeleteByConsentID deletes all status audit records for a consent
 func (dao *StatusAuditDAO) DeleteByConsentID(ctx context.Context, consentID, orgID string) error {
-	query := `DELETE FROM FS_CONSENT_STATUS_AUDIT WHERE CONSENT_ID = ? AND ORG_ID = ?`
+	query := `DELETE FROM CONSENT_STATUS_AUDIT WHERE CONSENT_ID = ? AND ORG_ID = ?`
 
 	_, err := dao.db.ExecContext(ctx, query, consentID, orgID)
 	if err != nil {
@@ -197,7 +197,7 @@ func (dao *StatusAuditDAO) GetStatusHistory(ctx context.Context, consentID, orgI
 	query := `
 		SELECT STATUS_AUDIT_ID, CONSENT_ID, CURRENT_STATUS, ACTION_TIME,
 		       REASON, ACTION_BY, PREVIOUS_STATUS, ORG_ID
-		FROM FS_CONSENT_STATUS_AUDIT
+		FROM CONSENT_STATUS_AUDIT
 		WHERE CONSENT_ID = ? AND ORG_ID = ? AND ACTION_TIME BETWEEN ? AND ?
 		ORDER BY ACTION_TIME DESC
 	`

@@ -1,6 +1,6 @@
 package models
 
-// ConsentStatusAudit represents the FS_CONSENT_STATUS_AUDIT table
+// ConsentStatusAudit represents the CONSENT_STATUS_AUDIT table
 type ConsentStatusAudit struct {
 	StatusAuditID  string  `db:"STATUS_AUDIT_ID" json:"statusAuditId"`
 	ConsentID      string  `db:"CONSENT_ID" json:"consentId"`

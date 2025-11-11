@@ -23,7 +23,7 @@ A comprehensive RESTful API service for managing consent lifecycle including ini
                │
 ┌──────────────▼──────────────────────────┐
 │       Database (MySQL with sqlx)        │
-│  FS_CONSENT, FS_CONSENT_AUTH_RESOURCE   │
+│  CONSENT, CONSENT_AUTH_RESOURCE         │
 └─────────────────────────────────────────┘
 
         ┌────────────────────┐

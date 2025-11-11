@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Consent represents the FS_CONSENT table
+// Consent represents the CONSENT table
 type Consent struct {
 	ConsentID                  string `db:"CONSENT_ID" json:"consentId"`
 	ConsentPurposes            JSON   `db:"CONSENT_PURPOSES" json:"consentPurposes"`
@@ -189,20 +189,20 @@ type ConsentUpdateRequest struct {
 
 // ConsentResponse represents the response after consent creation/retrieval
 type ConsentResponse struct {
-	ConsentID                  string                 `json:"consentId"`
-	ConsentPurpose             []ConsentPurposeItem   `json:"consentPurpose,omitempty"`
-	CreatedTime                int64                  `json:"createdTime"`
-	UpdatedTime                int64                  `json:"updatedTime"`
-	ClientID                   string                 `json:"clientId"`
-	ConsentType                string                 `json:"consentType"`
-	CurrentStatus              string                 `json:"currentStatus"`
-	ConsentFrequency           *int                   `json:"consentFrequency,omitempty"`
-	ValidityTime               *int64                 `json:"validityTime,omitempty"`
-	RecurringIndicator         *bool                  `json:"recurringIndicator,omitempty"`
-	DataAccessValidityDuration *int64                 `json:"dataAccessValidityDuration,omitempty"`
-	OrgID                      string                 `json:"orgId"`
-	Attributes                 map[string]string      `json:"attributes,omitempty"`
-	AuthResources              []ConsentAuthResource  `json:"authResources,omitempty"`
+	ConsentID                  string                `json:"consentId"`
+	ConsentPurpose             []ConsentPurposeItem  `json:"consentPurpose,omitempty"`
+	CreatedTime                int64                 `json:"createdTime"`
+	UpdatedTime                int64                 `json:"updatedTime"`
+	ClientID                   string                `json:"clientId"`
+	ConsentType                string                `json:"consentType"`
+	CurrentStatus              string                `json:"currentStatus"`
+	ConsentFrequency           *int                  `json:"consentFrequency,omitempty"`
+	ValidityTime               *int64                `json:"validityTime,omitempty"`
+	RecurringIndicator         *bool                 `json:"recurringIndicator,omitempty"`
+	DataAccessValidityDuration *int64                `json:"dataAccessValidityDuration,omitempty"`
+	OrgID                      string                `json:"orgId"`
+	Attributes                 map[string]string     `json:"attributes,omitempty"`
+	AuthResources              []ConsentAuthResource `json:"authResources,omitempty"`
 }
 
 // ConsentSearchParams represents search parameters for consent queries

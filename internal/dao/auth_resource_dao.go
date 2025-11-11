@@ -23,7 +23,7 @@ func NewAuthResourceDAO(db *database.DB) *AuthResourceDAO {
 // Create inserts a new authorization resource into the database
 func (dao *AuthResourceDAO) Create(ctx context.Context, authResource *models.ConsentAuthResource) error {
 	query := `
-		INSERT INTO FS_CONSENT_AUTH_RESOURCE (
+		INSERT INTO CONSENT_AUTH_RESOURCE (
 			AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
 			UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -52,7 +52,7 @@ func (dao *AuthResourceDAO) Create(ctx context.Context, authResource *models.Con
 // CreateWithTx inserts a new authorization resource using a transaction
 func (dao *AuthResourceDAO) CreateWithTx(ctx context.Context, tx *database.Transaction, authResource *models.ConsentAuthResource) error {
 	query := `
-		INSERT INTO FS_CONSENT_AUTH_RESOURCE (
+		INSERT INTO CONSENT_AUTH_RESOURCE (
 			AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
 			UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -83,7 +83,7 @@ func (dao *AuthResourceDAO) GetByID(ctx context.Context, authID, orgID string) (
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
 		       UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
-		FROM FS_CONSENT_AUTH_RESOURCE
+		FROM CONSENT_AUTH_RESOURCE
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
 
@@ -112,7 +112,7 @@ func (dao *AuthResourceDAO) GetByIDWithTx(ctx context.Context, tx *database.Tran
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
 		       UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
-		FROM FS_CONSENT_AUTH_RESOURCE
+		FROM CONSENT_AUTH_RESOURCE
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
 
@@ -141,7 +141,7 @@ func (dao *AuthResourceDAO) GetByConsentID(ctx context.Context, consentID, orgID
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
 		       UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
-		FROM FS_CONSENT_AUTH_RESOURCE
+		FROM CONSENT_AUTH_RESOURCE
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 		ORDER BY UPDATED_TIME DESC
 	`
@@ -170,7 +170,7 @@ func (dao *AuthResourceDAO) GetByConsentIDWithTx(ctx context.Context, tx *databa
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
 		       UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
-		FROM FS_CONSENT_AUTH_RESOURCE
+		FROM CONSENT_AUTH_RESOURCE
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 		ORDER BY UPDATED_TIME DESC
 	`
@@ -197,7 +197,7 @@ func (dao *AuthResourceDAO) GetByConsentIDWithTx(ctx context.Context, tx *databa
 // Update updates an existing authorization resource
 func (dao *AuthResourceDAO) Update(ctx context.Context, authResource *models.ConsentAuthResource) error {
 	query := `
-		UPDATE FS_CONSENT_AUTH_RESOURCE
+		UPDATE CONSENT_AUTH_RESOURCE
 		SET AUTH_STATUS = ?, USER_ID = ?, APPROVED_PURPOSE_DETAILS = ?, UPDATED_TIME = ?
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
@@ -232,7 +232,7 @@ func (dao *AuthResourceDAO) Update(ctx context.Context, authResource *models.Con
 // UpdateWithTx updates an existing authorization resource using a transaction
 func (dao *AuthResourceDAO) UpdateWithTx(ctx context.Context, tx *database.Transaction, authResource *models.ConsentAuthResource) error {
 	query := `
-		UPDATE FS_CONSENT_AUTH_RESOURCE
+		UPDATE CONSENT_AUTH_RESOURCE
 		SET AUTH_STATUS = ?, USER_ID = ?, APPROVED_PURPOSE_DETAILS = ?, UPDATED_TIME = ?
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
@@ -267,7 +267,7 @@ func (dao *AuthResourceDAO) UpdateWithTx(ctx context.Context, tx *database.Trans
 // UpdateStatus updates only the status of an authorization resource
 func (dao *AuthResourceDAO) UpdateStatus(ctx context.Context, authID, orgID, status string, updatedTime int64) error {
 	query := `
-		UPDATE FS_CONSENT_AUTH_RESOURCE
+		UPDATE CONSENT_AUTH_RESOURCE
 		SET AUTH_STATUS = ?, UPDATED_TIME = ?
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
@@ -291,7 +291,7 @@ func (dao *AuthResourceDAO) UpdateStatus(ctx context.Context, authID, orgID, sta
 
 // Delete deletes an authorization resource
 func (dao *AuthResourceDAO) Delete(ctx context.Context, authID, orgID string) error {
-	query := `DELETE FROM FS_CONSENT_AUTH_RESOURCE WHERE AUTH_ID = ? AND ORG_ID = ?`
+	query := `DELETE FROM CONSENT_AUTH_RESOURCE WHERE AUTH_ID = ? AND ORG_ID = ?`
 
 	result, err := dao.db.ExecContext(ctx, query, authID, orgID)
 	if err != nil {
@@ -312,7 +312,7 @@ func (dao *AuthResourceDAO) Delete(ctx context.Context, authID, orgID string) er
 
 // DeleteWithTx deletes an authorization resource using a transaction
 func (dao *AuthResourceDAO) DeleteWithTx(ctx context.Context, tx *database.Transaction, authID, orgID string) error {
-	query := `DELETE FROM FS_CONSENT_AUTH_RESOURCE WHERE AUTH_ID = ? AND ORG_ID = ?`
+	query := `DELETE FROM CONSENT_AUTH_RESOURCE WHERE AUTH_ID = ? AND ORG_ID = ?`
 
 	result, err := tx.ExecContext(ctx, query, authID, orgID)
 	if err != nil {
@@ -333,7 +333,7 @@ func (dao *AuthResourceDAO) DeleteWithTx(ctx context.Context, tx *database.Trans
 
 // DeleteByConsentID deletes all authorization resources for a consent
 func (dao *AuthResourceDAO) DeleteByConsentID(ctx context.Context, consentID, orgID string) error {
-	query := `DELETE FROM FS_CONSENT_AUTH_RESOURCE WHERE CONSENT_ID = ? AND ORG_ID = ?`
+	query := `DELETE FROM CONSENT_AUTH_RESOURCE WHERE CONSENT_ID = ? AND ORG_ID = ?`
 
 	_, err := dao.db.ExecContext(ctx, query, consentID, orgID)
 	if err != nil {
@@ -345,7 +345,7 @@ func (dao *AuthResourceDAO) DeleteByConsentID(ctx context.Context, consentID, or
 
 // DeleteByConsentIDWithTx deletes all authorization resources for a consent using a transaction
 func (dao *AuthResourceDAO) DeleteByConsentIDWithTx(ctx context.Context, tx *database.Transaction, consentID, orgID string) error {
-	query := `DELETE FROM FS_CONSENT_AUTH_RESOURCE WHERE CONSENT_ID = ? AND ORG_ID = ?`
+	query := `DELETE FROM CONSENT_AUTH_RESOURCE WHERE CONSENT_ID = ? AND ORG_ID = ?`
 
 	_, err := tx.ExecContext(ctx, query, consentID, orgID)
 	if err != nil {
@@ -357,7 +357,7 @@ func (dao *AuthResourceDAO) DeleteByConsentIDWithTx(ctx context.Context, tx *dat
 
 // Exists checks if an authorization resource exists
 func (dao *AuthResourceDAO) Exists(ctx context.Context, authID, orgID string) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM FS_CONSENT_AUTH_RESOURCE WHERE AUTH_ID = ? AND ORG_ID = ?)`
+	query := `SELECT EXISTS(SELECT 1 FROM CONSENT_AUTH_RESOURCE WHERE AUTH_ID = ? AND ORG_ID = ?)`
 
 	var exists bool
 	err := dao.db.GetContext(ctx, &exists, query, authID, orgID)
@@ -373,7 +373,7 @@ func (dao *AuthResourceDAO) GetByUserID(ctx context.Context, userID, orgID strin
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
 		       UPDATED_TIME, RESOURCE, ORG_ID
-		FROM FS_CONSENT_AUTH_RESOURCE
+		FROM CONSENT_AUTH_RESOURCE
 		WHERE USER_ID = ? AND ORG_ID = ?
 		ORDER BY UPDATED_TIME DESC
 	`

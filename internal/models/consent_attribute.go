@@ -1,6 +1,6 @@
 package models
 
-// ConsentAttribute represents the FS_CONSENT_ATTRIBUTE table
+// ConsentAttribute represents the CONSENT_ATTRIBUTE table
 type ConsentAttribute struct {
 	ConsentID string `db:"CONSENT_ID" json:"consentId"`
 	AttKey    string `db:"ATT_KEY" json:"key"`

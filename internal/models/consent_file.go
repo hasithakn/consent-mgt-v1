@@ -1,6 +1,6 @@
 package models
 
-// ConsentFile represents the FS_CONSENT_FILE table
+// ConsentFile represents the CONSENT_FILE table
 type ConsentFile struct {
 	ConsentID   string `db:"CONSENT_ID" json:"consentId"`
 	ConsentFile []byte `db:"CONSENT_FILE" json:"-"`

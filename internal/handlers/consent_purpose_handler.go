@@ -55,7 +55,7 @@ func (h *ConsentPurposeHandler) CreateConsentPurposes(c *gin.Context) {
 			Name:        request.Name,
 			Description: desc,
 			Type:        request.Type,
-			Value:       request.Value,
+			Attributes:  request.Attributes,
 		}
 		serviceRequests = append(serviceRequests, serviceReq)
 	}
@@ -63,6 +63,16 @@ func (h *ConsentPurposeHandler) CreateConsentPurposes(c *gin.Context) {
 	// Create all purposes in a transaction (all or nothing)
 	createdPurposes, err := h.purposeService.CreatePurposesInBatch(c.Request.Context(), orgID, serviceRequests)
 	if err != nil {
+		// Check if it's an attribute validation error
+		if strings.Contains(err.Error(), "attribute validation failed") {
+			// Return structured validation error
+			c.JSON(400, gin.H{
+				"error":   "Validation failed",
+				"message": err.Error(),
+				"type":    "attribute_validation_error",
+			})
+			return
+		}
 		// Check if it's a validation error
 		if strings.Contains(err.Error(), "cannot be empty") ||
 			strings.Contains(err.Error(), "too long") ||
@@ -160,12 +170,22 @@ func (h *ConsentPurposeHandler) UpdateConsentPurpose(c *gin.Context) {
 		Name:        request.Name,
 		Description: request.Description,
 		Type:        request.Type,
-		Value:       request.Value,
+		Attributes:  request.Attributes,
 	}
 
 	// Update the purpose
 	response, err := h.purposeService.UpdatePurpose(c.Request.Context(), purposeID, orgID, serviceReq)
 	if err != nil {
+		// Check if it's an attribute validation error
+		if strings.Contains(err.Error(), "attribute validation failed") {
+			// Return structured validation error
+			c.JSON(400, gin.H{
+				"error":   "Validation failed",
+				"message": err.Error(),
+				"type":    "attribute_validation_error",
+			})
+			return
+		}
 		// Check if it's a validation error
 		if strings.Contains(err.Error(), "is required") ||
 			strings.Contains(err.Error(), "cannot be empty") ||

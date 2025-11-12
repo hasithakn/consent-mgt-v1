@@ -70,6 +70,7 @@ func main() {
 	attributeDAO := dao.NewConsentAttributeDAO(db)
 	authResourceDAO := dao.NewAuthResourceDAO(db)
 	purposeDAO := dao.NewConsentPurposeDAO(db.DB)
+	purposeAttributeDAO := dao.NewConsentPurposeAttributeDAO(db.DB)
 
 	logger.Info("DAOs initialized successfully")
 
@@ -93,6 +94,7 @@ func main() {
 
 	purposeService := service.NewConsentPurposeService(
 		purposeDAO,
+		purposeAttributeDAO,
 		consentDAO,
 		db.DB,
 		logger,

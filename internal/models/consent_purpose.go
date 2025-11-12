@@ -4,12 +4,8 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-)
 
-// Purpose type constants
-const (
-	PurposeTypeString     = "string"
-	PurposeTypeJSONSchema = "json-schema"
+	"github.com/wso2/consent-management-api/internal/purpose_type_handlers"
 )
 
 // JSONValue represents a JSON value that can be stored in the database
@@ -56,12 +52,12 @@ func (j *JSONValue) UnmarshalJSON(data []byte) error {
 
 // ConsentPurpose represents a consent purpose entity
 type ConsentPurpose struct {
-	ID          string     `json:"id" db:"ID"`
-	Name        string     `json:"name" db:"NAME"`
-	Description *string    `json:"description,omitempty" db:"DESCRIPTION"`
-	Type        string     `json:"type" db:"TYPE"`
-	Value       *JSONValue `json:"value,omitempty" db:"VALUE"`
-	OrgID       string     `json:"orgId" db:"ORG_ID"`
+	ID          string            `json:"id" db:"ID"`
+	Name        string            `json:"name" db:"NAME"`
+	Description *string           `json:"description,omitempty" db:"DESCRIPTION"`
+	Type        string            `json:"type" db:"TYPE"`
+	Attributes  map[string]string `json:"attributes,omitempty" db:"-"`
+	OrgID       string            `json:"orgId" db:"ORG_ID"`
 }
 
 // ConsentPurposeMapping represents the mapping between consent and purpose
@@ -73,28 +69,28 @@ type ConsentPurposeMapping struct {
 
 // ConsentPurposeCreateRequest represents the request to create a consent purpose
 type ConsentPurposeCreateRequest struct {
-	Name        string      `json:"name" binding:"required"`
-	Description string      `json:"description,omitempty"`
-	Type        string      `json:"type" binding:"required,oneof=string json-schema"`
-	Value       interface{} `json:"value" binding:"required"`
+	Name        string            `json:"name" binding:"required"`
+	Description string            `json:"description,omitempty"`
+	Type        string            `json:"type" binding:"required"`
+	Attributes  map[string]string `json:"attributes,omitempty"`
 }
 
 // ConsentPurposeUpdateRequest represents the request to update a consent purpose
 // All fields are required - no partial updates allowed
 type ConsentPurposeUpdateRequest struct {
-	Name        string      `json:"name" binding:"required,max=255"`
-	Description *string     `json:"description,omitempty" binding:"omitempty,max=1024"`
-	Type        string      `json:"type" binding:"required,oneof=string json-schema"`
-	Value       interface{} `json:"value" binding:"required"`
+	Name        string            `json:"name" binding:"required,max=255"`
+	Description *string           `json:"description,omitempty" binding:"omitempty,max=1024"`
+	Type        string            `json:"type" binding:"required"`
+	Attributes  map[string]string `json:"attributes,omitempty"`
 }
 
 // ConsentPurposeResponse represents the response for consent purpose operations
 type ConsentPurposeResponse struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Description *string    `json:"description,omitempty"`
-	Type        string     `json:"type"`
-	Value       *JSONValue `json:"value,omitempty"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description *string           `json:"description,omitempty"`
+	Type        string            `json:"type"`
+	Attributes  map[string]string `json:"attributes,omitempty"`
 }
 
 // ConsentPurposeListResponse represents a list of consent purposes
@@ -110,15 +106,17 @@ func (cp *ConsentPurpose) ToConsentPurposeResponse() *ConsentPurposeResponse {
 		Name:        cp.Name,
 		Description: cp.Description,
 		Type:        cp.Type,
-		Value:       cp.Value,
+		Attributes:  cp.Attributes,
 	}
 }
 
-// ValidatePurposeType validates that the purpose type is one of the allowed values
+// ValidatePurposeType validates that the purpose type is registered in the handler registry
 func ValidatePurposeType(typeVal string) error {
-	if typeVal != PurposeTypeString && typeVal != PurposeTypeJSONSchema {
-		return fmt.Errorf("invalid purpose type '%s': must be one of [%s, %s]",
-			typeVal, PurposeTypeString, PurposeTypeJSONSchema)
+	_, err := purpose_type_handlers.GetHandler(typeVal)
+	if err != nil {
+		// Get all registered types for helpful error message
+		registeredTypes := purpose_type_handlers.GetAllHandlerTypes()
+		return fmt.Errorf("invalid purpose type '%s': must be one of %v", typeVal, registeredTypes)
 	}
 	return nil
 }

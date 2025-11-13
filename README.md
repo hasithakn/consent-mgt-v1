@@ -1,376 +1,158 @@
 # Consent Management API
 
-A comprehensive RESTful API service for managing consent lifecycle including initiation, authorization, validation, administration, and revocation.
+A RESTful API service for managing consents and consent purposes with support for dynamic attribute validation through pluggable type handlers.
 
-## 🏗️ Architecture
+## Features
 
-```
-┌─────────────────────────────────────────┐
-│         API Handlers (HTTP Layer)       │
-│  POST/GET/PUT /consents, /auth, /file   │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│       Core Services (Business Logic)    │
-│  ConsentService, AuthService, FileServ  │
-│  + Extension Point Client Integration   │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│          DAO Layer (Data Access)        │
-│  ConsentDAO, AuthDAO, FileDAO, etc.     │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│       Database (MySQL with sqlx)        │
-│  CONSENT, CONSENT_AUTH_RESOURCE         │
-└─────────────────────────────────────────┘
+- **Consent Management**: Create, retrieve, update, revoke consents
+- **Consent Purposes**: Manage consent purposes with type-based validation
+  - String type: Simple string values (no mandatory attributes)
+  - JSON Schema type: Schema-based validation (requires `validationSchema`)
+  - Attribute type: Resource-based attributes (requires `resourcePath` and `jsonPath`)
+- **Authorization Resources**: Handle consent authorization resources
+- **Multi-tenancy**: Organization-level isolation with `org-id` header
+- **Extensible Type Handlers**: Pluggable architecture for custom purpose types
 
-        ┌────────────────────┐
-        │ Extension Service  │ ← HTTP Client calls
-        │   (External API)   │
-        └────────────────────┘
-```
+## Technology Stack
 
-## 📁 Project Structure
-
-```
-consent-mgt-v1/
-├── cmd/
-│   └── server/              # Application entry point
-│       └── main.go
-├── internal/
-│   ├── models/              # Database models (structs)
-│   ├── config/              # Configuration management
-│   ├── database/            # Database connection & transactions
-│   ├── dao/                 # Data Access Objects
-│   ├── service/             # Business logic layer
-│   ├── handlers/            # HTTP request handlers
-│   ├── middleware/          # HTTP middleware (auth, logging, etc.)
-│   ├── router/              # Route definitions
-│   └── client/              # External service clients
-├── pkg/
-│   └── utils/               # Shared utilities
-├── configs/                 # Configuration files
-│   ├── config.yaml
-│   ├── config.dev.yaml
-│   └── config.prod.yaml
-├── migrations/              # Database migration scripts
-│   └── db_schema_mysql.sql
-├── tests/
-│   ├── dao/                 # DAO unit tests
-│   ├── service/             # Service unit tests
-│   ├── handlers/            # Handler unit tests
-│   └── integration/         # Integration tests
-├── docs/                    # Documentation
-│   └── API.md
-├── Dockerfile
-├── docker-compose.yml
-├── Makefile
-└── README.md
-```
-
-## 🚀 Features
-
-- **Consent Lifecycle Management**: Create, retrieve, update, and revoke consents
-- **Authorization Management**: Handle authorization resources for consents
-- **File Management**: Upload, download, and update consent-related files
-- **Audit Trail**: Complete status change tracking
-- **Multi-tenancy**: Organization-level data isolation
-- **Extension Points**: Customizable hooks for pre/post processing
-- **RESTful API**: Following OpenAPI 3.0 specification
-- **Database Support**: MySQL with connection pooling
-
-## 🛠️ Technology Stack
-
-- **Language**: Go 1.21+
+- **Go** 1.21+
 - **Web Framework**: Gin
-- **Database**: MySQL
-- **Database Layer**: sqlx
+- **Database**: MySQL 8.0+
+- **Database Driver**: sqlx
 - **Configuration**: Viper
-- **Logging**: Logrus
-- **Testing**: Testify, sqlmock, testcontainers
-- **UUID**: Google UUID
+- **Testing**: Testify
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Go 1.21 or higher
 - MySQL 8.0 or higher
-- Docker & Docker Compose (optional)
 
-## ⚙️ Installation & Setup
+## Project Structure
 
-### 1. Clone the repository
-
-```bash
-git clone <repository-url>
-cd consent-mgt-v1
+```
+consent-mgt-v1/
+├── cmd/server/                    # Application entry point
+│   └── main.go
+├── internal/
+│   ├── models/                    # Data models & DTOs
+│   ├── dao/                       # Data Access Objects
+│   ├── service/                   # Business logic
+│   ├── handlers/                  # HTTP handlers
+│   ├── router/                    # Route definitions
+│   ├── purpose_type_handlers/     # Type handler registry
+│   │   ├── string_handler.go     # String type handler
+│   │   ├── json_schema_handler.go # JSON Schema type handler
+│   │   ├── attribute_handler.go  # Attribute type handler
+│   │   └── registry.go           # Handler registration
+│   ├── database/                  # Database connection
+│   ├── config/                    # Configuration
+│   └── utils/                     # Utilities
+├── configs/
+│   └── config.yaml               # Configuration file
+├── db_scripts/
+│   └── db_schema_mysql.sql       # Database schema
+├── integration-tests/            # Integration tests
+│   └── api/
+│       ├── consent-purpose/      # 58 tests (CRUD + type handlers)
+│       ├── auth_resource_api_test.go
+│       ├── consent_api_test.go
+│       └── ...
+└── README.md
 ```
 
-### 2. Install dependencies
+## Quick Start
+
+### 1. Setup Database
 
 ```bash
-go mod download
+# Create database
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS AAconsent_mgt_v3;"
+
+# Import schema
+mysql -u root -p AAconsent_mgt_v3 < db_scripts/db_schema_mysql.sql
 ```
 
-### 3. Setup Database
+### 2. Configure Application
 
-```bash
-# Create database (if not exists)
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS AATest;"
-
-# Run migrations
-cd migrations
-chmod +x migrate.sh
-./migrate.sh
-cd ..
-```
-
-### 4. Configure the application
-
-Edit `configs/config.yaml` to match your environment:
+Edit `configs/config.yaml`:
 
 ```yaml
 server:
-  port: 9446
-  host: localhost
+  port: 3000
 
 database:
   host: localhost
   port: 3306
   user: root
-  password: root
-  database: AATest
+  password: your_password
+  database: AAconsent_mgt_v3
   maxOpenConns: 25
   maxIdleConns: 5
-  connMaxLifetimeMinutes: 5
-
-logging:
-  level: info  # debug, info, warn, error
-  format: json
 ```
 
-## 🚀 Running the Server
+### 3. Run the Server
 
-### Quick Start
-
+**Option A: Run directly**
 ```bash
-# Run the server
 go run cmd/server/main.go
-
-# Server starts at http://localhost:3000
-# Health check: curl http://localhost:3000/health
 ```
 
-### Build & Run
-
+**Option B: Build executable and run**
 ```bash
-# Build binary
+# Build executable
 go build -o consent-api-server cmd/server/main.go
 
-# Run binary
+# Run with default config (configs/config.yaml)
 ./consent-api-server
 
-# With custom config
-CONFIG_PATH=configs/config.yaml ./consent-api-server
+# Run with custom config
+./consent-api-server -config=/path/to/config.yaml
 ```
 
-### Stop Server
+Server starts at `http://localhost:3000`
 
-Press `Ctrl+C` to gracefully shutdown
+Health check: `curl http://localhost:3000/health`
 
-## 🧪 Testing
+## Testing
 
-### Run All Tests
+### Run All Integration Tests
 
 ```bash
-# Run all tests
-go test ./...
-
-# Run with verbose output
-go test -v ./...
+cd integration-tests
+go test ./... -v
 ```
 
-### Run Integration Tests
+### Run Specific Test Suite
 
 ```bash
-# Run integration tests
-go test ./tests/integration/... -v
+# Consent Purpose tests (58 tests)
+go test ./api/consent-purpose/... -v
 
-# Run specific test
-go test ./tests/integration/... -run TestCreateConsent -v
-
-# Run with coverage
-go test ./... -coverprofile=coverage.out
-go tool cover -html=coverage.out
+# Consent API tests
+go test ./api/ -run TestConsent -v
 ```
 
-### Test Requirements
+### Test Database Setup
 
-- MySQL database running on `localhost:3306`
-- Database: `AAconsent-mgt-v3` (configured in test setup)
-- User: `root` / Password: `password`
+Integration tests require:
+- MySQL running on `localhost:3306`
+- Database: `AAconsent-mgt-v3`
+- User/Password configured in test files
 
-### Manual API Testing
+### Test Coverage
 
-Once the server is running, you can test the API endpoints:
-
-#### Create a Consent
-
-```bash
-curl -X POST http://localhost:9446/api/v1/consents \
-  -H "Content-Type: application/json" \
-  -H "org-id: TEST_ORG" \
-  -H "client-id: test-client-123" \
-  -d '{
-    "receipt": {
-      "data": "Sample consent receipt",
-      "purpose": "Account access"
-    },
-    "consentType": "accounts",
-    "currentStatus": "awaitingAuthorization",
-    "validityTime": 7776000,
-    "recurringIndicator": false,
-    "attributes": {
-      "source": "mobile-app"
-    }
-  }'
-```
-
-#### Create Consent with Authorization Resources
-
-```bash
-curl -X POST http://localhost:9446/api/v1/consents \
-  -H "Content-Type: application/json" \
-  -H "org-id: TEST_ORG" \
-  -H "client-id: test-client-456" \
-  -d '{
-    "receipt": {
-      "data": "Consent with auth"
-    },
-    "consentType": "payments",
-    "currentStatus": "awaitingAuthorization",
-    "validityTime": 2592000,
-    "authResources": [
-      {
-        "authType": "authorization_code",
-        "authStatus": "authorized",
-        "userId": "user-123",
-        "resource": {
-          "scopes": ["read", "write"]
-        }
-      }
-    ]
-  }'
-```
-
-### Test Results
-
-Current test status: **30/30 tests passing ✓**
-
-- ✅ 10 Authorization Resource Integration Tests
-- ✅ 17 Consent Service Integration Tests
-- ✅ 3 API Integration Tests
-
-## 📚 API Documentation
-
-The API follows RESTful principles and is based on the OpenAPI 3.0 specification.
-
-### Base URL
-
-```
-http://localhost:9446/api/v1
-```
-
-### Implemented Endpoints
-
-#### ✅ Consents
-
-- `POST /consents` - Create a new consent (with optional auth resources)
-  - **Status**: ✅ Implemented & Tested
-  - **Headers**: `org-id`, `client-id`
-
-### Planned Endpoints
-
-#### Consents (Remaining)
-
-- `GET /consents/{consentId}` - Retrieve consent by ID
-- `PUT /consents/{consentId}` - Update consent
-- `GET /consents` - Search consents with filters
-- `POST /consents/{consentId}/revoke` - Revoke a consent
-
-#### Authorization Resources
-
-- `POST /consents/{consentId}/authorizations` - Create authorization resource
-- `GET /consents/{consentId}/authorizations` - List authorization resources
-- `GET /consents/{consentId}/authorizations/{authId}` - Get authorization resource
-- `PUT /consents/{consentId}/authorizations/{authId}` - Update authorization resource
-- `DELETE /consents/{consentId}/authorizations/{authId}` - Delete authorization resource
-
-### Common Headers
-
-All endpoints require the following headers:
-
-- `org-id`: Organization identifier (for multi-tenancy)
-- `client-id`: Client application identifier (optional, defaults from context)
-- `Content-Type`: application/json (for POST/PUT requests)
-
-## 🔧 Configuration
-
-Configuration is managed through YAML files in the `configs/` directory:
-
-```yaml
-server:
-  port: 9446
-  host: localhost
-
-database:
-  host: localhost
-  port: 3306
-  user: root
-  password: password
-  database: consent_mgt
-  maxOpenConns: 25
-  maxIdleConns: 5
-
-extension:
-  baseUrl: https://extension-service:8080/api/services
-  timeout: 30s
-
-logging:
-  level: info
-  format: json
-```
-
-## 🔐 Security
-
-- Basic Authentication for API endpoints
-- Multi-tenancy with ORG_ID isolation
-- SQL injection prevention through parameterized queries
-- Input validation at handler level
-
-## 📈 Development Status
-
-This project is currently under development. See the TODO list for progress tracking.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-Apache 2.0 - See LICENSE file for details
-
-## 📞 Contact
-
-WSO2 - architecture@wso2.com
-
-Project Link: [https://github.com/wso2/consent-management-api](https://github.com/wso2/consent-management-api)
-
----
-
-**Note**: This README will be updated as the project progresses through development phases.
+**Consent Purpose Tests** (58 tests total):
+- **CREATE**: 24 tests
+  - General CRUD: 11 tests
+  - Type handlers: 13 tests (string, json-schema, attribute)
+- **READ**: 13 tests
+  - General: 4 tests
+  - Type handlers: 7 tests
+  - List operations: 2 tests
+- **UPDATE**: 13 tests
+  - General: 4 tests
+  - Type handlers: 9 tests
+- **DELETE**: 6 tests
+  - General: 2 tests
+  - Type handlers: 4 tests
+- **VALIDATE**: 5 tests

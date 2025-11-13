@@ -6,22 +6,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/wso2/consent-management-api/internal/client"
 	"github.com/wso2/consent-management-api/internal/config"
+	extensionclient "github.com/wso2/consent-management-api/internal/extension-client"
 	"github.com/wso2/consent-management-api/internal/models"
 	"github.com/wso2/consent-management-api/internal/service"
-	"github.com/wso2/consent-management-api/pkg/utils"
+	"github.com/wso2/consent-management-api/internal/utils"
 )
 
 // ConsentHandler handles consent-related HTTP requests
 type ConsentHandler struct {
 	consentService        *service.ConsentService
 	consentPurposeService *service.ConsentPurposeService
-	extensionClient       *client.ExtensionClient
+	extensionClient       *extensionclient.ExtensionClient
 }
 
 // NewConsentHandler creates a new consent handler instance
-func NewConsentHandler(consentService *service.ConsentService, consentPurposeService *service.ConsentPurposeService, extensionClient *client.ExtensionClient) *ConsentHandler {
+func NewConsentHandler(consentService *service.ConsentService, consentPurposeService *service.ConsentPurposeService, extensionClient *extensionclient.ExtensionClient) *ConsentHandler {
 	return &ConsentHandler{
 		consentService:        consentService,
 		consentPurposeService: consentPurposeService,
@@ -473,17 +473,17 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 		ConsentInformation: map[string]interface{}{
 			"consentId":                  consent.ConsentID,
 			"status":                     consent.CurrentStatus,
-		"consentType":                consent.ConsentType,
-		"clientId":                   consent.ClientID,
-		"validityTime":               consent.ValidityTime,
-		"consentPurpose":             consent.ConsentPurpose,
-		"createdTime":                consent.CreatedTime,
-		"updatedTime":                consent.UpdatedTime,
-		"consentFrequency":           consent.ConsentFrequency,
-		"recurringIndicator":         consent.RecurringIndicator,
-		"dataAccessValidityDuration": consent.DataAccessValidityDuration,
-		"attributes":                 consent.Attributes,
-		"authResources":              consent.AuthResources,
+			"consentType":                consent.ConsentType,
+			"clientId":                   consent.ClientID,
+			"validityTime":               consent.ValidityTime,
+			"consentPurpose":             consent.ConsentPurpose,
+			"createdTime":                consent.CreatedTime,
+			"updatedTime":                consent.UpdatedTime,
+			"consentFrequency":           consent.ConsentFrequency,
+			"recurringIndicator":         consent.RecurringIndicator,
+			"dataAccessValidityDuration": consent.DataAccessValidityDuration,
+			"attributes":                 consent.Attributes,
+			"authResources":              consent.AuthResources,
 		},
 	}
 	c.JSON(200, response)

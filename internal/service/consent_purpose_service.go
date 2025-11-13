@@ -10,7 +10,7 @@ import (
 	"github.com/wso2/consent-management-api/internal/dao"
 	"github.com/wso2/consent-management-api/internal/models"
 	"github.com/wso2/consent-management-api/internal/purpose_type_handlers"
-	"github.com/wso2/consent-management-api/pkg/utils"
+	"github.com/wso2/consent-management-api/internal/utils"
 )
 
 // ConsentPurposeService handles business logic for consent purposes

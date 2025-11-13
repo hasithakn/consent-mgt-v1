@@ -3,10 +3,10 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/wso2/consent-management-api/internal/client"
+	"github.com/wso2/consent-management-api/internal/extension-client"
 	"github.com/wso2/consent-management-api/internal/handlers"
 	"github.com/wso2/consent-management-api/internal/service"
-	"github.com/wso2/consent-management-api/pkg/utils"
+	"github.com/wso2/consent-management-api/internal/utils"
 )
 
 // SetupRouter configures all API routes

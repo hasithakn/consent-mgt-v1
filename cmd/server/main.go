@@ -11,10 +11,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/wso2/consent-management-api/internal/client"
 	"github.com/wso2/consent-management-api/internal/config"
 	"github.com/wso2/consent-management-api/internal/dao"
 	"github.com/wso2/consent-management-api/internal/database"
+	extensionclient "github.com/wso2/consent-management-api/internal/extension-client"
 	"github.com/wso2/consent-management-api/internal/router"
 	"github.com/wso2/consent-management-api/internal/service"
 )
@@ -103,7 +103,7 @@ func main() {
 	logger.Info("Services initialized successfully")
 
 	// Initialize extension client
-	extensionClient := client.NewExtensionClient(&cfg.Extension, logger)
+	extensionClient := extensionclient.NewExtensionClient(&cfg.Extension, logger)
 	logger.WithField("enabled", extensionClient.IsExtensionEnabled()).Info("Extension client initialized")
 
 	// Setup router

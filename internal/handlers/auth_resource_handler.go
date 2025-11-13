@@ -7,7 +7,7 @@ import (
 
 	"github.com/wso2/consent-management-api/internal/models"
 	"github.com/wso2/consent-management-api/internal/service"
-	"github.com/wso2/consent-management-api/pkg/utils"
+	"github.com/wso2/consent-management-api/internal/utils"
 )
 
 // AuthResourceHandler handles authorization resource-related HTTP requests

@@ -106,7 +106,7 @@ func (h *ConsentHandler) CreateConsent(c *gin.Context) {
 
 	// Extract purpose names from the request's ConsentPurpose array
 	var purposeNames []string
-	if request.ConsentPurpose != nil && len(request.ConsentPurpose) > 0 {
+	if len(request.ConsentPurpose) > 0 {
 		purposeNames = make([]string, len(request.ConsentPurpose))
 		for i, purpose := range request.ConsentPurpose {
 			purposeNames[i] = purpose.Name
@@ -249,7 +249,7 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 
 	// Extract purpose names from the request's ConsentPurpose array
 	var purposeNames []string
-	if updateRequest.ConsentPurpose != nil && len(updateRequest.ConsentPurpose) > 0 {
+	if len(updateRequest.ConsentPurpose) > 0 {
 		purposeNames = make([]string, len(updateRequest.ConsentPurpose))
 		for i, purpose := range updateRequest.ConsentPurpose {
 			purposeNames[i] = purpose.Name

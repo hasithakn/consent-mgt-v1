@@ -91,7 +91,7 @@ func (c *ConsentCreateRequest) ToConsentInitiationData() ConsentInitiationData {
 
 	// Convert consent purposes to request payload for extension compatibility
 	// Extension API expects requestPayload map, so convert ConsentPurpose array to map
-	if c.ConsentPurpose != nil && len(c.ConsentPurpose) > 0 {
+	if len(c.ConsentPurpose) > 0 {
 		purposesMap := make(map[string]interface{})
 		purposesMap["consentPurpose"] = c.ConsentPurpose
 		initData.RequestPayload = purposesMap
@@ -229,7 +229,7 @@ func (c *ConsentUpdateRequest) ToConsentInitiationData() ConsentInitiationData {
 
 	// Convert consent purposes to request payload for extension compatibility
 	// Extension API expects requestPayload map, so convert ConsentPurpose array to map
-	if c.ConsentPurpose != nil && len(c.ConsentPurpose) > 0 {
+	if len(c.ConsentPurpose) > 0 {
 		purposesMap := make(map[string]interface{})
 		purposesMap["consentPurpose"] = c.ConsentPurpose
 		initData.RequestPayload = purposesMap

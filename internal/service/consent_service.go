@@ -260,7 +260,7 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 	updatedConsent := *existingConsent
 	updatedConsent.UpdatedTime = utils.GetCurrentTimeMillis()
 
-	if request.ConsentPurpose != nil && len(request.ConsentPurpose) > 0 {
+	if len(request.ConsentPurpose) > 0 {
 		consentPurposeJSON, err := json.Marshal(request.ConsentPurpose)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal consent purpose: %w", err)
@@ -520,7 +520,7 @@ func (s *ConsentService) validateConsentCreateRequest(request *models.ConsentCre
 	if err := utils.ValidateStatus(request.CurrentStatus); err != nil {
 		return err
 	}
-	if request.ConsentPurpose == nil || len(request.ConsentPurpose) == 0 {
+	if len(request.ConsentPurpose) == 0 {
 		return fmt.Errorf("consentPurpose is required")
 	}
 	// Validate DataAccessValidityDuration if provided (must be non-negative)

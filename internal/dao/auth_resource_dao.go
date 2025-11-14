@@ -25,7 +25,7 @@ func (dao *AuthResourceDAO) Create(ctx context.Context, authResource *models.Con
 	query := `
 		INSERT INTO CONSENT_AUTH_RESOURCE (
 			AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-			UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
+			UPDATED_TIME, RESOURCES, ORG_ID
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
@@ -38,7 +38,7 @@ func (dao *AuthResourceDAO) Create(ctx context.Context, authResource *models.Con
 		authResource.UserID,
 		authResource.AuthStatus,
 		authResource.UpdatedTime,
-		authResource.ApprovedPurposeDetails,
+		authResource.Resources,
 		authResource.OrgID,
 	)
 
@@ -54,7 +54,7 @@ func (dao *AuthResourceDAO) CreateWithTx(ctx context.Context, tx *database.Trans
 	query := `
 		INSERT INTO CONSENT_AUTH_RESOURCE (
 			AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-			UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
+			UPDATED_TIME, RESOURCES, ORG_ID
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
@@ -67,7 +67,7 @@ func (dao *AuthResourceDAO) CreateWithTx(ctx context.Context, tx *database.Trans
 		authResource.UserID,
 		authResource.AuthStatus,
 		authResource.UpdatedTime,
-		authResource.ApprovedPurposeDetails,
+		authResource.Resources,
 		authResource.OrgID,
 	)
 
@@ -82,7 +82,7 @@ func (dao *AuthResourceDAO) CreateWithTx(ctx context.Context, tx *database.Trans
 func (dao *AuthResourceDAO) GetByID(ctx context.Context, authID, orgID string) (*models.ConsentAuthResource, error) {
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-		       UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
+		       UPDATED_TIME, RESOURCES, ORG_ID
 		FROM CONSENT_AUTH_RESOURCE
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
@@ -96,11 +96,11 @@ func (dao *AuthResourceDAO) GetByID(ctx context.Context, authID, orgID string) (
 		return nil, fmt.Errorf("failed to get auth resource: %w", err)
 	}
 
-	// After loading a single resource
-	if authResource.ApprovedPurposeDetails != nil && *authResource.ApprovedPurposeDetails != "" {
-		var details models.ApprovedPurposeDetails
-		if err := json.Unmarshal([]byte(*authResource.ApprovedPurposeDetails), &details); err == nil {
-			authResource.ApprovedPurposeDetailsObj = &details
+	// Parse resources JSON string to interface
+	if authResource.Resources != nil && *authResource.Resources != "" {
+		var resources interface{}
+		if err := json.Unmarshal([]byte(*authResource.Resources), &resources); err == nil {
+			authResource.ResourceObj = resources
 		}
 	}
 
@@ -111,7 +111,7 @@ func (dao *AuthResourceDAO) GetByID(ctx context.Context, authID, orgID string) (
 func (dao *AuthResourceDAO) GetByIDWithTx(ctx context.Context, tx *database.Transaction, authID, orgID string) (*models.ConsentAuthResource, error) {
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-		       UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
+		       UPDATED_TIME, RESOURCES, ORG_ID
 		FROM CONSENT_AUTH_RESOURCE
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
@@ -125,11 +125,11 @@ func (dao *AuthResourceDAO) GetByIDWithTx(ctx context.Context, tx *database.Tran
 		return nil, fmt.Errorf("failed to get auth resource: %w", err)
 	}
 
-	// After loading a single resource
-	if authResource.ApprovedPurposeDetails != nil && *authResource.ApprovedPurposeDetails != "" {
-		var details models.ApprovedPurposeDetails
-		if err := json.Unmarshal([]byte(*authResource.ApprovedPurposeDetails), &details); err == nil {
-			authResource.ApprovedPurposeDetailsObj = &details
+	// Parse resources JSON string to interface
+	if authResource.Resources != nil && *authResource.Resources != "" {
+		var resources interface{}
+		if err := json.Unmarshal([]byte(*authResource.Resources), &resources); err == nil {
+			authResource.ResourceObj = resources
 		}
 	}
 
@@ -140,7 +140,7 @@ func (dao *AuthResourceDAO) GetByIDWithTx(ctx context.Context, tx *database.Tran
 func (dao *AuthResourceDAO) GetByConsentID(ctx context.Context, consentID, orgID string) ([]models.ConsentAuthResource, error) {
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-		       UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
+		       UPDATED_TIME, RESOURCES, ORG_ID
 		FROM CONSENT_AUTH_RESOURCE
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 		ORDER BY UPDATED_TIME DESC
@@ -152,12 +152,12 @@ func (dao *AuthResourceDAO) GetByConsentID(ctx context.Context, consentID, orgID
 		return nil, fmt.Errorf("failed to get auth resources by consent ID: %w", err)
 	}
 
-	// After loading multiple resources
+	// Parse resources for each auth resource
 	for i := range authResources {
-		if authResources[i].ApprovedPurposeDetails != nil && *authResources[i].ApprovedPurposeDetails != "" {
-			var details models.ApprovedPurposeDetails
-			if err := json.Unmarshal([]byte(*authResources[i].ApprovedPurposeDetails), &details); err == nil {
-				authResources[i].ApprovedPurposeDetailsObj = &details
+		if authResources[i].Resources != nil && *authResources[i].Resources != "" {
+			var resources interface{}
+			if err := json.Unmarshal([]byte(*authResources[i].Resources), &resources); err == nil {
+				authResources[i].ResourceObj = resources
 			}
 		}
 	}
@@ -169,7 +169,7 @@ func (dao *AuthResourceDAO) GetByConsentID(ctx context.Context, consentID, orgID
 func (dao *AuthResourceDAO) GetByConsentIDWithTx(ctx context.Context, tx *database.Transaction, consentID, orgID string) ([]models.ConsentAuthResource, error) {
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-		       UPDATED_TIME, APPROVED_PURPOSE_DETAILS, ORG_ID
+		       UPDATED_TIME, RESOURCES, ORG_ID
 		FROM CONSENT_AUTH_RESOURCE
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
 		ORDER BY UPDATED_TIME DESC
@@ -181,12 +181,12 @@ func (dao *AuthResourceDAO) GetByConsentIDWithTx(ctx context.Context, tx *databa
 		return nil, fmt.Errorf("failed to get auth resources by consent ID: %w", err)
 	}
 
-	// After loading multiple resources
+	// Parse resources for each auth resource
 	for i := range authResources {
-		if authResources[i].ApprovedPurposeDetails != nil && *authResources[i].ApprovedPurposeDetails != "" {
-			var details models.ApprovedPurposeDetails
-			if err := json.Unmarshal([]byte(*authResources[i].ApprovedPurposeDetails), &details); err == nil {
-				authResources[i].ApprovedPurposeDetailsObj = &details
+		if authResources[i].Resources != nil && *authResources[i].Resources != "" {
+			var resources interface{}
+			if err := json.Unmarshal([]byte(*authResources[i].Resources), &resources); err == nil {
+				authResources[i].ResourceObj = resources
 			}
 		}
 	}
@@ -198,7 +198,7 @@ func (dao *AuthResourceDAO) GetByConsentIDWithTx(ctx context.Context, tx *databa
 func (dao *AuthResourceDAO) Update(ctx context.Context, authResource *models.ConsentAuthResource) error {
 	query := `
 		UPDATE CONSENT_AUTH_RESOURCE
-		SET AUTH_STATUS = ?, USER_ID = ?, APPROVED_PURPOSE_DETAILS = ?, UPDATED_TIME = ?
+		SET AUTH_STATUS = ?, USER_ID = ?, RESOURCES = ?, UPDATED_TIME = ?
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
 
@@ -207,7 +207,7 @@ func (dao *AuthResourceDAO) Update(ctx context.Context, authResource *models.Con
 		query,
 		authResource.AuthStatus,
 		authResource.UserID,
-		authResource.ApprovedPurposeDetails,
+		authResource.Resources,
 		authResource.UpdatedTime,
 		authResource.AuthID,
 		authResource.OrgID,
@@ -233,7 +233,7 @@ func (dao *AuthResourceDAO) Update(ctx context.Context, authResource *models.Con
 func (dao *AuthResourceDAO) UpdateWithTx(ctx context.Context, tx *database.Transaction, authResource *models.ConsentAuthResource) error {
 	query := `
 		UPDATE CONSENT_AUTH_RESOURCE
-		SET AUTH_STATUS = ?, USER_ID = ?, APPROVED_PURPOSE_DETAILS = ?, UPDATED_TIME = ?
+		SET AUTH_STATUS = ?, USER_ID = ?, RESOURCES = ?, UPDATED_TIME = ?
 		WHERE AUTH_ID = ? AND ORG_ID = ?
 	`
 
@@ -242,7 +242,7 @@ func (dao *AuthResourceDAO) UpdateWithTx(ctx context.Context, tx *database.Trans
 		query,
 		authResource.AuthStatus,
 		authResource.UserID,
-		authResource.ApprovedPurposeDetails,
+		authResource.Resources,
 		authResource.UpdatedTime,
 		authResource.AuthID,
 		authResource.OrgID,
@@ -372,7 +372,7 @@ func (dao *AuthResourceDAO) Exists(ctx context.Context, authID, orgID string) (b
 func (dao *AuthResourceDAO) GetByUserID(ctx context.Context, userID, orgID string) ([]models.ConsentAuthResource, error) {
 	query := `
 		SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS,
-		       UPDATED_TIME, RESOURCE, ORG_ID
+		       UPDATED_TIME, RESOURCES, ORG_ID
 		FROM CONSENT_AUTH_RESOURCE
 		WHERE USER_ID = ? AND ORG_ID = ?
 		ORDER BY UPDATED_TIME DESC

@@ -3,6 +3,7 @@ package dao
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
@@ -238,14 +239,63 @@ func (dao *ConsentPurposeDAO) GetByConsentID(ctx context.Context, consentID, org
 	return purposes, nil
 }
 
-// LinkPurposeToConsent creates a mapping between a consent and a purpose
-func (dao *ConsentPurposeDAO) LinkPurposeToConsent(ctx context.Context, consentID, purposeID, orgID string) error {
+// GetMappingsByConsentID retrieves all purpose mappings with value and isSelected for a consent
+func (dao *ConsentPurposeDAO) GetMappingsByConsentID(ctx context.Context, consentID, orgID string) ([]models.ConsentPurposeMapping, error) {
 	query := `
-		INSERT INTO CONSENT_PURPOSE_MAPPING (CONSENT_ID, ORG_ID, PURPOSE_ID)
-		VALUES (?, ?, ?)
+		SELECT cpm.CONSENT_ID, cpm.ORG_ID, cpm.PURPOSE_ID, cpm.VALUE, cpm.IS_SELECTED,
+		       cp.NAME
+		FROM CONSENT_PURPOSE_MAPPING cpm
+		INNER JOIN CONSENT_PURPOSE cp ON cpm.PURPOSE_ID = cp.ID AND cpm.ORG_ID = cp.ORG_ID
+		WHERE cpm.CONSENT_ID = ? AND cpm.ORG_ID = ?
+		ORDER BY cp.NAME ASC
 	`
 
-	_, err := dao.db.ExecContext(ctx, query, consentID, orgID, purposeID)
+	type MappingRow struct {
+		ConsentID  string  `db:"CONSENT_ID"`
+		OrgID      string  `db:"ORG_ID"`
+		PurposeID  string  `db:"PURPOSE_ID"`
+		Value      *string `db:"VALUE"`
+		IsSelected bool    `db:"IS_SELECTED"`
+		Name       string  `db:"NAME"`
+	}
+
+	var rows []MappingRow
+	err := dao.db.SelectContext(ctx, &rows, query, consentID, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get purpose mappings for consent: %w", err)
+	}
+
+	mappings := make([]models.ConsentPurposeMapping, len(rows))
+	for i, row := range rows {
+		mappings[i] = models.ConsentPurposeMapping{
+			ConsentID:  row.ConsentID,
+			OrgID:      row.OrgID,
+			PurposeID:  row.PurposeID,
+			Value:      nil,
+			IsSelected: row.IsSelected,
+			Name:       row.Name, // For building the response
+		}
+		
+		// Unmarshal value JSON if present
+		if row.Value != nil && *row.Value != "" {
+			var valueObj interface{}
+			if err := json.Unmarshal([]byte(*row.Value), &valueObj); err == nil {
+				mappings[i].Value = valueObj
+			}
+		}
+	}
+
+	return mappings, nil
+}
+
+// LinkPurposeToConsent creates a mapping between a consent and a purpose
+func (dao *ConsentPurposeDAO) LinkPurposeToConsent(ctx context.Context, consentID, purposeID, orgID string, value *string, isSelected bool) error {
+	query := `
+		INSERT INTO CONSENT_PURPOSE_MAPPING (CONSENT_ID, ORG_ID, PURPOSE_ID, VALUE, IS_SELECTED)
+		VALUES (?, ?, ?, ?, ?)
+	`
+
+	_, err := dao.db.ExecContext(ctx, query, consentID, orgID, purposeID, value, isSelected)
 	if err != nil {
 		return fmt.Errorf("failed to link purpose to consent: %w", err)
 	}
@@ -254,13 +304,13 @@ func (dao *ConsentPurposeDAO) LinkPurposeToConsent(ctx context.Context, consentI
 }
 
 // LinkPurposeToConsentWithTx creates a mapping between a consent and a purpose within a transaction
-func (dao *ConsentPurposeDAO) LinkPurposeToConsentWithTx(ctx context.Context, tx *sqlx.Tx, consentID, purposeID, orgID string) error {
+func (dao *ConsentPurposeDAO) LinkPurposeToConsentWithTx(ctx context.Context, tx *sqlx.Tx, consentID, purposeID, orgID string, value *string, isSelected bool) error {
 	query := `
-		INSERT INTO CONSENT_PURPOSE_MAPPING (CONSENT_ID, ORG_ID, PURPOSE_ID)
-		VALUES (?, ?, ?)
+		INSERT INTO CONSENT_PURPOSE_MAPPING (CONSENT_ID, ORG_ID, PURPOSE_ID, VALUE, IS_SELECTED)
+		VALUES (?, ?, ?, ?, ?)
 	`
 
-	_, err := tx.ExecContext(ctx, query, consentID, orgID, purposeID)
+	_, err := tx.ExecContext(ctx, query, consentID, orgID, purposeID, value, isSelected)
 	if err != nil {
 		return fmt.Errorf("failed to link purpose to consent: %w", err)
 	}

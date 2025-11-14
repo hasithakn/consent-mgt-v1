@@ -104,24 +104,16 @@ func (h *ConsentHandler) CreateConsent(c *gin.Context) {
 	// Derive consent status from authorization statuses
 	request.CurrentStatus = handlerutils.DeriveConsentStatus(request.AuthResources)
 
-	// Extract purpose names from the request's ConsentPurpose array
-	var purposeNames []string
-	if len(request.ConsentPurpose) > 0 {
-		purposeNames = make([]string, len(request.ConsentPurpose))
-		for i, purpose := range request.ConsentPurpose {
-			purposeNames[i] = purpose.Name
-		}
-	}
-
 	// Create consent with purpose validation
 	var consent *models.ConsentResponse
-	if len(purposeNames) > 0 {
-		consent, err = h.consentService.CreateConsentWithPurposes(c.Request.Context(), request, clientID, orgID, purposeNames)
+	var consentErr error
+	if len(request.ConsentPurpose) > 0 {
+		consent, consentErr = h.consentService.CreateConsentWithPurposes(c.Request.Context(), request, clientID, orgID, request.ConsentPurpose)
 	} else {
-		consent, err = h.consentService.CreateConsent(c.Request.Context(), request, clientID, orgID)
+		consent, consentErr = h.consentService.CreateConsent(c.Request.Context(), request, clientID, orgID)
 	}
 
-	if err != nil {
+	if consentErr != nil {
 		// Check if it's a validation error
 		if strings.Contains(err.Error(), "must be") || strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "not found") {
 			utils.SendBadRequestError(c, "Failed to create consent", err.Error())
@@ -247,19 +239,10 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 	// Derive consent status from authorization statuses
 	updateRequest.CurrentStatus = handlerutils.DeriveConsentStatus(updateRequest.AuthResources)
 
-	// Extract purpose names from the request's ConsentPurpose array
-	var purposeNames []string
-	if len(updateRequest.ConsentPurpose) > 0 {
-		purposeNames = make([]string, len(updateRequest.ConsentPurpose))
-		for i, purpose := range updateRequest.ConsentPurpose {
-			purposeNames[i] = purpose.Name
-		}
-	}
-
 	// Update consent with purposes from request body
 	var updatedConsent *models.ConsentResponse
-	if len(purposeNames) > 0 {
-		updatedConsent, err = h.consentService.UpdateConsentWithPurposes(c.Request.Context(), consentID, orgID, updateRequest, purposeNames)
+	if len(updateRequest.ConsentPurpose) > 0 {
+		updatedConsent, err = h.consentService.UpdateConsentWithPurposes(c.Request.Context(), consentID, orgID, updateRequest, updateRequest.ConsentPurpose)
 	} else {
 		updatedConsent, err = h.consentService.UpdateConsent(c.Request.Context(), consentID, orgID, updateRequest)
 	}

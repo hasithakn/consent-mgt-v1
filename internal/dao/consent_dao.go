@@ -24,17 +24,16 @@ func NewConsentDAO(db *database.DB) *ConsentDAO {
 func (dao *ConsentDAO) Create(ctx context.Context, consent *models.Consent) error {
 	query := `
 	INSERT INTO CONSENT (
-			CONSENT_ID, CONSENT_PURPOSES, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
+			CONSENT_ID, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
 			CONSENT_TYPE, CURRENT_STATUS, CONSENT_FREQUENCY, VALIDITY_TIME,
 			RECURRING_INDICATOR, DATA_ACCESS_VALIDITY_DURATION, ORG_ID
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := dao.db.ExecContext(
 		ctx,
 		query,
 		consent.ConsentID,
-		consent.ConsentPurposes,
 		consent.CreatedTime,
 		consent.UpdatedTime,
 		consent.ClientID,
@@ -58,17 +57,16 @@ func (dao *ConsentDAO) Create(ctx context.Context, consent *models.Consent) erro
 func (dao *ConsentDAO) CreateWithTx(ctx context.Context, tx *database.Transaction, consent *models.Consent) error {
 	query := `
 	INSERT INTO CONSENT (
-			CONSENT_ID, CONSENT_PURPOSES, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
+			CONSENT_ID, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
 			CONSENT_TYPE, CURRENT_STATUS, CONSENT_FREQUENCY, VALIDITY_TIME,
 			RECURRING_INDICATOR, DATA_ACCESS_VALIDITY_DURATION, ORG_ID
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := tx.ExecContext(
 		ctx,
 		query,
 		consent.ConsentID,
-		consent.ConsentPurposes,
 		consent.CreatedTime,
 		consent.UpdatedTime,
 		consent.ClientID,
@@ -136,7 +134,7 @@ func (dao *ConsentDAO) GetByIDWithTx(ctx context.Context, tx *database.Transacti
 func (dao *ConsentDAO) Update(ctx context.Context, consent *models.Consent) error {
 	query := `
 	UPDATE CONSENT
-		SET CONSENT_PURPOSES = ?, UPDATED_TIME = ?, CURRENT_STATUS = ?,
+		SET UPDATED_TIME = ?, CURRENT_STATUS = ?,
 		    CONSENT_FREQUENCY = ?, VALIDITY_TIME = ?, RECURRING_INDICATOR = ?,
 		    DATA_ACCESS_VALIDITY_DURATION = ?
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
@@ -145,7 +143,6 @@ func (dao *ConsentDAO) Update(ctx context.Context, consent *models.Consent) erro
 	result, err := dao.db.ExecContext(
 		ctx,
 		query,
-		consent.ConsentPurposes,
 		consent.UpdatedTime,
 		consent.CurrentStatus,
 		consent.ConsentFrequency,
@@ -176,7 +173,7 @@ func (dao *ConsentDAO) Update(ctx context.Context, consent *models.Consent) erro
 func (dao *ConsentDAO) UpdateWithTx(ctx context.Context, tx *database.Transaction, consent *models.Consent) error {
 	query := `
 	UPDATE CONSENT
-		SET CONSENT_PURPOSES = ?, UPDATED_TIME = ?, CURRENT_STATUS = ?,
+		SET UPDATED_TIME = ?, CURRENT_STATUS = ?,
 		    CONSENT_FREQUENCY = ?, VALIDITY_TIME = ?, RECURRING_INDICATOR = ?,
 		    DATA_ACCESS_VALIDITY_DURATION = ?
 		WHERE CONSENT_ID = ? AND ORG_ID = ?
@@ -185,7 +182,6 @@ func (dao *ConsentDAO) UpdateWithTx(ctx context.Context, tx *database.Transactio
 	result, err := tx.ExecContext(
 		ctx,
 		query,
-		consent.ConsentPurposes,
 		consent.UpdatedTime,
 		consent.CurrentStatus,
 		consent.ConsentFrequency,

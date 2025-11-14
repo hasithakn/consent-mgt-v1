@@ -30,10 +30,10 @@ type ConsentInitiationData struct {
 
 // AuthorizationPayload represents authorization data in extension requests
 type AuthorizationPayload struct {
-	UserID                 string                  `json:"userId"`
-	Type                   string                  `json:"type"`
-	Status                 string                  `json:"status"`
-	ApprovedPurposeDetails *ApprovedPurposeDetails `json:"approvedPurposeDetails,omitempty"`
+	UserID    string      `json:"userId"`
+	Type      string      `json:"type"`
+	Status    string      `json:"status"`
+	Resources interface{} `json:"resources,omitempty"`
 }
 
 // PreProcessConsentCreationResponse represents the response from pre-process-consent-creation endpoint
@@ -105,11 +105,12 @@ func (c *ConsentCreateRequest) ToConsentInitiationData() ConsentInitiationData {
 			if auth.UserID != nil {
 				userID = *auth.UserID
 			}
+			
 			initData.Authorizations[i] = AuthorizationPayload{
-				UserID:                 userID,
-				Type:                   auth.AuthType,
-				Status:                 auth.AuthStatus,
-				ApprovedPurposeDetails: auth.ApprovedPurposeDetails,
+				UserID:    userID,
+				Type:      auth.AuthType,
+				Status:    auth.AuthStatus,
+				Resources: auth.Resources,
 			}
 		}
 	}
@@ -167,10 +168,10 @@ func (d *DetailedConsentResourceData) ToConsentCreateRequest() *ConsentCreateReq
 		for i, auth := range d.Authorizations {
 			userID := auth.UserID
 			req.AuthResources[i] = ConsentAuthResourceCreateRequest{
-				UserID:                 &userID,
-				AuthType:               auth.Type,
-				AuthStatus:             auth.Status,
-				ApprovedPurposeDetails: auth.ApprovedPurposeDetails,
+				UserID:     &userID,
+				AuthType:   auth.Type,
+				AuthStatus: auth.Status,
+				Resources:  auth.Resources,
 			}
 		}
 	}
@@ -244,10 +245,10 @@ func (c *ConsentUpdateRequest) ToConsentInitiationData() ConsentInitiationData {
 				userID = *auth.UserID
 			}
 			initData.Authorizations[i] = AuthorizationPayload{
-				UserID:                 userID,
-				Type:                   auth.AuthType,
-				Status:                 auth.AuthStatus,
-				ApprovedPurposeDetails: auth.ApprovedPurposeDetails,
+				UserID:    userID,
+				Type:      auth.AuthType,
+				Status:    auth.AuthStatus,
+				Resources: auth.Resources,
 			}
 		}
 	}
@@ -305,10 +306,10 @@ func (d *DetailedConsentResourceData) ToConsentUpdateRequest() *ConsentUpdateReq
 		for i, auth := range d.Authorizations {
 			userID := auth.UserID
 			req.AuthResources[i] = ConsentAuthResourceCreateRequest{
-				UserID:                 &userID,
-				AuthType:               auth.Type,
-				AuthStatus:             auth.Status,
-				ApprovedPurposeDetails: auth.ApprovedPurposeDetails,
+				UserID:     &userID,
+				AuthType:   auth.Type,
+				AuthStatus: auth.Status,
+				Resources:  auth.Resources,
 			}
 		}
 	}

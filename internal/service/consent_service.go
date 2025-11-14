@@ -8,6 +8,7 @@ import (
 	"github.com/wso2/consent-management-api/internal/dao"
 	"github.com/wso2/consent-management-api/internal/database"
 	"github.com/wso2/consent-management-api/internal/models"
+	serviceutils "github.com/wso2/consent-management-api/internal/service/utils"
 	"github.com/wso2/consent-management-api/internal/utils"
 
 	"github.com/sirupsen/logrus"
@@ -51,22 +52,18 @@ func (s *ConsentService) CreateConsent(ctx context.Context, request *models.Cons
 }
 
 // CreateConsentWithPurposes creates a new consent and links it to purposes
-func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request *models.ConsentCreateRequest, clientID, orgID string, purposeNames []string) (*models.ConsentResponse, error) {
+func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request *models.ConsentCreateRequest, clientID, orgID string, consentPurposes []models.ConsentPurposeItem) (*models.ConsentResponse, error) {
 	// Validate request
 	if err := s.validateConsentCreateRequest(request, clientID, orgID); err != nil {
 		return nil, err
 	}
 
-	// Convert consent purpose array to JSON
-	consentPurposeJSON, err := json.Marshal(request.ConsentPurpose)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal consent purpose: %w", err)
-	}
+	// Note: ConsentPurpose array will be stored in CONSENT_PURPOSE_MAPPING table,
+	// not in the CONSENT table's JSON column anymore
 
 	// Build consent model
 	consent := &models.Consent{
 		ConsentID:                  utils.GenerateConsentID(),
-		ConsentPurposes:            models.JSON(consentPurposeJSON),
 		ClientID:                   clientID,
 		ConsentType:                request.ConsentType,
 		CurrentStatus:              request.CurrentStatus,
@@ -120,30 +117,26 @@ func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request 
 	// Create authorization resources
 	if len(request.AuthResources) > 0 {
 		for _, authReq := range request.AuthResources {
-			// Marshal approved purpose details to JSON if present, else set to empty struct
-			var approvedPurposeDetailsJSON *string
-			if authReq.ApprovedPurposeDetails == nil {
-				emptyDetailsBytes, _ := json.Marshal(models.ApprovedPurposeDetails{})
-				emptyDetailsStr := string(emptyDetailsBytes)
-				approvedPurposeDetailsJSON = &emptyDetailsStr
-			} else {
-				approvedPurposeDetailsBytes, err := json.Marshal(authReq.ApprovedPurposeDetails)
+			// Marshal resources to JSON if present (resources can be any valid JSON)
+			var resourcesJSON *string
+			if authReq.Resources != nil {
+				resourcesBytes, err := json.Marshal(authReq.Resources)
 				if err != nil {
-					return nil, fmt.Errorf("failed to marshal approved purpose details: %w", err)
+					return nil, fmt.Errorf("failed to marshal resources: %w", err)
 				}
-				approvedPurposeDetailsStr := string(approvedPurposeDetailsBytes)
-				approvedPurposeDetailsJSON = &approvedPurposeDetailsStr
+				resourcesStr := string(resourcesBytes)
+				resourcesJSON = &resourcesStr
 			}
 
 			authResource := &models.ConsentAuthResource{
-				AuthID:                 utils.GenerateAuthID(),
-				ConsentID:              consent.ConsentID,
-				AuthType:               authReq.AuthType,
-				UserID:                 authReq.UserID,
-				AuthStatus:             authReq.AuthStatus,
-				UpdatedTime:            consent.CreatedTime,
-				ApprovedPurposeDetails: approvedPurposeDetailsJSON,
-				OrgID:                  consent.OrgID,
+				AuthID:      utils.GenerateAuthID(),
+				ConsentID:   consent.ConsentID,
+				AuthType:    authReq.AuthType,
+				UserID:      authReq.UserID,
+				AuthStatus:  authReq.AuthStatus,
+				UpdatedTime: consent.CreatedTime,
+				Resources:   resourcesJSON,
+				OrgID:       consent.OrgID,
 			}
 
 			if err := s.authResourceDAO.CreateWithTx(ctx, tx, authResource); err != nil {
@@ -153,7 +146,13 @@ func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request 
 	}
 
 	// Link consent purposes if provided
-	if len(purposeNames) > 0 {
+	if len(consentPurposes) > 0 {
+		// Extract purpose names for ID lookup
+		purposeNames := make([]string, len(consentPurposes))
+		for i, p := range consentPurposes {
+			purposeNames[i] = p.Name
+		}
+
 		// Get purpose ID's by names
 		purposeIDMap, err := s.consentPurposeDAO.GetIDsByNames(ctx, purposeNames, orgID)
 		if err != nil {
@@ -171,16 +170,29 @@ func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request 
 			return nil, fmt.Errorf("purposes not found: %v", missingPurposes)
 		}
 
-		// Link each purpose to the consent within transaction
-		for _, purposeID := range purposeIDMap {
-			if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consent.ConsentID, purposeID, orgID); err != nil {
+		// Link each purpose to the consent within transaction with value and isSelected
+		for _, purposeItem := range consentPurposes {
+			purposeName := purposeIDMap[purposeItem.Name]
+
+			// Marshal value to JSON string if present
+			var valueJSON *string
+			if purposeItem.Value != nil {
+				valueBytes, err := json.Marshal(purposeItem.Value)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal purpose value: %w", err)
+				}
+				valueStr := string(valueBytes)
+				valueJSON = &valueStr
+			}
+
+			if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consent.ConsentID, purposeName, orgID, valueJSON, purposeItem.IsSelected); err != nil {
 				return nil, fmt.Errorf("failed to link purpose: %w", err)
 			}
 		}
 
 		s.logger.WithFields(logrus.Fields{
 			"consent_id":    consent.ConsentID,
-			"purpose_count": len(purposeNames),
+			"purpose_count": len(consentPurposes),
 		}).Info("Linked purposes to consent within transaction")
 	}
 
@@ -188,10 +200,11 @@ func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request 
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// Retrieve auth resources after creation
+	// Retrieve related data after creation
 	authResources, _ := s.authResourceDAO.GetByConsentID(ctx, consent.ConsentID, consent.OrgID)
+	purposeMappings, _ := s.consentPurposeDAO.GetMappingsByConsentID(ctx, consent.ConsentID, consent.OrgID)
 
-	return s.buildConsentResponse(consent, request.Attributes, authResources), nil
+	return serviceutils.BuildConsentResponse(consent, request.Attributes, authResources, purposeMappings, s.logger), nil
 }
 
 // GetConsent retrieves a consent by ID
@@ -210,8 +223,9 @@ func (s *ConsentService) GetConsent(ctx context.Context, consentID, orgID string
 
 	attributes, _ := s.attributeDAO.GetByConsentID(ctx, consentID, orgID)
 	authResources, _ := s.authResourceDAO.GetByConsentID(ctx, consentID, orgID)
+	purposeMappings, _ := s.consentPurposeDAO.GetMappingsByConsentID(ctx, consentID, orgID)
 
-	return s.buildConsentResponse(consent, attributes, authResources), nil
+	return serviceutils.BuildConsentResponse(consent, attributes, authResources, purposeMappings, s.logger), nil
 }
 
 // UpdateConsent updates an existing consent
@@ -220,7 +234,7 @@ func (s *ConsentService) UpdateConsent(ctx context.Context, consentID, orgID str
 }
 
 // UpdateConsentWithPurposes updates a consent and replaces its purpose mappings
-func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentID, orgID string, request *models.ConsentUpdateRequest, purposeNames []string) (*models.ConsentResponse, error) {
+func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentID, orgID string, request *models.ConsentUpdateRequest, consentPurposes []models.ConsentPurposeItem) (*models.ConsentResponse, error) {
 	// Validate inputs
 	if err := utils.ValidateConsentID(consentID); err != nil {
 		return nil, err
@@ -228,15 +242,15 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 	if err := utils.ValidateOrgID(orgID); err != nil {
 		return nil, err
 	}
-	if request.CurrentStatus != "" {
-		if err := utils.ValidateStatus(request.CurrentStatus); err != nil {
-			return nil, err
-		}
-	}
 	if request.ConsentType != "" {
 		if err := utils.ValidateConsentType(request.ConsentType); err != nil {
 			return nil, err
 		}
+	}
+
+	// Validate consent purposes (mandatory)
+	if len(consentPurposes) == 0 {
+		return nil, fmt.Errorf("consentPurpose is required")
 	}
 
 	// Start transaction
@@ -252,29 +266,15 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 		return nil, fmt.Errorf("failed to retrieve consent: %w", err)
 	}
 
-	// Track if status changed
-	statusChanged := false
-	previousStatus := existingConsent.CurrentStatus
-
 	// Update consent fields
 	updatedConsent := *existingConsent
 	updatedConsent.UpdatedTime = utils.GetCurrentTimeMillis()
 
-	if len(request.ConsentPurpose) > 0 {
-		consentPurposeJSON, err := json.Marshal(request.ConsentPurpose)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal consent purpose: %w", err)
-		}
-		updatedConsent.ConsentPurposes = models.JSON(consentPurposeJSON)
-	}
+	// Note: CurrentStatus is derived from authorization states, not set directly
+	// Status will be updated after processing auth resources
 
 	if request.ConsentType != "" {
 		updatedConsent.ConsentType = request.ConsentType
-	}
-
-	if request.CurrentStatus != "" && request.CurrentStatus != existingConsent.CurrentStatus {
-		updatedConsent.CurrentStatus = request.CurrentStatus
-		statusChanged = true
 	}
 
 	if request.ConsentFrequency != nil {
@@ -295,31 +295,6 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 			return nil, fmt.Errorf("dataAccessValidityDuration must be non-negative")
 		}
 		updatedConsent.DataAccessValidityDuration = request.DataAccessValidityDuration
-	}
-
-	// Update consent
-	if err := s.consentDAO.UpdateWithTx(ctx, tx, &updatedConsent); err != nil {
-		return nil, fmt.Errorf("failed to update consent: %w", err)
-	}
-
-	// Create status audit if status changed
-	if statusChanged {
-		actionBy := updatedConsent.ClientID
-		reason := "Consent status updated"
-		audit := &models.ConsentStatusAudit{
-			StatusAuditID:  utils.GenerateAuditID(),
-			ConsentID:      consentID,
-			CurrentStatus:  updatedConsent.CurrentStatus,
-			ActionTime:     updatedConsent.UpdatedTime,
-			ActionBy:       &actionBy,
-			PreviousStatus: &previousStatus,
-			Reason:         &reason,
-			OrgID:          orgID,
-		}
-
-		if err := s.statusAuditDAO.CreateWithTx(ctx, tx, audit); err != nil {
-			return nil, fmt.Errorf("failed to create audit record: %w", err)
-		}
 	}
 
 	// Update attributes if provided
@@ -345,30 +320,26 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 
 		if len(request.AuthResources) > 0 {
 			for _, authReq := range request.AuthResources {
-				// Marshal approved purpose details to JSON if present, else set to empty struct
-				var approvedPurposeDetailsJSON *string
-				if authReq.ApprovedPurposeDetails == nil {
-					emptyDetailsBytes, _ := json.Marshal(models.ApprovedPurposeDetails{})
-					emptyDetailsStr := string(emptyDetailsBytes)
-					approvedPurposeDetailsJSON = &emptyDetailsStr
-				} else {
-					approvedPurposeDetailsBytes, err := json.Marshal(authReq.ApprovedPurposeDetails)
+				// Marshal resources to JSON if present (resources can be any valid JSON)
+				var resourcesJSON *string
+				if authReq.Resources != nil {
+					resourcesBytes, err := json.Marshal(authReq.Resources)
 					if err != nil {
-						return nil, fmt.Errorf("failed to marshal approved purpose details: %w", err)
+						return nil, fmt.Errorf("failed to marshal resources: %w", err)
 					}
-					approvedPurposeDetailsStr := string(approvedPurposeDetailsBytes)
-					approvedPurposeDetailsJSON = &approvedPurposeDetailsStr
+					resourcesStr := string(resourcesBytes)
+					resourcesJSON = &resourcesStr
 				}
 
 				authResource := &models.ConsentAuthResource{
-					AuthID:                 utils.GenerateAuthID(),
-					ConsentID:              consentID,
-					AuthType:               authReq.AuthType,
-					UserID:                 authReq.UserID,
-					AuthStatus:             authReq.AuthStatus,
-					UpdatedTime:            updatedConsent.UpdatedTime,
-					ApprovedPurposeDetails: approvedPurposeDetailsJSON,
-					OrgID:                  orgID,
+					AuthID:      utils.GenerateAuthID(),
+					ConsentID:   consentID,
+					AuthType:    authReq.AuthType,
+					UserID:      authReq.UserID,
+					AuthStatus:  authReq.AuthStatus,
+					UpdatedTime: updatedConsent.UpdatedTime,
+					Resources:   resourcesJSON,
+					OrgID:       orgID,
 				}
 
 				if err := s.authResourceDAO.CreateWithTx(ctx, tx, authResource); err != nil {
@@ -378,45 +349,94 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 		}
 	}
 
-	// Update consent purposes if provided
-	if purposeNames != nil {
-		// Clear existing purpose mappings
-		if err := s.consentPurposeDAO.ClearConsentPurposesWithTx(ctx, tx.Tx, consentID, orgID); err != nil {
-			return nil, fmt.Errorf("failed to clear existing purposes: %w", err)
-		}
-
-		// Link new purposes if any
-		if len(purposeNames) > 0 {
-			// Get purpose IDs by names
-			purposeIDMap, err := s.consentPurposeDAO.GetIDsByNames(ctx, purposeNames, orgID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get purpose IDs: %w", err)
-			}
-
-			// Verify all purposes were found
-			if len(purposeIDMap) != len(purposeNames) {
-				missingPurposes := []string{}
-				for _, name := range purposeNames {
-					if _, found := purposeIDMap[name]; !found {
-						missingPurposes = append(missingPurposes, name)
-					}
-				}
-				return nil, fmt.Errorf("purposes not found: %v", missingPurposes)
-			}
-
-			// Link each purpose to the consent within transaction
-			for _, purposeID := range purposeIDMap {
-				if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consentID, purposeID, orgID); err != nil {
-					return nil, fmt.Errorf("failed to link purpose: %w", err)
-				}
-			}
-
-			s.logger.WithFields(logrus.Fields{
-				"consent_id":    consentID,
-				"purpose_count": len(purposeNames),
-			}).Info("Updated consent purposes within transaction")
+	// Derive consent status from authorization states (if auth resources were provided)
+	var statusChanged bool
+	previousStatus := existingConsent.CurrentStatus
+	if request.AuthResources != nil && request.CurrentStatus != "" {
+		if updatedConsent.CurrentStatus != request.CurrentStatus {
+			updatedConsent.CurrentStatus = request.CurrentStatus
+			statusChanged = true
 		}
 	}
+
+	// Update consent with potentially new status
+	if err := s.consentDAO.UpdateWithTx(ctx, tx, &updatedConsent); err != nil {
+		return nil, fmt.Errorf("failed to update consent: %w", err)
+	}
+
+	// Create status audit if status changed
+	if statusChanged {
+		actionBy := updatedConsent.ClientID
+		reason := "Consent status updated based on authorization states"
+		audit := &models.ConsentStatusAudit{
+			StatusAuditID:  utils.GenerateAuditID(),
+			ConsentID:      consentID,
+			CurrentStatus:  updatedConsent.CurrentStatus,
+			ActionTime:     updatedConsent.UpdatedTime,
+			ActionBy:       &actionBy,
+			PreviousStatus: &previousStatus,
+			Reason:         &reason,
+			OrgID:          orgID,
+		}
+
+		if err := s.statusAuditDAO.CreateWithTx(ctx, tx, audit); err != nil {
+			return nil, fmt.Errorf("failed to create audit record: %w", err)
+		}
+	}
+
+	// Always update consent purposes (mandatory field)
+	// Clear existing purpose mappings
+	if err := s.consentPurposeDAO.ClearConsentPurposesWithTx(ctx, tx.Tx, consentID, orgID); err != nil {
+		return nil, fmt.Errorf("failed to clear existing purposes: %w", err)
+	}
+
+	// Extract purpose names for ID lookup
+	purposeNames := make([]string, len(consentPurposes))
+	for i, p := range consentPurposes {
+		purposeNames[i] = p.Name
+	}
+
+	// Get purpose IDs by names
+	purposeIDMap, err := s.consentPurposeDAO.GetIDsByNames(ctx, purposeNames, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get purpose IDs: %w", err)
+	}
+
+	// Verify all purposes were found
+	if len(purposeIDMap) != len(purposeNames) {
+		missingPurposes := []string{}
+		for _, name := range purposeNames {
+			if _, found := purposeIDMap[name]; !found {
+				missingPurposes = append(missingPurposes, name)
+			}
+		}
+		return nil, fmt.Errorf("purposes not found: %v", missingPurposes)
+	}
+
+	// Link each purpose to the consent within transaction with value and isSelected
+	for _, purposeItem := range consentPurposes {
+		purposeID := purposeIDMap[purposeItem.Name]
+
+		// Marshal value to JSON string if present
+		var valueJSON *string
+		if purposeItem.Value != nil {
+			valueBytes, err := json.Marshal(purposeItem.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal purpose value: %w", err)
+			}
+			valueStr := string(valueBytes)
+			valueJSON = &valueStr
+		}
+
+		if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consentID, purposeID, orgID, valueJSON, purposeItem.IsSelected); err != nil {
+			return nil, fmt.Errorf("failed to link purpose: %w", err)
+		}
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"consent_id":    consentID,
+		"purpose_count": len(consentPurposes),
+	}).Info("Updated consent purposes within transaction")
 
 	// Commit transaction
 	if err := tx.Commit(); err != nil {
@@ -426,8 +446,9 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 	// Retrieve and return updated consent
 	attributes, _ := s.attributeDAO.GetByConsentID(ctx, consentID, orgID)
 	authResources, _ := s.authResourceDAO.GetByConsentID(ctx, consentID, orgID)
+	purposeMappings, _ := s.consentPurposeDAO.GetMappingsByConsentID(ctx, consentID, orgID)
 
-	return s.buildConsentResponse(&updatedConsent, attributes, authResources), nil
+	return serviceutils.BuildConsentResponse(&updatedConsent, attributes, authResources, purposeMappings, s.logger), nil
 }
 
 // RevokeConsent revokes a consent
@@ -499,7 +520,8 @@ func (s *ConsentService) SearchConsents(ctx context.Context, params *models.Cons
 	for _, consent := range consents {
 		attributes, _ := s.attributeDAO.GetByConsentID(ctx, consent.ConsentID, consent.OrgID)
 		authResources, _ := s.authResourceDAO.GetByConsentID(ctx, consent.ConsentID, consent.OrgID)
-		responses = append(responses, s.buildConsentResponse(&consent, attributes, authResources))
+		purposeMappings, _ := s.consentPurposeDAO.GetMappingsByConsentID(ctx, consent.ConsentID, consent.OrgID)
+		responses = append(responses, serviceutils.BuildConsentResponse(&consent, attributes, authResources, purposeMappings, s.logger))
 	}
 
 	pagination := utils.CalculatePaginationMetadata(total, params.Limit, params.Offset)
@@ -528,52 +550,6 @@ func (s *ConsentService) validateConsentCreateRequest(request *models.ConsentCre
 		return fmt.Errorf("dataAccessValidityDuration must be non-negative")
 	}
 	return nil
-}
-
-func (s *ConsentService) buildConsentResponse(consent *models.Consent, attributes map[string]string, authResources []models.ConsentAuthResource) *models.ConsentResponse {
-	// Unmarshal consent purposes from JSON
-	var consentPurpose []models.ConsentPurposeItem
-	if len(consent.ConsentPurposes) > 0 {
-		if err := json.Unmarshal(consent.ConsentPurposes, &consentPurpose); err != nil {
-			s.logger.WithError(err).Warn("Failed to unmarshal consent purposes")
-			consentPurpose = nil
-		}
-	}
-
-	// Convert auth resources to response format
-	var authResourceResponses []models.ConsentAuthResource
-	if authResources != nil {
-		authResourceResponses = make([]models.ConsentAuthResource, len(authResources))
-		for i, ar := range authResources {
-			authResourceResponses[i] = ar
-			// Unmarshal approved purpose details if present
-			if ar.ApprovedPurposeDetails != nil {
-				var approvedPurposeDetails models.ApprovedPurposeDetails
-				if err := json.Unmarshal([]byte(*ar.ApprovedPurposeDetails), &approvedPurposeDetails); err != nil {
-					s.logger.WithError(err).Warn("Failed to unmarshal approved purpose details")
-				} else {
-					authResourceResponses[i].ApprovedPurposeDetailsObj = &approvedPurposeDetails
-				}
-			}
-		}
-	}
-
-	return &models.ConsentResponse{
-		ConsentID:                  consent.ConsentID,
-		ConsentPurpose:             consentPurpose,
-		CreatedTime:                consent.CreatedTime,
-		UpdatedTime:                consent.UpdatedTime,
-		ClientID:                   consent.ClientID,
-		ConsentType:                consent.ConsentType,
-		CurrentStatus:              consent.CurrentStatus,
-		ConsentFrequency:           consent.ConsentFrequency,
-		ValidityTime:               consent.ValidityTime,
-		RecurringIndicator:         consent.RecurringIndicator,
-		DataAccessValidityDuration: consent.DataAccessValidityDuration,
-		OrgID:                      consent.OrgID,
-		Attributes:                 attributes,
-		AuthResources:              authResourceResponses,
-	}
 }
 
 // SearchConsentIDsByAttribute searches for consent IDs by attribute key and/or value

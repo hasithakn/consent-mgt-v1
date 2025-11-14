@@ -110,7 +110,7 @@ paths:
             type: string
         - name: consentStatuses
           in: query
-          description: A comma-separated list of consent statuses to filter by (e.g., 'authorised,revoked').
+          description: A comma-separated list of consent statuses to filter by (e.g., 'active,revoked'). Valid values are 'created', 'active', 'rejected', 'revoked', 'expired'.
           schema:
             type: string
         - name: clientIds
@@ -1494,6 +1494,43 @@ paths:
         - basicAuth: []
 components:
   schemas:
+    ConsentPurposeItem:
+      type: object
+      description: |
+        Represents a single consent purpose with its selection state and optional value.
+        
+        Used in consent create/update requests and responses to indicate which purposes
+        are associated with a consent and whether they are selected/approved.
+      required:
+        - name
+        - isSelected
+      properties:
+        name:
+          type: string
+          description: The purpose identifier/name (must match an existing consent purpose)
+          example: "utility_read"
+        value:
+          description: |
+            Optional purpose value - flexible type that can be:
+            - string: Simple text value
+            - object: Structured data  
+            - array: List of values
+            
+            This value is persisted in the consent_purpose_mapping table and can be
+            used to store additional context about how this purpose applies.
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          example: "utility:read"
+        isSelected:
+          type: boolean
+          description: |
+            Indicates whether this purpose is selected/approved for this consent.
+            
+            This field is REQUIRED and must be explicitly set to true or false.
+            It is persisted in the database and returned in all consent responses.
+          example: true
     File:
       type: object
       description: Represents a file to be uploaded or downloaded.
@@ -1501,10 +1538,17 @@ components:
       properties: {}
     AuthorizationResourceRequestBody:
       type: object
-      description: Payload for creating or updating an authorization resource.
+      description: |
+        Payload for creating or updating an authorization resource.
+        
+        **Authorization Status/State:**
+        The `status` field represents the authorization state which determines the consent status:
+        - `approved` (default if not provided): Authorization is approved → consent will be "active"
+        - `created`: Authorization is created but not yet approved → consent will be "created"
+        - `rejected`: Authorization was rejected → consent will be "rejected"
+        - Custom values: Will be resolved via extension point to one of the known consent statuses
       required:
         - type
-        - status
       properties:
         userId:
           description: The unique ID of the user who performed this authorization.
@@ -1515,25 +1559,34 @@ components:
           type: string
           example: "authorisation"
         status:
-          description: The current status of this specific authorization (e.g., 'created', 'authorised', 'rejected').
+          description: |
+            The current status/state of this specific authorization.
+            
+            Defaults to "approved" if not provided. Known states:
+            - `approved`: Authorization approved (default) → consent becomes "active"
+            - `created`: Authorization created but not yet approved → consent becomes "created"  
+            - `rejected`: Authorization rejected → consent becomes "rejected"
+            - Custom states: Resolved via extension point
           type: string
-          example: "created"
-        approvedPurposeDetails:
-          description: Details of approved purposes and additional resources for this authorization.
-          type: object
-          properties:
-            approvedPurposesNames:
-              description: Array of approved consent purpose names.
-              type: array
-              items:
-                type: string
-              example: ["utility_read", "taxes_read"]
-            approvedAdditionalResources:
-              description: Array of additional approved resources (flexible structure).
-              type: array
-              items:
-                type: object
-              example: []
+          example: "approved"
+        resources:
+          description: |
+            Flexible resources field that can contain any valid JSON structure.
+            
+            This field replaces the deprecated `approvedPurposeDetails` and can be used to store:
+            - Account information
+            - Payment details
+            - Resource identifiers
+            - Any other authorization-specific data
+            
+            The API validates that this is valid JSON but does not enforce a specific schema.
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          example:
+            accountIds: ["123456", "789012"]
+            permissions: ["read", "write"]
     ConsentRevokePayload:
       type: object
       description: The request body for revoking a consent.
@@ -1566,6 +1619,9 @@ components:
         - `rejected`: Consent was rejected
         - `revoked`: Consent was revoked
         - `expired`: Consent has expired
+      required:
+        - type
+        - consentPurpose
       properties:
         type:
           description: The type of consent (e.g., 'accounts', 'payments').
@@ -1591,22 +1647,15 @@ components:
           format: int32
           example: 0
         consentPurpose:
-          description: Array of consent purposes for this consent.
+          description: |
+            Array of consent purposes for this consent (REQUIRED).
+            
+            Each item must specify the purpose name, selection state, and optional value.
+            At least one purpose must be provided.
           type: array
+          minItems: 1
           items:
-            type: object
-            properties:
-              name:
-                type: string
-                description: Purpose name
-                example: "utility_read"
-              value:
-                description: Purpose value
-                oneOf:
-                  - type: string
-                  - type: object
-                  - type: array
-                example: "utility:read"
+            $ref: "#/components/schemas/ConsentPurposeItem"
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
@@ -1645,22 +1694,18 @@ components:
             Custom states will be resolved via extension point.
           type: string
           example: "approved"
-        approvedPurposeDetails:
-          description: Details of approved purposes and additional resources for this authorization.
-          type: object
-          properties:
-            approvedPurposesNames:
-              description: Array of approved consent purpose names.
-              type: array
-              items:
-                type: string
-              example: ["utility_read", "taxes_read"]
-            approvedAdditionalResources:
-              description: Array of additional approved resources (flexible structure).
-              type: array
-              items:
-                type: object
-              example: []
+        resources:
+          description: |
+            Flexible resources field that can contain any valid JSON structure.
+            
+            Can store account IDs, payment details, resource identifiers, or any
+            other authorization-specific data. Validated as JSON but no schema enforced.
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          example:
+            accountIds: ["123456", "789012"]
     ConsentAuthorizationCreateResponse:
       type: object
       description: Represents a detaild authorization object.
@@ -1678,28 +1723,20 @@ components:
           type: string
           example: "authorisation"
         status:
-          description: The current status of this specific authorization (e.g., 'created', 'authorised', 'rejected').
+          description: The current status of this specific authorization (e.g., 'created', 'approved', 'rejected').
           type: string
           example: "created"
         updatedTime:
           type: integer
           format: int32
-        approvedPurposeDetails:
-          description: Details of approved purposes and additional resources for this authorization.
-          type: object
-          properties:
-            approvedPurposesNames:
-              description: Array of approved consent purpose names.
-              type: array
-              items:
-                type: string
-              example: ["utility_read", "taxes_read"]
-            approvedAdditionalResources:
-              description: Array of additional approved resources (flexible structure).
-              type: array
-              items:
-                type: object
-              example: []
+        resources:
+          description: Flexible resources field containing authorization-specific data as JSON.
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          example:
+            accountIds: ["123456", "789012"]
     ConsentErrorCommon:
       type: object
       description: A standardized error response object.
@@ -1738,6 +1775,12 @@ components:
         - If any authorization has status "created" → consent status = "created"  
         - If all authorizations have status "approved" (or empty/default) → consent status = "active"
         - For custom authorization states → consent status is resolved via extension point (must return a known status)
+        
+        **Consent Purpose:**
+        The consentPurpose field is REQUIRED and will completely replace existing purposes.
+        The API always clears existing purpose mappings and creates new ones from the request.
+      required:
+        - consentPurpose
       properties:
         type:
           description: The type of consent (e.g., 'accounts', 'payments').
@@ -1763,22 +1806,15 @@ components:
           format: int32
           example: 0
         consentPurpose:
-          description: Array of consent purposes for this consent.
+          description: |
+            Array of consent purposes for this consent (REQUIRED).
+            
+            This field completely replaces existing purposes. All existing purpose mappings
+            will be cleared and new ones created from this array.
           type: array
+          minItems: 1
           items:
-            type: object
-            properties:
-              name:
-                type: string
-                description: Purpose name
-                example: "utility_read"
-              value:
-                description: Purpose value
-                oneOf:
-                  - type: string
-                  - type: object
-                  - type: array
-                example: "utility:read"
+            $ref: "#/components/schemas/ConsentPurposeItem"
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
@@ -1799,22 +1835,10 @@ components:
           type: string
           example: "consent_id"
         consentPurpose:
-          description: Array of consent purposes for this consent.
+          description: Array of consent purposes for this consent with their selection states and values.
           type: array
           items:
-            type: object
-            properties:
-              name:
-                type: string
-                description: Purpose name
-                example: "utility_read"
-              value:
-                description: Purpose value
-                oneOf:
-                  - type: string
-                  - type: object
-                  - type: array
-                example: "utility:read"
+            $ref: "#/components/schemas/ConsentPurposeItem"
         createdTime:
           type: integer
           format: int32
@@ -1828,9 +1852,9 @@ components:
           type: string
           example: "accounts"
         status:
-          description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
+          description: The current status of the consent in its lifecycle. Valid values are 'created', 'active', 'rejected', 'revoked', 'expired'. Status is derived from authorization state - approved authorization yields 'active', created authorization yields 'created', rejected authorization yields 'rejected'.
           type: string
-          example: "AwaitingAuthorisation"
+          example: "active"
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
           type: integer
@@ -1872,22 +1896,10 @@ components:
           type: string
           example: "consent_id"
         consentPurpose:
-          description: Array of consent purposes for this consent.
+          description: Array of consent purposes for this consent with their selection states and values.
           type: array
           items:
-            type: object
-            properties:
-              name:
-                type: string
-                description: Purpose name
-                example: "utility_read"
-              value:
-                description: Purpose value
-                oneOf:
-                  - type: string
-                  - type: object
-                  - type: array
-                example: "utility:read"
+            $ref: "#/components/schemas/ConsentPurposeItem"
         createdTime:
           type: integer
           format: int32
@@ -1901,9 +1913,9 @@ components:
           type: string
           example: "accounts"
         status:
-          description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
+          description: The current status of the consent in its lifecycle. Valid values are 'created', 'active', 'rejected', 'revoked', 'expired'. Status is derived from authorization state - approved authorization yields 'active', created authorization yields 'created', rejected authorization yields 'rejected'.
           type: string
-          example: "AwaitingAuthorisation"
+          example: "active"
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
           type: integer
@@ -1979,22 +1991,10 @@ components:
           type: string
           example: "consent_id"
         consentPurpose:
-          description: Array of consent purposes for this consent.
+          description: Array of consent purposes for this consent with their selection states and values.
           type: array
           items:
-            type: object
-            properties:
-              name:
-                type: string
-                description: Purpose name
-                example: "utility_read"
-              value:
-                description: Purpose value
-                oneOf:
-                  - type: string
-                  - type: object
-                  - type: array
-                example: "utility:read"
+            $ref: "#/components/schemas/ConsentPurposeItem"
         createdTime:
           type: integer
           format: int32
@@ -2008,9 +2008,9 @@ components:
           type: string
           example: "accounts"
         status:
-          description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
+          description: The current status of the consent in its lifecycle. Valid values are 'created', 'active', 'rejected', 'revoked', 'expired'. Status is derived from authorization state - approved authorization yields 'active', created authorization yields 'created', rejected authorization yields 'rejected'.
           type: string
-          example: "AwaitingAuthorisation"
+          example: "active"
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
           type: integer
@@ -2053,22 +2053,10 @@ components:
           type: string
           example: "consent_id"
         consentPurpose:
-          description: Array of consent purposes for this consent.
+          description: Array of consent purposes for this consent with their selection states and values.
           type: array
           items:
-            type: object
-            properties:
-              name:
-                type: string
-                description: Purpose name
-                example: "utility_read"
-              value:
-                description: Purpose value
-                oneOf:
-                  - type: string
-                  - type: object
-                  - type: array
-                example: "utility:read"
+            $ref: "#/components/schemas/ConsentPurposeItem"
         createdTime:
           type: integer
           format: int32
@@ -2082,9 +2070,9 @@ components:
           type: string
           example: "accounts"
         status:
-          description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
+          description: The current status of the consent in its lifecycle. Valid values are 'created', 'active', 'rejected', 'revoked', 'expired'. Status is derived from authorization state - approved authorization yields 'active', created authorization yields 'created', rejected authorization yields 'rejected'.
           type: string
-          example: "AwaitingAuthorisation"
+          example: "active"
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
           type: integer
@@ -2151,28 +2139,20 @@ components:
           type: string
           example: "authorisation"
         status:
-          description: The current status of this specific authorization (e.g., 'created', 'authorised', 'rejected').
+          description: The current status of this specific authorization (e.g., 'created', 'approved', 'rejected').
           type: string
           example: "created"
         updatedTime:
           type: integer
           format: int32
-        approvedPurposeDetails:
-          description: Details of approved purposes and additional resources for this authorization.
-          type: object
-          properties:
-            approvedPurposesNames:
-              description: Array of approved consent purpose names.
-              type: array
-              items:
-                type: string
-              example: ["utility_read", "taxes_read"]
-            approvedAdditionalResources:
-              description: Array of additional approved resources (flexible structure).
-              type: array
-              items:
-                type: object
-              example: []
+        resources:
+          description: Flexible resources field containing authorization-specific data as JSON.
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          example:
+            accountIds: ["123456", "789012"]
     ValidateRequest:
       type: object
       description: Request payload for validating a consent for a specific action.
@@ -2447,6 +2427,40 @@ components:
       required:
         - code
         - message
+    AuthorizationState:
+      type: string
+      description: |
+        Known authorization states/statuses that can be set on authorization resources.
+        
+        These states determine the consent status:
+        - `approved` (default): Authorization is approved → consent becomes "active"
+        - `created`: Authorization is created but not yet approved → consent becomes "created"
+        - `rejected`: Authorization was rejected → consent becomes "rejected"
+        - Custom states: Will be resolved via extension point to a known ConsentStatus
+      enum:
+        - approved
+        - created
+        - rejected
+      example: approved
+    ConsentStatus:
+      type: string
+      description: |
+        Lifecycle statuses maintained by the Consent Management API.
+        
+        These statuses are automatically derived from authorization states and represent
+        the current state of the consent:
+        - `created`: Consent is created but not yet approved
+        - `active`: Consent is approved and active (derived from "approved" authorization)
+        - `rejected`: Consent was rejected
+        - `revoked`: Consent was revoked by user or admin
+        - `expired`: Consent has expired based on validityTime
+      enum:
+        - created
+        - active
+        - rejected
+        - revoked
+        - expired
+      example: active
   securitySchemes:
     basicAuth:
       type: http

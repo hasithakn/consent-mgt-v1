@@ -77,24 +77,24 @@ type AuthorizationState string
 
 const (
 	// AuthStateCreated indicates the authorization is created but not yet approved/rejected
-	AuthStateCreated AuthorizationState = "created"
+	AuthStateCreated AuthorizationState = "CREATED"
 	// AuthStateApproved indicates the authorization was approved
-	AuthStateApproved AuthorizationState = "approved"
+	AuthStateApproved AuthorizationState = "APPROVED"
 	// AuthStateRejected indicates the authorization was rejected
-	AuthStateRejected AuthorizationState = "rejected"
+	AuthStateRejected AuthorizationState = "REJECTED"
 	// AuthStateCustom indicates a non-standard/custom state which should be resolved by an extension
-	AuthStateCustom AuthorizationState = "custom"
+	AuthStateCustom AuthorizationState = "CUSTOM"
 )
 
 // ConsentStatus lists allowed consent lifecycle statuses maintained by consent-mgt API
 type ConsentStatus string
 
 const (
-	ConsentStatusCreated  ConsentStatus = "created"
-	ConsentStatusActive   ConsentStatus = "active"
-	ConsentStatusRejected ConsentStatus = "rejected"
-	ConsentStatusRevoked  ConsentStatus = "revoked"
-	ConsentStatusExpired  ConsentStatus = "expired"
+	ConsentStatusCreated  ConsentStatus = "CREATED"
+	ConsentStatusActive   ConsentStatus = "ACTIVE"
+	ConsentStatusRejected ConsentStatus = "REJECTED"
+	ConsentStatusRevoked  ConsentStatus = "REVOKED"
+	ConsentStatusExpired  ConsentStatus = "EXPIRED"
 )
 
 // DeriveConsentStatusFromAuthState maps an authorization.state value to a ConsentStatus when possible.

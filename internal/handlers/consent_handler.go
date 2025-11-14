@@ -115,11 +115,11 @@ func (h *ConsentHandler) CreateConsent(c *gin.Context) {
 
 	if consentErr != nil {
 		// Check if it's a validation error
-		if strings.Contains(err.Error(), "must be") || strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "not found") {
-			utils.SendBadRequestError(c, "Failed to create consent", err.Error())
+		if strings.Contains(consentErr.Error(), "must be") || strings.Contains(consentErr.Error(), "invalid") || strings.Contains(consentErr.Error(), "required") || strings.Contains(consentErr.Error(), "not found") {
+			utils.SendBadRequestError(c, "Failed to create consent", consentErr.Error())
 			return
 		}
-		utils.SendInternalServerError(c, "Failed to create consent", err.Error())
+		utils.SendInternalServerError(c, "Failed to create consent", consentErr.Error())
 		return
 	}
 

@@ -2433,15 +2433,15 @@ components:
         Known authorization states/statuses that can be set on authorization resources.
         
         These states determine the consent status:
-        - `approved` (default): Authorization is approved → consent becomes "active"
-        - `created`: Authorization is created but not yet approved → consent becomes "created"
-        - `rejected`: Authorization was rejected → consent becomes "rejected"
+        - `APPROVED` (default): Authorization is approved → consent becomes "ACTIVE"
+        - `CREATED`: Authorization is created but not yet approved → consent becomes "CREATED"
+        - `REJECTED`: Authorization was rejected → consent becomes "REJECTED"
         - Custom states: Will be resolved via extension point to a known ConsentStatus
       enum:
-        - approved
-        - created
-        - rejected
-      example: approved
+        - APPROVED
+        - CREATED
+        - REJECTED
+      example: APPROVED
     ConsentStatus:
       type: string
       description: |
@@ -2449,18 +2449,18 @@ components:
         
         These statuses are automatically derived from authorization states and represent
         the current state of the consent:
-        - `created`: Consent is created but not yet approved
-        - `active`: Consent is approved and active (derived from "approved" authorization)
-        - `rejected`: Consent was rejected
-        - `revoked`: Consent was revoked by user or admin
-        - `expired`: Consent has expired based on validityTime
+        - `CREATED`: Consent is created but not yet approved
+        - `ACTIVE`: Consent is approved and active (derived from "APPROVED" authorization)
+        - `REJECTED`: Consent was rejected
+        - `REVOKED`: Consent was revoked by user or admin
+        - `EXPIRED`: Consent has expired based on validityTime
       enum:
-        - created
-        - active
-        - rejected
-        - revoked
-        - expired
-      example: active
+        - CREATED
+        - ACTIVE
+        - REJECTED
+        - REVOKED
+        - EXPIRED
+      example: ACTIVE
   securitySchemes:
     basicAuth:
       type: http

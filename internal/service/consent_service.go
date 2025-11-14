@@ -185,7 +185,13 @@ func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request 
 				valueJSON = &valueStr
 			}
 
-			if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consent.ConsentID, purposeName, orgID, valueJSON, purposeItem.IsSelected); err != nil {
+			// Dereference IsSelected pointer (should not be nil at this point due to defaulting in ToConsentCreateRequest)
+			isSelected := false
+			if purposeItem.IsSelected != nil {
+				isSelected = *purposeItem.IsSelected
+			}
+
+			if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consent.ConsentID, purposeName, orgID, valueJSON, isSelected); err != nil {
 				return nil, fmt.Errorf("failed to link purpose: %w", err)
 			}
 		}
@@ -428,7 +434,13 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 			valueJSON = &valueStr
 		}
 
-		if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consentID, purposeID, orgID, valueJSON, purposeItem.IsSelected); err != nil {
+		// Dereference IsSelected pointer (should not be nil at this point due to defaulting in ToConsentUpdateRequest)
+		isSelected := false
+		if purposeItem.IsSelected != nil {
+			isSelected = *purposeItem.IsSelected
+		}
+
+		if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consentID, purposeID, orgID, valueJSON, isSelected); err != nil {
 			return nil, fmt.Errorf("failed to link purpose: %w", err)
 		}
 	}

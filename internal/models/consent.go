@@ -87,7 +87,7 @@ func (j *JSON) UnmarshalJSON(data []byte) error {
 type ConsentPurposeItem struct {
 	Name       string      `json:"name"`
 	Value      interface{} `json:"value"` // Can be string, object, or array
-	IsSelected bool        `json:"isSelected"`
+	IsSelected *bool       `json:"isSelected,omitempty"` // Pointer to distinguish nil (defaults to true) from explicit false
 }
 
 // ConsentAPIRequest represents the API payload for creating a consent (external format)
@@ -258,8 +258,19 @@ func (c *Consent) GetUpdatedTime() time.Time {
 // ToConsentCreateRequest converts API request format to internal format
 // Note: CurrentStatus will be set by the handler based on authorization states
 func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, error) {
+	// Apply default isSelected=true to purposes where it's not provided
+	consentPurposes := make([]ConsentPurposeItem, len(req.ConsentPurpose))
+	for i, cp := range req.ConsentPurpose {
+		consentPurposes[i] = cp
+		if consentPurposes[i].IsSelected == nil {
+			// Default to true when not provided
+			trueVal := true
+			consentPurposes[i].IsSelected = &trueVal
+		}
+	}
+
 	createReq := &ConsentCreateRequest{
-		ConsentPurpose:             req.ConsentPurpose,
+		ConsentPurpose:             consentPurposes,
 		ConsentType:                req.Type,
 		CurrentStatus:              "", // Will be set by handler based on auth states
 		Attributes:                 req.Attributes,

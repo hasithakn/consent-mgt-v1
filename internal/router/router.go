@@ -18,7 +18,8 @@ func SetupRouter(
 ) *gin.Engine {
 	router := gin.Default()
 
-	// Global middleware to extract headers and set context
+	// Global middleware to extract headers and set context.
+	// Accept both the new header 'tpp-client-id' and the legacy 'client-id' for tests/clients.
 	router.Use(func(c *gin.Context) {
 		// Extract and set org ID
 		orgID := c.GetHeader("org-id")
@@ -26,8 +27,11 @@ func SetupRouter(
 			utils.SetContextValue(c, "orgID", orgID)
 		}
 
-		// Extract and set client ID
+		// Prefer the standard header 'tpp-client-id', but fall back to legacy 'client-id'
 		clientID := c.GetHeader("tpp-client-id")
+		if clientID == "" {
+			clientID = c.GetHeader("client-id")
+		}
 		if clientID != "" {
 			utils.SetContextValue(c, "clientID", clientID)
 		}

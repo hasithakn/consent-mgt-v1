@@ -23,7 +23,7 @@ func BuildConsentResponse(
 			consentPurpose[i] = models.ConsentPurposeItem{
 				Name:       mapping.Name,
 				Value:      mapping.Value,
-				IsSelected: mapping.IsSelected,
+				IsSelected: &mapping.IsSelected,
 			}
 		}
 	}

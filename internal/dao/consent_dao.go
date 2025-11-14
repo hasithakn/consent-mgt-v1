@@ -89,7 +89,7 @@ func (dao *ConsentDAO) CreateWithTx(ctx context.Context, tx *database.Transactio
 // GetByID retrieves a consent by ID and organization ID
 func (dao *ConsentDAO) GetByID(ctx context.Context, consentID, orgID string) (*models.Consent, error) {
 	query := `
-		SELECT CONSENT_ID, CONSENT_PURPOSES, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
+		SELECT CONSENT_ID, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
 		       CONSENT_TYPE, CURRENT_STATUS, CONSENT_FREQUENCY, VALIDITY_TIME,
 		       RECURRING_INDICATOR, DATA_ACCESS_VALIDITY_DURATION, ORG_ID
 	FROM CONSENT
@@ -111,7 +111,7 @@ func (dao *ConsentDAO) GetByID(ctx context.Context, consentID, orgID string) (*m
 // GetByIDWithTx retrieves a consent by ID using a transaction
 func (dao *ConsentDAO) GetByIDWithTx(ctx context.Context, tx *database.Transaction, consentID, orgID string) (*models.Consent, error) {
 	query := `
-		SELECT CONSENT_ID, CONSENT_PURPOSES, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
+		SELECT CONSENT_ID, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
 		       CONSENT_TYPE, CURRENT_STATUS, CONSENT_FREQUENCY, VALIDITY_TIME,
 		       RECURRING_INDICATOR, DATA_ACCESS_VALIDITY_DURATION, ORG_ID
 	FROM CONSENT
@@ -359,7 +359,7 @@ func (dao *ConsentDAO) Search(ctx context.Context, params *models.ConsentSearchP
 
 	// Build the main query
 	query := fmt.Sprintf(`
-		SELECT DISTINCT c.CONSENT_ID, c.CONSENT_PURPOSES, c.CREATED_TIME, c.UPDATED_TIME, c.CLIENT_ID,
+		SELECT DISTINCT c.CONSENT_ID, c.CREATED_TIME, c.UPDATED_TIME, c.CLIENT_ID,
 		       c.CONSENT_TYPE, c.CURRENT_STATUS, c.CONSENT_FREQUENCY, c.VALIDITY_TIME,
 		       c.RECURRING_INDICATOR, c.DATA_ACCESS_VALIDITY_DURATION, c.ORG_ID
 	FROM CONSENT c%s
@@ -392,7 +392,7 @@ func (dao *ConsentDAO) Search(ctx context.Context, params *models.ConsentSearchP
 // GetByClientID retrieves all consents for a specific client
 func (dao *ConsentDAO) GetByClientID(ctx context.Context, clientID, orgID string) ([]models.Consent, error) {
 	query := `
-		SELECT CONSENT_ID, CONSENT_PURPOSES, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
+		SELECT CONSENT_ID, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
 		       CONSENT_TYPE, CURRENT_STATUS, CONSENT_FREQUENCY, VALIDITY_TIME,
 		       RECURRING_INDICATOR, DATA_ACCESS_VALIDITY_DURATION, ORG_ID
 		FROM CONSENT
@@ -433,7 +433,7 @@ type QueryBuilder struct {
 func (dao *ConsentDAO) NewQueryBuilder() *QueryBuilder {
 	return &QueryBuilder{
 		baseQuery: `
-			SELECT CONSENT_ID, CONSENT_PURPOSES, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
+			SELECT CONSENT_ID, CREATED_TIME, UPDATED_TIME, CLIENT_ID,
 				   CONSENT_TYPE, CURRENT_STATUS, CONSENT_FREQUENCY, VALIDITY_TIME,
 				   RECURRING_INDICATOR, DATA_ACCESS_VALIDITY_DURATION, ORG_ID
 			FROM CONSENT

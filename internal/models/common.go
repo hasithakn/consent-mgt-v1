@@ -1,6 +1,9 @@
 package models
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 // ErrorResponse represents a standard error response
 type ErrorResponse struct {
@@ -66,5 +69,52 @@ func NewSuccessResponse(message string, data interface{}) *SuccessResponse {
 	return &SuccessResponse{
 		Message: message,
 		Data:    data,
+	}
+}
+
+// AuthorizationState represents known authorization states produced by authorizations
+type AuthorizationState string
+
+const (
+	// AuthStateCreated indicates the authorization is created but not yet approved/rejected
+	AuthStateCreated AuthorizationState = "created"
+	// AuthStateApproved indicates the authorization was approved
+	AuthStateApproved AuthorizationState = "approved"
+	// AuthStateRejected indicates the authorization was rejected
+	AuthStateRejected AuthorizationState = "rejected"
+	// AuthStateCustom indicates a non-standard/custom state which should be resolved by an extension
+	AuthStateCustom AuthorizationState = "custom"
+)
+
+// ConsentStatus lists allowed consent lifecycle statuses maintained by consent-mgt API
+type ConsentStatus string
+
+const (
+	ConsentStatusCreated  ConsentStatus = "created"
+	ConsentStatusActive   ConsentStatus = "active"
+	ConsentStatusRejected ConsentStatus = "rejected"
+	ConsentStatusRevoked  ConsentStatus = "revoked"
+	ConsentStatusExpired  ConsentStatus = "expired"
+)
+
+// DeriveConsentStatusFromAuthState maps an authorization.state value to a ConsentStatus when possible.
+// Returns the derived status and true when derivation succeeded. For custom/unknown states it returns
+// empty string and false to indicate that the extension point should be invoked to resolve the final status.
+func DeriveConsentStatusFromAuthState(authState string) (ConsentStatus, bool) {
+	s := strings.ToLower(strings.TrimSpace(authState))
+	if s == "" {
+		// default when not defined: treat as approved -> active
+		return ConsentStatusActive, true
+	}
+	switch s {
+	case string(AuthStateApproved):
+		return ConsentStatusActive, true
+	case string(AuthStateRejected):
+		return ConsentStatusRejected, true
+	case string(AuthStateCreated):
+		return ConsentStatusCreated, true
+	default:
+		// unknown/custom state - extension should resolve to one of known ConsentStatus values
+		return "", false
 	}
 }

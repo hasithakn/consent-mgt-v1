@@ -8,6 +8,7 @@ import (
 
 	"github.com/wso2/consent-management-api/internal/config"
 	extensionclient "github.com/wso2/consent-management-api/internal/extension-client"
+	handlerutils "github.com/wso2/consent-management-api/internal/handlers/utils"
 	"github.com/wso2/consent-management-api/internal/models"
 	"github.com/wso2/consent-management-api/internal/service"
 	"github.com/wso2/consent-management-api/internal/utils"
@@ -99,6 +100,9 @@ func (h *ConsentHandler) CreateConsent(c *gin.Context) {
 			}
 		}
 	}
+
+	// Derive consent status from authorization statuses
+	request.CurrentStatus = handlerutils.DeriveConsentStatus(request.AuthResources)
 
 	// Extract purpose names from the request's ConsentPurpose array
 	var purposeNames []string
@@ -239,6 +243,9 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 			}
 		}
 	}
+
+	// Derive consent status from authorization statuses
+	updateRequest.CurrentStatus = handlerutils.DeriveConsentStatus(updateRequest.AuthResources)
 
 	// Extract purpose names from the request's ConsentPurpose array
 	var purposeNames []string

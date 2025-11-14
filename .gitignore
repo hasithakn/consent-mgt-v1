@@ -55,3 +55,4 @@ logs/
 configs/config.local.yaml
 consent-api-server
 main
+consent-mgt-v1.code-workspace

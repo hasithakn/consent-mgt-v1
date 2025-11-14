@@ -91,9 +91,9 @@ type ConsentPurposeItem struct {
 }
 
 // ConsentAPIRequest represents the API payload for creating a consent (external format)
+// Note: Status is not included in the request - it will be derived from authorization states
 type ConsentAPIRequest struct {
 	Type                       string                    `json:"type" binding:"required"`
-	Status                     string                    `json:"status" binding:"required"`
 	ValidityTime               *int64                    `json:"validityTime,omitempty"`
 	RecurringIndicator         *bool                     `json:"recurringIndicator,omitempty"`
 	Frequency                  *int                      `json:"frequency,omitempty"`
@@ -104,10 +104,11 @@ type ConsentAPIRequest struct {
 }
 
 // AuthorizationAPIRequest represents the API payload for authorization resource (external format)
+// Status field represents the authorization status/state (created, approved, rejected, or custom)
 type AuthorizationAPIRequest struct {
 	UserID                 string                  `json:"userId,omitempty"`
 	Type                   string                  `json:"type" binding:"required"`
-	Status                 string                  `json:"status" binding:"required"`
+	Status                 string                  `json:"status,omitempty"` // Optional: defaults to "approved" if not provided
 	ApprovedPurposeDetails *ApprovedPurposeDetails `json:"approvedPurposeDetails,omitempty"`
 }
 
@@ -118,10 +119,16 @@ func (req *AuthorizationAPIRequest) ToAuthResourceCreateRequest() *ConsentAuthRe
 		userID = &req.UserID
 	}
 
+	// Default status to "approved" if not provided
+	status := req.Status
+	if status == "" {
+		status = string(AuthStateApproved)
+	}
+
 	return &ConsentAuthResourceCreateRequest{
 		AuthType:               req.Type,
 		UserID:                 userID,
-		AuthStatus:             req.Status,
+		AuthStatus:             status, // Store the status value in AuthStatus field
 		ApprovedPurposeDetails: req.ApprovedPurposeDetails,
 	}
 }
@@ -149,9 +156,9 @@ func (req *AuthorizationAPIUpdateRequest) ToAuthResourceUpdateRequest() *Consent
 }
 
 // ConsentAPIUpdateRequest represents the API payload for updating a consent (external format)
+// Note: Status is not included in the request - it will be derived from authorization states
 type ConsentAPIUpdateRequest struct {
 	Type                       string                    `json:"type,omitempty"`
-	Status                     string                    `json:"status,omitempty"`
 	ValidityTime               *int64                    `json:"validityTime,omitempty"`
 	RecurringIndicator         *bool                     `json:"recurringIndicator,omitempty"`
 	Frequency                  *int                      `json:"frequency,omitempty"`
@@ -249,11 +256,12 @@ func (c *Consent) GetUpdatedTime() time.Time {
 }
 
 // ToConsentCreateRequest converts API request format to internal format
+// Note: CurrentStatus will be set by the handler based on authorization states
 func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, error) {
 	createReq := &ConsentCreateRequest{
 		ConsentPurpose:             req.ConsentPurpose,
 		ConsentType:                req.Type,
-		CurrentStatus:              req.Status,
+		CurrentStatus:              "", // Will be set by handler based on auth states
 		Attributes:                 req.Attributes,
 		ValidityTime:               req.ValidityTime,
 		ConsentFrequency:           req.Frequency,
@@ -270,10 +278,16 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 				userID = &auth.UserID
 			}
 
+			// Default status to "approved" if not provided
+			status := auth.Status
+			if status == "" {
+				status = string(AuthStateApproved)
+			}
+
 			createReq.AuthResources[i] = ConsentAuthResourceCreateRequest{
 				AuthType:               auth.Type,
 				UserID:                 userID,
-				AuthStatus:             auth.Status,
+				AuthStatus:             status, // Store the status value
 				ApprovedPurposeDetails: auth.ApprovedPurposeDetails,
 			}
 		}
@@ -283,11 +297,12 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 }
 
 // ToConsentUpdateRequest converts API update request format to internal format
+// Note: CurrentStatus will be set by the handler based on authorization states
 func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequest, error) {
 	updateReq := &ConsentUpdateRequest{
 		ConsentPurpose:             req.ConsentPurpose,
 		ConsentType:                req.Type,
-		CurrentStatus:              req.Status,
+		CurrentStatus:              "", // Will be set by handler based on auth states
 		Attributes:                 req.Attributes,
 		ValidityTime:               req.ValidityTime,
 		ConsentFrequency:           req.Frequency,
@@ -304,10 +319,16 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 				userID = &auth.UserID
 			}
 
+			// Default status to "approved" if not provided
+			status := auth.Status
+			if status == "" {
+				status = string(AuthStateApproved)
+			}
+
 			updateReq.AuthResources[i] = ConsentAuthResourceCreateRequest{
 				AuthType:               auth.Type,
 				UserID:                 userID,
-				AuthStatus:             auth.Status,
+				AuthStatus:             status, // Store the status value
 				ApprovedPurposeDetails: auth.ApprovedPurposeDetails,
 			}
 		}

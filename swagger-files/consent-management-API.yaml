@@ -1550,16 +1550,27 @@ components:
           example: "Admin revoke"
     ConsentCreatePayload:
       type: object
-      description: The request body for initiating a new consent.
+      description: |
+        The request body for initiating a new consent.
+        
+        **Status Derivation:**
+        The consent status is NOT provided in the request. Instead, it is automatically derived by the API based on the authorization states:
+        - If any authorization has status "rejected" → consent status = "rejected"
+        - If any authorization has status "created" → consent status = "created"  
+        - If all authorizations have status "approved" (or empty/default) → consent status = "active"
+        - For custom authorization states → consent status is resolved via extension point (must return a known status)
+        
+        **Known Consent Statuses:**
+        - `created`: Consent is created but not yet approved
+        - `active`: Consent is approved and active
+        - `rejected`: Consent was rejected
+        - `revoked`: Consent was revoked
+        - `expired`: Consent has expired
       properties:
         type:
           description: The type of consent (e.g., 'accounts', 'payments').
           type: string
           example: "accounts"
-        status:
-          description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
-          type: string
-          example: "AwaitingAuthorisation"
         validityTime:
           description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
           type: integer
@@ -1609,7 +1620,15 @@ components:
             $ref: "#/components/schemas/ConsentAuthorizationCreatePayload"
     ConsentAuthorizationCreatePayload:
       type: object
-      description: Represents a detaild authorization object.
+      description: |
+        Represents a detailed authorization object.
+        
+        **Authorization State:**
+        The status field represents the authorization state which determines the consent status:
+        - `approved` (default if not provided): Authorization is approved → consent will be "active"
+        - `created`: Authorization is created but not yet approved → consent will be "created"
+        - `rejected`: Authorization was rejected → consent will be "rejected"
+        - Custom states: Will be resolved via extension point to determine final consent status
       properties:
         userId:
           description: The unique ID of the user who performed this authorization.
@@ -1620,9 +1639,12 @@ components:
           type: string
           example: "authorisation"
         status:
-          description: The current status of this specific authorization (e.g., 'created', 'authorised', 'rejected').
+          description: |
+            The authorization state (defaults to "approved" if not provided).
+            Known states: approved, created, rejected.
+            Custom states will be resolved via extension point.
           type: string
-          example: "created"
+          example: "approved"
         approvedPurposeDetails:
           description: Details of approved purposes and additional resources for this authorization.
           type: object
@@ -1707,16 +1729,20 @@ components:
           $ref: "#/components/schemas/ConsentSearchMetadata"
     ConsentUpdateRequest:
       type: object
-      description: A generic success response for consent management operations that return consent details.
+      description: |
+        Request body for updating a consent.
+        
+        **Status Derivation:**
+        The consent status is NOT provided in the request. Instead, it is automatically derived by the API based on the authorization states:
+        - If any authorization has status "rejected" → consent status = "rejected"
+        - If any authorization has status "created" → consent status = "created"  
+        - If all authorizations have status "approved" (or empty/default) → consent status = "active"
+        - For custom authorization states → consent status is resolved via extension point (must return a known status)
       properties:
         type:
           description: The type of consent (e.g., 'accounts', 'payments').
           type: string
           example: "accounts"
-        status:
-          description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
-          type: string
-          example: "AwaitingAuthorisation"
         validityTime:
           description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
           type: integer

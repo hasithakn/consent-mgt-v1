@@ -358,8 +358,9 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 	// Derive consent status from authorization states (if auth resources were provided)
 	var statusChanged bool
 	previousStatus := existingConsent.CurrentStatus
-	if request.AuthResources != nil && request.CurrentStatus != "" {
-		if updatedConsent.CurrentStatus != request.CurrentStatus {
+	if request.AuthResources != nil {
+		// Status is derived in the handler and passed in CurrentStatus
+		if request.CurrentStatus != "" && updatedConsent.CurrentStatus != request.CurrentStatus {
 			updatedConsent.CurrentStatus = request.CurrentStatus
 			statusChanged = true
 		}
@@ -598,4 +599,9 @@ func (s *ConsentService) SearchConsentIDsByAttribute(ctx context.Context, key, v
 	}
 
 	return consentIDs, nil
+}
+
+// DeleteConsent deletes a consent by ID and orgID
+func (s *ConsentService) DeleteConsent(ctx context.Context, consentID, orgID string) error {
+	return s.consentDAO.Delete(ctx, consentID, orgID)
 }

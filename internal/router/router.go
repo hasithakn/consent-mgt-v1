@@ -74,6 +74,7 @@ func SetupRouter(
 			// General consent operations
 			consents.GET("/:consentId", consentHandler.GetConsent)
 			consents.PUT("/:consentId", consentHandler.UpdateConsent)
+			consents.DELETE("/:consentId", consentHandler.DeleteConsent)
 
 			// Authorization resource routes under consent
 			consents.POST("/:consentId/authorizations", authResourceHandler.CreateAuthResource)

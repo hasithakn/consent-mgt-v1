@@ -100,7 +100,7 @@ type ConsentAPIRequest struct {
 	DataAccessValidityDuration *int64                    `json:"dataAccessValidityDuration,omitempty"`
 	ConsentPurpose             []ConsentPurposeItem      `json:"consentPurpose,omitempty"`
 	Attributes                 map[string]string         `json:"attributes,omitempty"`
-	Authorizations             []AuthorizationAPIRequest `json:"authorizations,omitempty"`
+	Authorizations             []AuthorizationAPIRequest `json:"authorizations"` // Remove omitempty to allow explicit empty array in updates
 }
 
 // AuthorizationAPIRequest represents the API payload for authorization resource (external format)
@@ -165,7 +165,7 @@ type ConsentAPIUpdateRequest struct {
 	DataAccessValidityDuration *int64                    `json:"dataAccessValidityDuration,omitempty"`
 	ConsentPurpose             []ConsentPurposeItem      `json:"consentPurpose,omitempty"`
 	Attributes                 map[string]string         `json:"attributes,omitempty"`
-	Authorizations             []AuthorizationAPIRequest `json:"authorizations,omitempty"`
+	Authorizations             []AuthorizationAPIRequest `json:"authorizations"` // Remove omitempty to allow explicit empty array
 }
 
 // ConsentCreateRequest represents the internal request payload for creating a consent
@@ -322,7 +322,8 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 	}
 
 	// Map authorizations to auth resources
-	if len(req.Authorizations) > 0 {
+	// If Authorizations is not nil (even if empty), set AuthResources to indicate intent to update
+	if req.Authorizations != nil {
 		updateReq.AuthResources = make([]ConsentAuthResourceCreateRequest, len(req.Authorizations))
 		for i, auth := range req.Authorizations {
 			var userID *string

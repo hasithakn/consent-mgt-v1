@@ -82,6 +82,8 @@ const (
 	AuthStateApproved AuthorizationState = "APPROVED"
 	// AuthStateRejected indicates the authorization was rejected
 	AuthStateRejected AuthorizationState = "REJECTED"
+	// AuthStateRevoked indicates the authorization was revoked
+	AuthStateRevoked AuthorizationState = "REVOKED"
 	// AuthStateCustom indicates a non-standard/custom state which should be resolved by an extension
 	AuthStateCustom AuthorizationState = "CUSTOM"
 )
@@ -107,11 +109,13 @@ func DeriveConsentStatusFromAuthState(authState string) (ConsentStatus, bool) {
 		return ConsentStatusActive, true
 	}
 	switch s {
-	case string(AuthStateApproved):
+	case strings.ToLower(string(AuthStateApproved)):
 		return ConsentStatusActive, true
-	case string(AuthStateRejected):
+	case strings.ToLower(string(AuthStateRejected)):
 		return ConsentStatusRejected, true
-	case string(AuthStateCreated):
+	case strings.ToLower(string(AuthStateRevoked)):
+		return ConsentStatusRevoked, true
+	case strings.ToLower(string(AuthStateCreated)):
 		return ConsentStatusCreated, true
 	default:
 		// unknown/custom state - extension should resolve to one of known ConsentStatus values

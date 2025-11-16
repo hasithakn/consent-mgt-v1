@@ -1,0 +1,1048 @@
+package consent
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/wso2/consent-management-api/internal/models"
+)
+
+// TestUpdateConsent_Success tests successful update of consent fields
+func TestUpdateConsent_Success(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	// Create test purposes
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access":    "Data access purpose",
+		"payment_access": "Payment access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create a consent first
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Initial value", IsSelected: BoolPtr(true)},
+		},
+		Attributes: map[string]string{
+			"channel": "web",
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	// Update the consent
+	validityTime := int64(86400) // 1 day
+	updateReq := &models.ConsentAPIRequest{
+		Type:         "accounts",
+		ValidityTime: &validityTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Updated value", IsSelected: BoolPtr(false)},
+			{Name: "payment_access", Value: "Payment data", IsSelected: BoolPtr(true)},
+		},
+		Attributes: map[string]string{
+			"channel": "mobile",
+			"version": "2.0",
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResp.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	assert.Equal(t, http.StatusOK, updateRecorder.Code, "Should return 200 OK")
+
+	var updateResp models.ConsentAPIResponse
+	err = json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp)
+	require.NoError(t, err)
+
+	// Verify updated fields
+	assert.Equal(t, createResp.ID, updateResp.ID, "ID should not change")
+	assert.Equal(t, "accounts", updateResp.Type, "Type should remain")
+	assert.NotNil(t, updateResp.ValidityTime, "ValidityTime should be set")
+	assert.Equal(t, validityTime, *updateResp.ValidityTime, "ValidityTime should match")
+
+	// Verify updated purposes
+	require.Len(t, updateResp.ConsentPurpose, 2, "Should have 2 consent purposes after update")
+	
+	purposeMap := make(map[string]models.ConsentPurposeItem)
+	for _, cp := range updateResp.ConsentPurpose {
+		purposeMap[cp.Name] = cp
+	}
+
+	dataAccess, exists := purposeMap["data_access"]
+	assert.True(t, exists, "data_access purpose should exist")
+	assert.Equal(t, "Updated value", dataAccess.Value, "data_access value should be updated")
+	assert.NotNil(t, dataAccess.IsSelected, "IsSelected should not be nil")
+	assert.False(t, *dataAccess.IsSelected, "data_access should not be selected after update")
+
+	paymentAccess, exists := purposeMap["payment_access"]
+	assert.True(t, exists, "payment_access purpose should exist")
+	assert.Equal(t, "Payment data", paymentAccess.Value, "payment_access value should match")
+	assert.NotNil(t, paymentAccess.IsSelected, "IsSelected should not be nil")
+	assert.True(t, *paymentAccess.IsSelected, "payment_access should be selected")
+
+	// Verify updated attributes
+	assert.Equal(t, "mobile", updateResp.Attributes["channel"], "channel should be updated")
+	assert.Equal(t, "2.0", updateResp.Attributes["version"], "version should be added")
+
+	// Verify via GET to ensure persistence
+	getReq, err := http.NewRequest("GET", "/api/v1/consents/"+createResp.ID, nil)
+	require.NoError(t, err)
+	getReq.Header.Set("org-id", "TEST_ORG")
+	getReq.Header.Set("client-id", "TEST_CLIENT")
+
+	getRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(getRecorder, getReq)
+	assert.Equal(t, http.StatusOK, getRecorder.Code)
+
+	var getResp models.ConsentAPIResponse
+	err = json.Unmarshal(getRecorder.Body.Bytes(), &getResp)
+	require.NoError(t, err)
+
+	assert.Equal(t, "mobile", getResp.Attributes["channel"], "Updated attribute should persist")
+	assert.Len(t, getResp.ConsentPurpose, 2, "Updated purposes should persist")
+
+	t.Logf("✓ Successfully updated consent %s", createResp.ID)
+}
+
+// TestUpdateConsent_AddDataAccessValidityDuration tests adding dataAccessValidityDuration to existing consent
+func TestUpdateConsent_AddDataAccessValidityDuration(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access": "Data access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent without dataAccessValidityDuration
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	// Verify no dataAccessValidityDuration initially
+	assert.Nil(t, createResp.DataAccessValidityDuration, "Should not have dataAccessValidityDuration initially")
+
+	// Update with dataAccessValidityDuration
+	duration := int64(86400)
+	updateReq := &models.ConsentAPIRequest{
+		Type:                       "accounts",
+		DataAccessValidityDuration: &duration,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResp.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	assert.Equal(t, http.StatusOK, updateRecorder.Code)
+
+	var updateResp models.ConsentAPIResponse
+	err = json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp)
+	require.NoError(t, err)
+
+	// Verify dataAccessValidityDuration was added
+	assert.NotNil(t, updateResp.DataAccessValidityDuration, "DataAccessValidityDuration should be set")
+	assert.Equal(t, duration, *updateResp.DataAccessValidityDuration, "DataAccessValidityDuration should match")
+
+	t.Logf("✓ Successfully added dataAccessValidityDuration to consent")
+}
+
+// TestUpdateConsent_ChangeDataAccessValidityDuration tests changing dataAccessValidityDuration
+func TestUpdateConsent_ChangeDataAccessValidityDuration(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access": "Data access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent with initial dataAccessValidityDuration
+	initialDuration := int64(86400) // 1 day
+	createReq := &models.ConsentAPIRequest{
+		Type:                       "accounts",
+		DataAccessValidityDuration: &initialDuration,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	// Verify initial duration
+	assert.Equal(t, initialDuration, *createResp.DataAccessValidityDuration)
+
+	// Update with new duration
+	newDuration := int64(172800) // 2 days
+	updateReq := &models.ConsentAPIRequest{
+		Type:                       "accounts",
+		DataAccessValidityDuration: &newDuration,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResp.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	assert.Equal(t, http.StatusOK, updateRecorder.Code)
+
+	var updateResp models.ConsentAPIResponse
+	err = json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp)
+	require.NoError(t, err)
+
+	// Verify duration was changed
+	assert.Equal(t, newDuration, *updateResp.DataAccessValidityDuration, "DataAccessValidityDuration should be updated")
+
+	t.Logf("✓ Successfully changed dataAccessValidityDuration from %d to %d", initialDuration, newDuration)
+}
+
+// TestUpdateConsent_NegativeDataAccessValidityDuration tests update with negative duration
+func TestUpdateConsent_NegativeDataAccessValidityDuration(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access": "Data access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	// Try to update with negative duration
+	negativeDuration := int64(-1000)
+	updateReq := &models.ConsentAPIRequest{
+		Type:                       "accounts",
+		DataAccessValidityDuration: &negativeDuration,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResp.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	// Should return 400 Bad Request
+	assert.Equal(t, http.StatusBadRequest, updateRecorder.Code, "Should reject negative dataAccessValidityDuration")
+
+	t.Logf("✓ Correctly rejected negative dataAccessValidityDuration in update")
+}
+
+// TestUpdateConsent_NotFound tests update of non-existent consent
+func TestUpdateConsent_NotFound(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access": "Data access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	nonExistentID := "CONSENT-nonexistent-12345"
+
+	updateReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+nonExistentID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	// Should return 404 Not Found
+	assert.Equal(t, http.StatusNotFound, updateRecorder.Code, "Should return 404 for non-existent consent")
+
+	t.Logf("✓ Correctly returned 404 for update of non-existent consent")
+}
+
+// TestUpdateConsent_DifferentOrgID tests that consent from different org cannot be updated
+func TestUpdateConsent_DifferentOrgID(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access": "Data access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent with TEST_ORG
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Initial", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	// Try to update with different org-id
+	updateReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Updated", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResp.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "DIFFERENT_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	// Should return 404 (consent not found for this org)
+	assert.Equal(t, http.StatusNotFound, updateRecorder.Code, "Should return 404 when org doesn't match")
+
+	t.Logf("✓ Correctly prevented update of consent from different org")
+}
+
+// TestUpdateConsent_InvalidRequest tests update with invalid/missing required fields
+func TestUpdateConsent_InvalidRequest(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access": "Data access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create a consent first
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	testCases := []struct {
+		name        string
+		requestBody string
+		expectedMsg string
+	}{
+		{
+			name:        "Empty consentPurpose array",
+			requestBody: `{"type": "accounts", "consentPurpose": []}`,
+			expectedMsg: "consentPurpose cannot be empty",
+		},
+		{
+			name:        "Invalid JSON",
+			requestBody: `{invalid json}`,
+			expectedMsg: "invalid JSON",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResp.ID, bytes.NewBufferString(tc.requestBody))
+			require.NoError(t, err)
+			updateHTTPReq.Header.Set("Content-Type", "application/json")
+			updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+			updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+			updateRecorder := httptest.NewRecorder()
+			env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+			assert.Equal(t, http.StatusBadRequest, updateRecorder.Code, "Should return 400 Bad Request")
+			t.Logf("✓ Correctly rejected update with %s", tc.name)
+		})
+	}
+}
+
+// TestUpdateConsent_WithNonExistentPurpose tests updating consent with a purpose that doesn't exist
+func TestUpdateConsent_WithNonExistentPurpose(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access": "Data access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	// Try to update with multiple purposes where one doesn't exist
+	updateReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Valid purpose", IsSelected: BoolPtr(true)},
+			{Name: "nonexistent_purpose", Value: "This doesn't exist", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResp.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	// Should return 400 Bad Request for non-existent purpose
+	assert.Equal(t, http.StatusBadRequest, updateRecorder.Code, "Should reject update with non-existent purpose")
+
+	t.Logf("✓ Correctly rejected update with non-existent purpose")
+}
+
+// TestUpdateConsent_UpdateAuthResourceAndCheckStatus tests updating authorization and verifying consent status changes
+func TestUpdateConsent_UpdateAuthResourceAndCheckStatus(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access": "Data access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent with APPROVED authorization
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				UserID: "user-123",
+				Type:   "authorization_code",
+				Status: "APPROVED",
+			},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	// Verify initial status is ACTIVE (APPROVED auth -> ACTIVE consent)
+	assert.Equal(t, "ACTIVE", createResp.Status, "Initial consent status should be ACTIVE")
+
+	// Update consent with authorization changed to REJECTED via PUT /consents
+	require.Len(t, createResp.Authorizations, 1, "Should have 1 authorization")
+
+	updateReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				UserID: "user-123",
+				Type:   "authorization_code",
+				Status: "REJECTED",
+			},
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResp.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	assert.Equal(t, http.StatusOK, updateRecorder.Code, "Consent update should succeed")
+
+	var updateResp models.ConsentAPIResponse
+	err = json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp)
+	require.NoError(t, err)
+
+	// Consent status should now be REJECTED
+	assert.Equal(t, "REJECTED", updateResp.Status, "Consent status should change to REJECTED when authorization is rejected")
+	assert.Len(t, updateResp.Authorizations, 1, "Should still have 1 authorization")
+	assert.Equal(t, "REJECTED", updateResp.Authorizations[0].Status, "Authorization status should be REJECTED")
+
+	// GET the consent and verify status persists
+	getReq, err := http.NewRequest("GET", "/api/v1/consents/"+createResp.ID, nil)
+	require.NoError(t, err)
+	getReq.Header.Set("org-id", "TEST_ORG")
+	getReq.Header.Set("client-id", "TEST_CLIENT")
+
+	getRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(getRecorder, getReq)
+	assert.Equal(t, http.StatusOK, getRecorder.Code)
+
+	var getResp models.ConsentAPIResponse
+	err = json.Unmarshal(getRecorder.Body.Bytes(), &getResp)
+	require.NoError(t, err)
+
+	// Consent status should persist as REJECTED
+	assert.Equal(t, "REJECTED", getResp.Status, "Consent status should remain REJECTED")
+	assert.Len(t, getResp.Authorizations, 1, "Should still have 1 authorization")
+	assert.Equal(t, "REJECTED", getResp.Authorizations[0].Status, "Authorization status should remain REJECTED")
+
+	t.Logf("✓ Consent status correctly updated from APPROVED to REJECTED via PUT /consents")
+}
+
+// TestUpdateConsent_RemovePurposes tests updating consent to remove purposes
+func TestUpdateConsent_RemovePurposes(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access":    "Data access purpose",
+		"payment_access": "Payment access purpose",
+		"profile_access": "Profile access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent with 3 purposes
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Data", IsSelected: BoolPtr(true)},
+			{Name: "payment_access", Value: "Payment", IsSelected: BoolPtr(true)},
+			{Name: "profile_access", Value: "Profile", IsSelected: BoolPtr(false)},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	// Verify 3 purposes
+	assert.Len(t, createResp.ConsentPurpose, 3, "Should have 3 purposes initially")
+
+	// Update to keep only 1 purpose
+	updateReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Data only", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResp.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	assert.Equal(t, http.StatusOK, updateRecorder.Code)
+
+	var updateResp models.ConsentAPIResponse
+	err = json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp)
+	require.NoError(t, err)
+
+	// Verify only 1 purpose remains
+	assert.Len(t, updateResp.ConsentPurpose, 1, "Should have only 1 purpose after update")
+	assert.Equal(t, "data_access", updateResp.ConsentPurpose[0].Name, "Remaining purpose should be data_access")
+	assert.Equal(t, "Data only", updateResp.ConsentPurpose[0].Value, "Purpose value should be updated")
+
+	t.Logf("✓ Successfully removed purposes (3 → 1)")
+}
+
+// TestUpdateConsent_RemoveAuthResourcesAndCheckStatus tests removing authorization resources and checking consent status
+func TestUpdateConsent_RemoveAuthResourcesAndCheckStatus(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access": "Data access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent with 2 authorizations
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				UserID: "user-001",
+				Type:   "authorization_code",
+				Status: "APPROVED",
+			},
+			{
+				UserID: "user-002",
+				Type:   "authorization_code",
+				Status: "APPROVED",
+			},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	// Verify initial state
+	assert.Len(t, createResp.Authorizations, 2, "Should have 2 authorizations initially")
+	assert.Equal(t, "ACTIVE", createResp.Status, "Initial consent status should be ACTIVE")
+
+	// Update consent without authorizations (remove them)
+	updateReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{}, // Empty array to remove authorizations
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResp.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	assert.Equal(t, http.StatusOK, updateRecorder.Code)
+
+	var updateResp models.ConsentAPIResponse
+	err = json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp)
+	require.NoError(t, err)
+
+	// Verify authorizations are removed and status changed to CREATED
+	assert.Empty(t, updateResp.Authorizations, "Authorizations should be removed")
+	assert.Equal(t, "CREATED", updateResp.Status, "Consent status should revert to CREATED when authorizations are removed")
+
+	t.Logf("✓ Successfully removed authorizations and consent status changed from APPROVED to CREATED")
+}
+
+// TestUpdateConsent_AddMultipleAuthResourcesWithMixedStatuses tests adding multiple auth resources with different statuses
+func TestUpdateConsent_AddMultipleAuthResourcesWithMixedStatuses(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access": "Data access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent without authorizations
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	// Verify initial status is CREATED (no authorizations)
+	assert.Equal(t, "CREATED", createResp.Status, "Initial consent status should be CREATED")
+	assert.Empty(t, createResp.Authorizations, "Should have no authorizations initially")
+
+	// Update consent with multiple authorizations with mixed statuses
+	updateReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				UserID: "user-001",
+				Type:   "authorization_code",
+				Status: "APPROVED",
+			},
+			{
+				UserID: "user-002",
+				Type:   "authorization_code",
+				Status: "REJECTED",
+			},
+			{
+				UserID: "user-003",
+				Type:   "authorization_code",
+				Status: "ACTIVE",
+			},
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResp.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	assert.Equal(t, http.StatusOK, updateRecorder.Code)
+
+	var updateResp models.ConsentAPIResponse
+	err = json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp)
+	require.NoError(t, err)
+
+	// Verify authorizations were added
+	assert.Len(t, updateResp.Authorizations, 3, "Should have 3 authorizations after update")
+
+	// Collect all statuses
+	authStatuses := make(map[string]int)
+	for _, auth := range updateResp.Authorizations {
+		authStatuses[auth.Status]++
+	}
+
+	// Verify all expected statuses are present
+	assert.Equal(t, 1, authStatuses["APPROVED"], "Should have 1 APPROVED authorization")
+	assert.Equal(t, 1, authStatuses["REJECTED"], "Should have 1 REJECTED authorization")
+	assert.Equal(t, 1, authStatuses["ACTIVE"], "Should have 1 ACTIVE authorization")
+
+	// Consent status should reflect the "priority" of authorization statuses
+	// Typically: REJECTED > APPROVED > ACTIVE > CREATED
+	// So if there's a REJECTED, consent should be REJECTED
+	assert.Equal(t, "REJECTED", updateResp.Status, "Consent status should be REJECTED when there's at least one REJECTED authorization")
+
+	t.Logf("✓ Successfully added 3 authorizations with mixed statuses (APPROVED, REJECTED, ACTIVE)")
+	t.Logf("✓ Consent status correctly set to REJECTED (highest priority)")
+}
+
+// TestUpdateConsent_ChangeAuthStatusFromApprovedToRevoked tests status priority when changing from APPROVED to REVOKED
+func TestUpdateConsent_ChangeAuthStatusFromApprovedToRevoked(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access": "Data access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent with APPROVED authorization
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				UserID: "user-123",
+				Type:   "authorization_code",
+				Status: "APPROVED",
+			},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	// Verify initial status
+	require.Len(t, createResp.Authorizations, 1)
+	assert.Equal(t, "ACTIVE", createResp.Status, "Initial status should be ACTIVE (APPROVED auth -> ACTIVE consent)")
+
+	// Update consent with authorization changed to REVOKED via PUT /consents
+	updateReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				UserID: "user-123",
+				Type:   "authorization_code",
+				Status: "REVOKED",
+			},
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+createResp.ID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	assert.Equal(t, http.StatusOK, updateRecorder.Code)
+
+	var updateResp models.ConsentAPIResponse
+	err = json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp)
+	require.NoError(t, err)
+
+	// Verify status changed to REVOKED
+	assert.Equal(t, "REVOKED", updateResp.Status, "Consent status should be REVOKED when authorization is revoked")
+
+	// GET consent and verify status persists
+	getReq, err := http.NewRequest("GET", "/api/v1/consents/"+createResp.ID, nil)
+	require.NoError(t, err)
+	getReq.Header.Set("org-id", "TEST_ORG")
+	getReq.Header.Set("client-id", "TEST_CLIENT")
+
+	getRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(getRecorder, getReq)
+
+	var getResp models.ConsentAPIResponse
+	err = json.Unmarshal(getRecorder.Body.Bytes(), &getResp)
+	require.NoError(t, err)
+
+	assert.Equal(t, "REVOKED", getResp.Status, "Consent status should remain REVOKED")
+
+	t.Logf("✓ Consent status correctly changed from APPROVED to REVOKED via PUT /consents")
+}

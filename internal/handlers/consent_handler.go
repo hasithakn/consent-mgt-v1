@@ -251,7 +251,8 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 		// Check if it's a validation error
 		if strings.Contains(err.Error(), "cannot be empty") || strings.Contains(err.Error(), "too long") ||
 			strings.Contains(err.Error(), "invalid status") || strings.Contains(err.Error(), "must be") ||
-			strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") {
+			strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") ||
+			strings.Contains(err.Error(), "purposes not found") {
 			utils.SendBadRequestError(c, "Failed to update consent", err.Error())
 			return
 		}
@@ -547,4 +548,27 @@ func (h *ConsentHandler) RevokeConsent(c *gin.Context) {
 	}
 
 	utils.SendOKResponse(c, response)
+}
+
+// DeleteConsent handles DELETE /consents/:consentId
+func (h *ConsentHandler) DeleteConsent(c *gin.Context) {
+	// Get consentID from path parameter
+	consentID := c.Param("consentId")
+
+	// Get orgID from context (set by middleware)
+	orgID := utils.GetOrgIDFromContext(c)
+
+	// Call the service to delete the consent
+	err := h.consentService.DeleteConsent(c.Request.Context(), consentID, orgID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			utils.SendNotFoundError(c, "Consent not found")
+			return
+		}
+		utils.SendInternalServerError(c, "Failed to delete consent", err.Error())
+		return
+	}
+
+	// Return 204 No Content on successful deletion
+	c.Status(204)
 }

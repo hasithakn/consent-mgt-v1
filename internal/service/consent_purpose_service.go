@@ -446,6 +446,37 @@ func (s *ConsentPurposeService) UpdatePurpose(ctx context.Context, purposeID, or
 		return nil, err
 	}
 
+	// Check if purpose exists
+	existingPurpose, err := s.purposeDAO.GetByID(ctx, purposeID, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("purpose not found: %w", err)
+	}
+
+	// Check if name is being changed and if there are existing consent bindings
+	// Only prevent update if the name is changing and the purpose is in use
+	if req.Name != existingPurpose.Name {
+		hasBindings, err := s.purposeDAO.HasConsentBindings(ctx, purposeID, orgID)
+		if err != nil {
+			s.logger.WithError(err).Error("Failed to check consent bindings")
+			return nil, fmt.Errorf("failed to check consent bindings: %w", err)
+		}
+
+		if hasBindings {
+			count, _ := s.purposeDAO.CountConsentBindings(ctx, purposeID, orgID)
+			return nil, fmt.Errorf("cannot update consent purpose name: it is currently used by %d consent(s). Please remove all consent bindings before changing the purpose name", count)
+		}
+
+		// Check if the new name already exists
+		exists, err := s.purposeDAO.ExistsByName(ctx, req.Name, orgID)
+		if err != nil {
+			s.logger.WithError(err).Error("Failed to check purpose name existence")
+			return nil, fmt.Errorf("failed to validate purpose name: %w", err)
+		}
+		if exists {
+			return nil, fmt.Errorf("purpose name '%s' already exists for this organization", req.Name)
+		}
+	}
+
 	// Validate purpose type
 	if err := models.ValidatePurposeType(req.Type); err != nil {
 		return nil, fmt.Errorf("invalid purpose type: %w", err)
@@ -463,24 +494,6 @@ func (s *ConsentPurposeService) UpdatePurpose(ctx context.Context, purposeID, or
 
 	// Process attributes (normalize, set defaults, etc.)
 	processedAttrs := s.processAttributesForType(req.Type, req.Attributes)
-
-	// Check if purpose exists
-	existingPurpose, err := s.purposeDAO.GetByID(ctx, purposeID, orgID)
-	if err != nil {
-		return nil, fmt.Errorf("purpose not found: %w", err)
-	}
-
-	// Check if name is being changed and if the new name already exists
-	if req.Name != existingPurpose.Name {
-		exists, err := s.purposeDAO.ExistsByName(ctx, req.Name, orgID)
-		if err != nil {
-			s.logger.WithError(err).Error("Failed to check purpose name existence")
-			return nil, fmt.Errorf("failed to validate purpose name: %w", err)
-		}
-		if exists {
-			return nil, fmt.Errorf("purpose name '%s' already exists for this organization", req.Name)
-		}
-	}
 
 	// Begin transaction
 	tx, err := s.db.BeginTxx(ctx, nil)
@@ -539,6 +552,18 @@ func (s *ConsentPurposeService) DeletePurpose(ctx context.Context, purposeID, or
 	_, err := s.purposeDAO.GetByID(ctx, purposeID, orgID)
 	if err != nil {
 		return fmt.Errorf("purpose not found: %w", err)
+	}
+
+	// Check if purpose has any consent bindings
+	hasBindings, err := s.purposeDAO.HasConsentBindings(ctx, purposeID, orgID)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to check consent bindings")
+		return fmt.Errorf("failed to check consent bindings: %w", err)
+	}
+
+	if hasBindings {
+		count, _ := s.purposeDAO.CountConsentBindings(ctx, purposeID, orgID)
+		return fmt.Errorf("cannot delete consent purpose: it is currently used by %d consent(s). Please remove all consent bindings before deleting", count)
 	}
 
 	// Begin transaction

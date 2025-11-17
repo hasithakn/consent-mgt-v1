@@ -191,7 +191,8 @@ func (h *ConsentPurposeHandler) UpdateConsentPurpose(c *gin.Context) {
 			strings.Contains(err.Error(), "cannot be empty") ||
 			strings.Contains(err.Error(), "too long") ||
 			strings.Contains(err.Error(), "invalid purpose type") ||
-			strings.Contains(err.Error(), "already exists") {
+			strings.Contains(err.Error(), "already exists") ||
+			strings.Contains(err.Error(), "currently used by") {
 			utils.SendBadRequestError(c, "Invalid request", err.Error())
 			return
 		}
@@ -220,6 +221,11 @@ func (h *ConsentPurposeHandler) DeleteConsentPurpose(c *gin.Context) {
 	// Delete the purpose
 	err := h.purposeService.DeletePurpose(c.Request.Context(), purposeID, orgID)
 	if err != nil {
+		// Check if it's a binding constraint error
+		if strings.Contains(err.Error(), "currently used by") {
+			utils.SendBadRequestError(c, "Cannot delete consent purpose", err.Error())
+			return
+		}
 		// Check if it's a not found error
 		if strings.Contains(err.Error(), "not found") {
 			utils.SendNotFoundError(c, "Consent purpose not found")

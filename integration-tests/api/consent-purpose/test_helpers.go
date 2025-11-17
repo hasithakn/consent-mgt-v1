@@ -19,6 +19,7 @@ type TestConsentPurposeAPIEnvironment struct {
 	Router         http.Handler
 	PurposeService *service.ConsentPurposeService
 	PurposeDAO     *dao.ConsentPurposeDAO
+	ConsentDAO     *dao.ConsentDAO
 }
 
 // setupConsentPurposeAPITestEnvironment initializes test environment for API tests
@@ -76,5 +77,6 @@ func setupConsentPurposeAPITestEnvironment(t *testing.T) *TestConsentPurposeAPIE
 		Router:         ginRouter,
 		PurposeService: purposeService,
 		PurposeDAO:     purposeDAO,
+		ConsentDAO:     consentDAO,
 	}
 }

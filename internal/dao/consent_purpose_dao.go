@@ -500,3 +500,38 @@ func (dao *ConsentPurposeDAO) ValidatePurposeNames(ctx context.Context, names []
 
 	return validNames, nil
 }
+
+// HasConsentBindings checks if a consent purpose has any existing consent bindings
+// Returns true if the purpose is referenced in any consent, false otherwise
+func (dao *ConsentPurposeDAO) HasConsentBindings(ctx context.Context, purposeID, orgID string) (bool, error) {
+	query := `
+		SELECT COUNT(*) 
+		FROM CONSENT_PURPOSE_MAPPING 
+		WHERE PURPOSE_ID = ? AND ORG_ID = ?
+	`
+
+	var count int
+	err := dao.db.GetContext(ctx, &count, query, purposeID, orgID)
+	if err != nil {
+		return false, fmt.Errorf("failed to check consent bindings: %w", err)
+	}
+
+	return count > 0, nil
+}
+
+// CountConsentBindings returns the number of consents that reference a given purpose
+func (dao *ConsentPurposeDAO) CountConsentBindings(ctx context.Context, purposeID, orgID string) (int, error) {
+	query := `
+		SELECT COUNT(*) 
+		FROM CONSENT_PURPOSE_MAPPING 
+		WHERE PURPOSE_ID = ? AND ORG_ID = ?
+	`
+
+	var count int
+	err := dao.db.GetContext(ctx, &count, query, purposeID, orgID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count consent bindings: %w", err)
+	}
+
+	return count, nil
+}

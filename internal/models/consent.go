@@ -446,11 +446,11 @@ type ValidateRequest struct {
 // ValidateResponse represents the response for validation API
 type ValidateResponse struct {
 	IsValid            bool                   `json:"isValid"`
-	ModifiedPayload    interface{}            `json:"modifiedPayload"`
-	ErrorCode          string                 `json:"errorCode,omitempty"`
+	ModifiedPayload    interface{}            `json:"modifiedPayload,omitempty"`
+	ErrorCode          int                    `json:"errorCode,omitempty"`
 	ErrorMessage       string                 `json:"errorMessage,omitempty"`
-	HTTPCode           string                 `json:"httpCode,omitempty"`
-	ConsentInformation map[string]interface{} `json:"consentInformation"`
+	ErrorDescription   string                 `json:"errorDescription,omitempty"`
+	ConsentInformation map[string]interface{} `json:"consentInformation,omitempty"`
 }
 
 // ConsentRevokeResponse represents the response after revoking a consent

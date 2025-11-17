@@ -275,12 +275,11 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 	var req models.ValidateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response := models.ValidateResponse{
-			IsValid:            false,
-			ModifiedPayload:    nil,
-			ErrorCode:          "InvalidRequest",
-			ErrorMessage:       "Invalid request body: " + err.Error(),
-			HTTPCode:           "400",
-			ConsentInformation: map[string]interface{}{},
+			IsValid:          false,
+			ModifiedPayload:  nil,
+			ErrorCode:        400,
+			ErrorMessage:     "invalid_request",
+			ErrorDescription: "Invalid request body: " + err.Error(),
 		}
 		c.JSON(200, response)
 		return
@@ -289,12 +288,11 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 	// Basic validation
 	if req.ConsentID == "" {
 		response := models.ValidateResponse{
-			IsValid:            false,
-			ModifiedPayload:    nil,
-			ErrorCode:          "InvalidRequest",
-			ErrorMessage:       "consentId is required",
-			HTTPCode:           "400",
-			ConsentInformation: map[string]interface{}{},
+			IsValid:          false,
+			ModifiedPayload:  nil,
+			ErrorCode:        400,
+			ErrorMessage:     "invalid_request",
+			ErrorDescription: "consentId is required",
 		}
 		c.JSON(200, response)
 		return
@@ -302,12 +300,11 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 
 	if err := utils.ValidateConsentID(req.ConsentID); err != nil {
 		response := models.ValidateResponse{
-			IsValid:            false,
-			ModifiedPayload:    nil,
-			ErrorCode:          "InvalidRequest",
-			ErrorMessage:       "Invalid consentId: " + err.Error(),
-			HTTPCode:           "400",
-			ConsentInformation: map[string]interface{}{},
+			IsValid:          false,
+			ModifiedPayload:  nil,
+			ErrorCode:        400,
+			ErrorMessage:     "invalid_request",
+			ErrorDescription: "Invalid consentId: " + err.Error(),
 		}
 		c.JSON(200, response)
 		return
@@ -315,12 +312,11 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 
 	if req.UserID == "" {
 		response := models.ValidateResponse{
-			IsValid:            false,
-			ModifiedPayload:    nil,
-			ErrorCode:          "InvalidRequest",
-			ErrorMessage:       "userId is required",
-			HTTPCode:           "400",
-			ConsentInformation: map[string]interface{}{},
+			IsValid:          false,
+			ModifiedPayload:  nil,
+			ErrorCode:        400,
+			ErrorMessage:     "invalid_request",
+			ErrorDescription: "userId is required",
 		}
 		c.JSON(200, response)
 		return
@@ -329,12 +325,11 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 	// Validate resource params
 	if req.ResourceParams.Resource == "" || req.ResourceParams.HTTPMethod == "" {
 		response := models.ValidateResponse{
-			IsValid:            false,
-			ModifiedPayload:    nil,
-			ErrorCode:          "InvalidRequest",
-			ErrorMessage:       "resourceParams.resource and resourceParams.httpMethod are required",
-			HTTPCode:           "400",
-			ConsentInformation: map[string]interface{}{},
+			IsValid:          false,
+			ModifiedPayload:  nil,
+			ErrorCode:        400,
+			ErrorMessage:     "invalid_request",
+			ErrorDescription: "resourceParams.resource and resourceParams.httpMethod are required",
 		}
 		c.JSON(200, response)
 		return
@@ -349,12 +344,11 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 		// Check if consent not found
 		if strings.Contains(err.Error(), "consent not found") {
 			response := models.ValidateResponse{
-				IsValid:            false,
-				ModifiedPayload:    nil,
-				ErrorCode:          "NotFound",
-				ErrorMessage:       "Consent not found",
-				HTTPCode:           "404",
-				ConsentInformation: map[string]interface{}{},
+				IsValid:          false,
+				ModifiedPayload:  nil,
+				ErrorCode:        404,
+				ErrorMessage:     "consent_not_found",
+				ErrorDescription: "Consent not found",
 			}
 			c.JSON(200, response)
 			return
@@ -362,12 +356,11 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 
 		// Internal error
 		response := models.ValidateResponse{
-			IsValid:            false,
-			ModifiedPayload:    nil,
-			ErrorCode:          "InternalError",
-			ErrorMessage:       "Failed to retrieve consent: " + err.Error(),
-			HTTPCode:           "500",
-			ConsentInformation: map[string]interface{}{},
+			IsValid:          false,
+			ModifiedPayload:  nil,
+			ErrorCode:        500,
+			ErrorMessage:     "internal_error",
+			ErrorDescription: "Failed to retrieve consent: " + err.Error(),
 		}
 		c.JSON(200, response)
 		return
@@ -377,12 +370,11 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 	cfg := config.Get()
 	if cfg == nil {
 		response := models.ValidateResponse{
-			IsValid:            false,
-			ModifiedPayload:    nil,
-			ErrorCode:          "InternalError",
-			ErrorMessage:       "Configuration not loaded",
-			HTTPCode:           "500",
-			ConsentInformation: map[string]interface{}{},
+			IsValid:          false,
+			ModifiedPayload:  nil,
+			ErrorCode:        500,
+			ErrorMessage:     "internal_error",
+			ErrorDescription: "Configuration not loaded",
 		}
 		c.JSON(200, response)
 		return
@@ -391,11 +383,11 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 	// Check if consent is in active status (config-based)
 	if !cfg.Consent.IsActiveStatus(consent.CurrentStatus) {
 		response := models.ValidateResponse{
-			IsValid:         false,
-			ModifiedPayload: nil,
-			ErrorCode:       "Unauthorized",
-			ErrorMessage:    fmt.Sprintf("Consent is not in active state. Current status: %s, Expected: %s", consent.CurrentStatus, cfg.Consent.StatusMappings.ActiveStatus),
-			HTTPCode:        "401",
+			IsValid:          false,
+			ModifiedPayload:  nil,
+			ErrorCode:        401,
+			ErrorMessage:     "invalid_consent_status",
+			ErrorDescription: fmt.Sprintf("Consent is not in active state. Current status: %s, Expected: %s", consent.CurrentStatus, cfg.Consent.StatusMappings.ActiveStatus),
 			ConsentInformation: map[string]interface{}{
 				"consentId": consent.ConsentID,
 				"status":    consent.CurrentStatus,
@@ -420,11 +412,11 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 		if err != nil {
 			// Log the error but continue with the expired status response
 			response := models.ValidateResponse{
-				IsValid:         false,
-				ModifiedPayload: nil,
-				ErrorCode:       "Expired",
-				ErrorMessage:    fmt.Sprintf("Consent has expired. Failed to update status: %s", err.Error()),
-				HTTPCode:        "401",
+				IsValid:          false,
+				ModifiedPayload:  nil,
+				ErrorCode:        401,
+				ErrorMessage:     "consent_expired",
+				ErrorDescription: fmt.Sprintf("Consent has expired. Failed to update status: %s", err.Error()),
 				ConsentInformation: map[string]interface{}{
 					"consentId":    consent.ConsentID,
 					"status":       consent.CurrentStatus,
@@ -437,11 +429,11 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 
 		// Return expired response with updated consent data
 		response := models.ValidateResponse{
-			IsValid:         false,
-			ModifiedPayload: nil,
-			ErrorCode:       "Expired",
-			ErrorMessage:    fmt.Sprintf("Consent has expired. Status updated to: %s", expiredStatus),
-			HTTPCode:        "401",
+			IsValid:          false,
+			ModifiedPayload:  nil,
+			ErrorCode:        401,
+			ErrorMessage:     "consent_expired",
+			ErrorDescription: fmt.Sprintf("Consent has expired. Status updated to: %s", expiredStatus),
 			ConsentInformation: map[string]interface{}{
 				"consentId":    updatedConsent.ConsentID,
 				"status":       updatedConsent.CurrentStatus,

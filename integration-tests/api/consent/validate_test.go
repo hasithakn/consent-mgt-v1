@@ -272,10 +272,8 @@ func TestValidateConsent_ExpiredConsentUpdatesStatus(t *testing.T) {
 	// Verify the consent information includes updated status
 	assert.NotNil(t, validateResponse.ConsentInformation)
 	consentInfo := validateResponse.ConsentInformation
-	updatedStatus, ok := consentInfo["status"].(string)
-	assert.True(t, ok, "Status should be a string")
-	assert.Equal(t, "EXPIRED", updatedStatus, "Consent status in response should be EXPIRED")
-	t.Logf("✓ Validate response shows updated status: %s", updatedStatus)
+	assert.Equal(t, "EXPIRED", consentInfo.Status, "Consent status in response should be EXPIRED")
+	t.Logf("✓ Validate response shows updated status: %s", consentInfo.Status)
 
 	// Verify by calling GET endpoint again that the status was persisted to database
 	req, _ = http.NewRequest("GET", "/api/v1/consents/"+consent.ID, nil)
@@ -551,56 +549,51 @@ func TestValidateConsent_FullConsentInformationResponse(t *testing.T) {
 	// ========== COMPREHENSIVE FIELD VALIDATION ==========
 
 	// 1. Core required fields
-	assert.Equal(t, getResponse.ID, consentInfo["id"], "id must match")
-	assert.Equal(t, getResponse.Type, consentInfo["type"], "type must match")
-	assert.Equal(t, getResponse.Status, consentInfo["status"], "status must match")
-	assert.Equal(t, getResponse.ClientID, consentInfo["clientId"], "clientId must match")
+	assert.Equal(t, getResponse.ID, consentInfo.ID, "id must match")
+	assert.Equal(t, getResponse.Type, consentInfo.Type, "type must match")
+	assert.Equal(t, getResponse.Status, consentInfo.Status, "status must match")
+	assert.Equal(t, getResponse.ClientID, consentInfo.ClientID, "clientId must match")
 	t.Logf("✓ Core fields validated: id, type, status, clientId")
 
 	// 2. Timestamps
-	assert.NotNil(t, consentInfo["createdTime"], "createdTime must be present")
-	assert.NotNil(t, consentInfo["updatedTime"], "updatedTime must be present")
-	assert.Equal(t, getResponse.CreatedTime, int64(consentInfo["createdTime"].(float64)), "createdTime must match")
-	assert.Equal(t, getResponse.UpdatedTime, int64(consentInfo["updatedTime"].(float64)), "updatedTime must match")
+	assert.NotZero(t, consentInfo.CreatedTime, "createdTime must be present")
+	assert.NotZero(t, consentInfo.UpdatedTime, "updatedTime must be present")
+	assert.Equal(t, getResponse.CreatedTime, consentInfo.CreatedTime, "createdTime must match")
+	assert.Equal(t, getResponse.UpdatedTime, consentInfo.UpdatedTime, "updatedTime must match")
 	t.Logf("✓ Timestamps validated: createdTime, updatedTime")
 
 	// 3. Optional fields that were provided
-	assert.NotNil(t, consentInfo["validityTime"], "validityTime should be present")
-	assert.Equal(t, float64(*getResponse.ValidityTime), consentInfo["validityTime"].(float64), "validityTime must match")
+	assert.NotNil(t, consentInfo.ValidityTime, "validityTime should be present")
+	assert.Equal(t, *getResponse.ValidityTime, *consentInfo.ValidityTime, "validityTime must match")
 	
-	assert.NotNil(t, consentInfo["frequency"], "frequency should be present")
-	assert.Equal(t, float64(*getResponse.Frequency), consentInfo["frequency"].(float64), "frequency must match")
+	assert.NotNil(t, consentInfo.Frequency, "frequency should be present")
+	assert.Equal(t, *getResponse.Frequency, *consentInfo.Frequency, "frequency must match")
 	
-	assert.NotNil(t, consentInfo["recurringIndicator"], "recurringIndicator should be present")
-	assert.Equal(t, *getResponse.RecurringIndicator, consentInfo["recurringIndicator"].(bool), "recurringIndicator must match")
+	assert.NotNil(t, consentInfo.RecurringIndicator, "recurringIndicator should be present")
+	assert.Equal(t, *getResponse.RecurringIndicator, *consentInfo.RecurringIndicator, "recurringIndicator must match")
 	
-	assert.NotNil(t, consentInfo["dataAccessValidityDuration"], "dataAccessValidityDuration should be present")
-	assert.Equal(t, float64(*getResponse.DataAccessValidityDuration), consentInfo["dataAccessValidityDuration"].(float64), "dataAccessValidityDuration must match")
+	assert.NotNil(t, consentInfo.DataAccessValidityDuration, "dataAccessValidityDuration should be present")
+	assert.Equal(t, *getResponse.DataAccessValidityDuration, *consentInfo.DataAccessValidityDuration, "dataAccessValidityDuration must match")
 	t.Logf("✓ Optional fields validated: validityTime, frequency, recurringIndicator, dataAccessValidityDuration")
 
 	// 4. Attributes - verify all attributes match
-	validateAttributes, ok := consentInfo["attributes"].(map[string]interface{})
-	assert.True(t, ok, "attributes should be a map")
-	assert.Len(t, validateAttributes, len(getResponse.Attributes), "attributes count must match")
+	assert.Len(t, consentInfo.Attributes, len(getResponse.Attributes), "attributes count must match")
 	
 	for key, expectedValue := range getResponse.Attributes {
-		actualValue, exists := validateAttributes[key]
+		actualValue, exists := consentInfo.Attributes[key]
 		assert.True(t, exists, "attribute '%s' should exist in validate response", key)
 		assert.Equal(t, expectedValue, actualValue, "attribute '%s' value must match", key)
 	}
 	t.Logf("✓ All %d attributes validated", len(getResponse.Attributes))
 
 	// 5. Consent Purposes - comprehensive validation
-	validatePurposes, ok := consentInfo["consentPurpose"].([]interface{})
-	assert.True(t, ok, "consentPurpose should be an array")
-	assert.Len(t, validatePurposes, len(getResponse.ConsentPurpose), "consentPurpose count must match")
-	assert.Len(t, validatePurposes, 3, "should have 3 consent purposes")
+	assert.Len(t, consentInfo.ConsentPurpose, len(getResponse.ConsentPurpose), "consentPurpose count must match")
+	assert.Len(t, consentInfo.ConsentPurpose, 3, "should have 3 consent purposes")
 
 	// Create maps for easier comparison
-	validatePurposeMap := make(map[string]map[string]interface{})
-	for _, cpInterface := range validatePurposes {
-		cp := cpInterface.(map[string]interface{})
-		validatePurposeMap[cp["name"].(string)] = cp
+	validatePurposeMap := make(map[string]models.ConsentPurposeItem)
+	for _, cp := range consentInfo.ConsentPurpose {
+		validatePurposeMap[cp.Name] = cp
 	}
 
 	getPurposeMap := make(map[string]models.ConsentPurposeItem)
@@ -612,32 +605,31 @@ func TestValidateConsent_FullConsentInformationResponse(t *testing.T) {
 		validateCP, exists := validatePurposeMap[purposeName]
 		assert.True(t, exists, "purpose '%s' should exist in validate response", purposeName)
 
-		assert.Equal(t, getCP.Name, validateCP["name"], "purpose name must match")
-		assert.Equal(t, *getCP.IsSelected, validateCP["isSelected"], "purpose isSelected must match for %s", purposeName)
+		assert.Equal(t, getCP.Name, validateCP.Name, "purpose name must match")
+		assert.Equal(t, *getCP.IsSelected, *validateCP.IsSelected, "purpose isSelected must match for %s", purposeName)
 		
 		// Validate enriched fields
-		assert.NotEmpty(t, validateCP["type"], "purpose type should be enriched for %s", purposeName)
-		assert.NotEmpty(t, validateCP["description"], "purpose description should be enriched for %s", purposeName)
+		assert.NotNil(t, validateCP.Type, "purpose type should be enriched for %s", purposeName)
+		assert.NotEmpty(t, *validateCP.Type, "purpose type should not be empty for %s", purposeName)
+		assert.NotNil(t, validateCP.Description, "purpose description should be enriched for %s", purposeName)
+		assert.NotEmpty(t, *validateCP.Description, "purpose description should not be empty for %s", purposeName)
 		
 		// Verify value matches
 		if getCP.Value != nil {
-			assert.NotNil(t, validateCP["value"], "purpose value should be present for %s", purposeName)
-			assert.Equal(t, getCP.Value, validateCP["value"], "purpose value must match for %s", purposeName)
+			assert.NotNil(t, validateCP.Value, "purpose value should be present for %s", purposeName)
+			assert.Equal(t, getCP.Value, validateCP.Value, "purpose value must match for %s", purposeName)
 		}
 	}
 	t.Logf("✓ All %d consent purposes validated with enrichment (type, description, attributes)", len(getResponse.ConsentPurpose))
 
 	// 6. Authorizations - comprehensive validation
-	validateAuths, ok := consentInfo["authorizations"].([]interface{})
-	assert.True(t, ok, "authorizations should be an array")
-	assert.Len(t, validateAuths, len(getResponse.Authorizations), "authorizations count must match")
-	assert.Len(t, validateAuths, 2, "should have 2 authorizations")
+	assert.Len(t, consentInfo.Authorizations, len(getResponse.Authorizations), "authorizations count must match")
+	assert.Len(t, consentInfo.Authorizations, 2, "should have 2 authorizations")
 
 	// Create maps for easier comparison
-	validateAuthMap := make(map[string]map[string]interface{})
-	for _, authInterface := range validateAuths {
-		auth := authInterface.(map[string]interface{})
-		validateAuthMap[auth["id"].(string)] = auth
+	validateAuthMap := make(map[string]models.AuthorizationAPIResponse)
+	for _, auth := range consentInfo.Authorizations {
+		validateAuthMap[auth.ID] = auth
 	}
 
 	getAuthMap := make(map[string]models.AuthorizationAPIResponse)
@@ -649,39 +641,25 @@ func TestValidateConsent_FullConsentInformationResponse(t *testing.T) {
 		validateAuth, exists := validateAuthMap[authID]
 		assert.True(t, exists, "authorization '%s' should exist in validate response", authID)
 
-		assert.Equal(t, getAuth.ID, validateAuth["id"], "auth id must match")
-		assert.Equal(t, getAuth.Type, validateAuth["type"], "auth type must match")
-		assert.Equal(t, getAuth.Status, validateAuth["status"], "auth status must match")
+		assert.Equal(t, getAuth.ID, validateAuth.ID, "auth id must match")
+		assert.Equal(t, getAuth.Type, validateAuth.Type, "auth type must match")
+		assert.Equal(t, getAuth.Status, validateAuth.Status, "auth status must match")
 		
-		// UserID is a pointer in API response, but string in validate response
+		// UserID is a pointer in API response
 		if getAuth.UserID != nil {
-			assert.Equal(t, *getAuth.UserID, validateAuth["userId"], "auth userId must match")
+			assert.Equal(t, *getAuth.UserID, *validateAuth.UserID, "auth userId must match")
 		}
 		
-		assert.NotNil(t, validateAuth["updatedTime"], "auth updatedTime should be present")
-		assert.Equal(t, getAuth.UpdatedTime, int64(validateAuth["updatedTime"].(float64)), "auth updatedTime must match")
+		assert.NotZero(t, validateAuth.UpdatedTime, "auth updatedTime should be present")
+		assert.Equal(t, getAuth.UpdatedTime, validateAuth.UpdatedTime, "auth updatedTime must match")
 		
 		// Verify resources if present
 		if getAuth.Resources != nil {
-			assert.NotNil(t, validateAuth["resources"], "auth resources should be present for %s", authID)
+			assert.NotNil(t, validateAuth.Resources, "auth resources should be present for %s", authID)
 			// Deep comparison of resources structure would go here
 		}
 	}
 	t.Logf("✓ All %d authorizations validated", len(getResponse.Authorizations))
-
-	// 7. Verify structure completeness - no extra or missing fields at top level
-	expectedTopLevelFields := []string{
-		"id", "type", "status", "clientId",
-		"createdTime", "updatedTime", "validityTime",
-		"frequency", "recurringIndicator", "dataAccessValidityDuration",
-		"attributes", "consentPurpose", "authorizations",
-	}
-
-	for _, field := range expectedTopLevelFields {
-		_, exists := consentInfo[field]
-		assert.True(t, exists, "field '%s' must be present in validate response", field)
-	}
-	t.Logf("✓ All expected top-level fields present in validate response")
 
 	// Final verification
 	t.Logf("✓ ========== COMPREHENSIVE VALIDATION COMPLETE ==========")

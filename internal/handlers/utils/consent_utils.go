@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/wso2/consent-management-api/internal/models"
 	"github.com/wso2/consent-management-api/internal/service"
@@ -68,78 +66,58 @@ func DeriveConsentStatus(authResources []models.ConsentAuthResourceCreateRequest
 	return string(models.ConsentStatusActive)
 }
 
-// BuildConsentInformation creates a consent information map matching GET /consents/{consentId} response
-// with enriched consent purpose details from the consent purpose service
-func BuildConsentInformation(c *gin.Context, purposeService *service.ConsentPurposeService, consent *models.ConsentResponse, orgID string) map[string]interface{} {
+// BuildEnrichedConsentAPIResponse creates a consent information map matching GET /consents/{consentId} response
+// with enriched consent purpose details from the consent purpose service.
+// This reuses the ToAPIResponse() method and only adds enrichment of consent purposes.
+func BuildEnrichedConsentAPIResponse(c *gin.Context, purposeService *service.ConsentPurposeService, consent *models.ConsentResponse, orgID string) *models.ConsentAPIResponse {
 	if consent == nil {
 		return nil
 	}
 
-	// Enrich consent purposes with full purpose details
-	enrichedPurposes := EnrichConsentPurposes(c.Request.Context(), purposeService, consent.ConsentPurpose, orgID)
-
-	// Convert consent to API response to get the correct field names
+	// Use ToAPIResponse to build the complete response structure
 	apiResponse := consent.ToAPIResponse()
 
-	// Build the consent information matching GET /consents/{id} response structure
-	consentInfo := map[string]interface{}{
-		"id":                         apiResponse.ID,
-		"status":                     apiResponse.Status,
-		"type":                       apiResponse.Type,
-		"clientId":                   apiResponse.ClientID,
-		"consentPurpose":             enrichedPurposes,
-		"createdTime":                apiResponse.CreatedTime,
-		"updatedTime":                apiResponse.UpdatedTime,
-		"validityTime":               apiResponse.ValidityTime,
-		"recurringIndicator":         apiResponse.RecurringIndicator,
-		"frequency":                  apiResponse.Frequency,
-		"dataAccessValidityDuration": apiResponse.DataAccessValidityDuration,
-		"attributes":                 apiResponse.Attributes,
-		"authorizations":             apiResponse.Authorizations,
-	}
+	// Enrich consent purposes with full purpose details (type, description, attributes)
+	if purposeService != nil && len(apiResponse.ConsentPurpose) > 0 {
+		enrichedPurposes := make([]models.ConsentPurposeItem, 0, len(apiResponse.ConsentPurpose))
 
-	// Include modifiedResponse if present
-	if len(apiResponse.ModifiedResponse) > 0 {
-		consentInfo["modifiedResponse"] = apiResponse.ModifiedResponse
-	}
+		for _, cp := range apiResponse.ConsentPurpose {
+			enrichedPurpose := cp // Start with the existing purpose item
 
-	return consentInfo
-}
+			// Fetch full purpose details from consent purpose service
+			if cp.Name != "" {
+				purpose, err := purposeService.GetPurposeByName(c.Request.Context(), cp.Name, orgID)
+				if err == nil && purpose != nil {
+					// Enrich with type, description, and attributes from the purpose definition
+					enrichedPurpose.Type = &purpose.Type
+					enrichedPurpose.Description = purpose.Description
 
-// EnrichConsentPurposes fetches full purpose details and enriches the consent purposes
-func EnrichConsentPurposes(ctx context.Context, purposeService *service.ConsentPurposeService, consentPurposes []models.ConsentPurposeItem, orgID string) []map[string]interface{} {
-	enrichedPurposes := make([]map[string]interface{}, 0, len(consentPurposes))
-
-	for _, cp := range consentPurposes {
-		enrichedPurpose := map[string]interface{}{
-			"name":       cp.Name,
-			"value":      cp.Value,
-			"isSelected": cp.IsSelected,
-		}
-
-		// Fetch full purpose details from consent purpose service
-		if purposeService != nil && cp.Name != "" {
-			purpose, err := purposeService.GetPurposeByName(ctx, cp.Name, orgID)
-			if err == nil && purpose != nil {
-				// Add type, description, and attributes from the purpose
-				enrichedPurpose["type"] = purpose.Type
-				enrichedPurpose["description"] = purpose.Description
-				if len(purpose.Attributes) > 0 {
-					enrichedPurpose["attributes"] = purpose.Attributes
+					// Convert map[string]string to map[string]interface{}
+					if len(purpose.Attributes) > 0 {
+						attrs := make(map[string]interface{}, len(purpose.Attributes))
+						for k, v := range purpose.Attributes {
+							attrs[k] = v
+						}
+						enrichedPurpose.Attributes = attrs
+					} else {
+						enrichedPurpose.Attributes = map[string]interface{}{}
+					}
 				} else {
-					enrichedPurpose["attributes"] = map[string]interface{}{}
+					// If we can't fetch the purpose, add empty values for enriched fields
+					emptyType := ""
+					emptyDesc := ""
+					enrichedPurpose.Type = &emptyType
+					enrichedPurpose.Description = &emptyDesc
+					enrichedPurpose.Attributes = map[string]interface{}{}
 				}
-			} else {
-				// Log the error for debugging (errors are silently ignored to not break validation)
-				// If we can't fetch the purpose, add empty values
-				enrichedPurpose["type"] = ""
-				enrichedPurpose["description"] = ""
-				enrichedPurpose["attributes"] = map[string]interface{}{}
 			}
+
+			enrichedPurposes = append(enrichedPurposes, enrichedPurpose)
 		}
 
-		enrichedPurposes = append(enrichedPurposes, enrichedPurpose)
+		// Replace with enriched purposes
+		apiResponse.ConsentPurpose = enrichedPurposes
 	}
 
-	return enrichedPurposes
+	return apiResponse
 }

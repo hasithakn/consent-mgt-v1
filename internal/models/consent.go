@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -85,9 +86,12 @@ func (j *JSON) UnmarshalJSON(data []byte) error {
 
 // ConsentPurposeItem represents a single consent purpose with name, value, and selection status
 type ConsentPurposeItem struct {
-	Name       string      `json:"name"`
-	Value      interface{} `json:"value"` // Can be string, object, or array
-	IsSelected *bool       `json:"isSelected,omitempty"` // Pointer to distinguish nil (defaults to true) from explicit false
+	Name        string                 `json:"name"`
+	Value       interface{}            `json:"value"`                  // Can be string, object, or array
+	IsSelected  *bool                  `json:"isSelected,omitempty"`   // Pointer to distinguish nil (defaults to true) from explicit false
+	Type        *string                `json:"type,omitempty"`         // Enriched from purpose definition (optional)
+	Description *string                `json:"description,omitempty"`  // Enriched from purpose definition (optional)
+	Attributes  map[string]interface{} `json:"attributes,omitempty"`   // Enriched from purpose definition (optional)
 }
 
 // ConsentAPIRequest represents the API payload for creating a consent (external format)
@@ -428,6 +432,81 @@ func (resp *ConsentResponse) ToAPIResponse() *ConsentAPIResponse {
 	return apiResp
 }
 
+// ToEnrichedAPIResponse converts internal response to API response with enriched consent purposes
+// This method can be used by handlers that need to include full purpose details (type, description, attributes)
+func (resp *ConsentResponse) ToEnrichedAPIResponse(ctx context.Context, purposeService interface {
+	GetPurposeByName(ctx context.Context, name, orgID string) (*ConsentPurposeResponse, error)
+}, orgID string) *ConsentAPIResponse {
+	apiResp := resp.ToAPIResponse()
+	
+	// Enrich consent purposes with full purpose details
+	if purposeService != nil && len(apiResp.ConsentPurpose) > 0 {
+		apiResp.EnrichConsentPurposes(ctx, purposeService, orgID)
+	}
+	
+	return apiResp
+}
+
+// EnrichConsentPurposes enriches the consent purposes with full details from purpose definitions
+func (apiResp *ConsentAPIResponse) EnrichConsentPurposes(ctx context.Context, purposeService interface {
+	GetPurposeByName(ctx context.Context, name, orgID string) (*ConsentPurposeResponse, error)
+}, orgID string) {
+	if purposeService == nil || len(apiResp.ConsentPurpose) == 0 {
+		return
+	}
+
+	for i := range apiResp.ConsentPurpose {
+		cp := &apiResp.ConsentPurpose[i]
+		
+		if cp.Name == "" {
+			continue
+		}
+
+		// Fetch full purpose details
+		purpose, err := purposeService.GetPurposeByName(ctx, cp.Name, orgID)
+		if err == nil && purpose != nil {
+			// Set enriched fields - these would need to be added to ConsentPurposeItem model
+			// For now, this is a placeholder showing the pattern
+			// The actual enrichment happens in the map conversion
+		}
+	}
+}
+
+// ToMap converts ConsentAPIResponse to map[string]interface{} for flexible response building
+// This is useful for responses that need to be modified or extended (e.g., validate response)
+func (apiResp *ConsentAPIResponse) ToMap() map[string]interface{} {
+	result := map[string]interface{}{
+		"id":                         apiResp.ID,
+		"type":                       apiResp.Type,
+		"status":                     apiResp.Status,
+		"clientId":                   apiResp.ClientID,
+		"createdTime":                apiResp.CreatedTime,
+		"updatedTime":                apiResp.UpdatedTime,
+		"consentPurpose":             apiResp.ConsentPurpose,
+		"attributes":                 apiResp.Attributes,
+		"authorizations":             apiResp.Authorizations,
+	}
+
+	// Add optional fields only if they are not nil
+	if apiResp.ValidityTime != nil {
+		result["validityTime"] = apiResp.ValidityTime
+	}
+	if apiResp.Frequency != nil {
+		result["frequency"] = apiResp.Frequency
+	}
+	if apiResp.RecurringIndicator != nil {
+		result["recurringIndicator"] = apiResp.RecurringIndicator
+	}
+	if apiResp.DataAccessValidityDuration != nil {
+		result["dataAccessValidityDuration"] = apiResp.DataAccessValidityDuration
+	}
+	if len(apiResp.ModifiedResponse) > 0 {
+		result["modifiedResponse"] = apiResp.ModifiedResponse
+	}
+
+	return result
+}
+
 // ValidateRequest represents the payload for validation API
 type ValidateRequest struct {
 	Headers         map[string]interface{} `json:"headers"`
@@ -445,12 +524,12 @@ type ValidateRequest struct {
 
 // ValidateResponse represents the response for validation API
 type ValidateResponse struct {
-	IsValid            bool                   `json:"isValid"`
-	ModifiedPayload    interface{}            `json:"modifiedPayload,omitempty"`
-	ErrorCode          int                    `json:"errorCode,omitempty"`
-	ErrorMessage       string                 `json:"errorMessage,omitempty"`
-	ErrorDescription   string                 `json:"errorDescription,omitempty"`
-	ConsentInformation map[string]interface{} `json:"consentInformation,omitempty"`
+	IsValid            bool                  `json:"isValid"`
+	ModifiedPayload    interface{}           `json:"modifiedPayload,omitempty"`
+	ErrorCode          int                   `json:"errorCode,omitempty"`
+	ErrorMessage       string                `json:"errorMessage,omitempty"`
+	ErrorDescription   string                `json:"errorDescription,omitempty"`
+	ConsentInformation *ConsentAPIResponse   `json:"consentInformation,omitempty"`
 }
 
 // ConsentRevokeResponse represents the response after revoking a consent

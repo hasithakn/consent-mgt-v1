@@ -74,7 +74,7 @@ func BuildEnrichedConsentAPIResponse(c *gin.Context, purposeService *service.Con
 		return nil
 	}
 
-	// Use ToAPIResponse to build the complete response structure
+	// Use ToAPIResponse to build the complete base response structure
 	apiResponse := consent.ToAPIResponse()
 
 	// Enrich consent purposes with full purpose details (type, description, attributes)
@@ -82,7 +82,8 @@ func BuildEnrichedConsentAPIResponse(c *gin.Context, purposeService *service.Con
 		enrichedPurposes := make([]models.ConsentPurposeItem, 0, len(apiResponse.ConsentPurpose))
 
 		for _, cp := range apiResponse.ConsentPurpose {
-			enrichedPurpose := cp // Start with the existing purpose item
+			// Convert base purpose to enriched purpose
+			enrichedPurpose := cp
 
 			// Fetch full purpose details from consent purpose service
 			if cp.Name != "" {
@@ -115,7 +116,7 @@ func BuildEnrichedConsentAPIResponse(c *gin.Context, purposeService *service.Con
 			enrichedPurposes = append(enrichedPurposes, enrichedPurpose)
 		}
 
-		// Replace with enriched purposes
+		// Set enriched purposes
 		apiResponse.ConsentPurpose = enrichedPurposes
 	}
 

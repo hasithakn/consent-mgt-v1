@@ -3,6 +3,8 @@ package models
 import (
 	"net/http"
 	"strings"
+
+	"github.com/wso2/consent-management-api/internal/config"
 )
 
 // ErrorResponse represents a standard error response
@@ -82,22 +84,52 @@ const (
 	AuthStateApproved AuthorizationState = "APPROVED"
 	// AuthStateRejected indicates the authorization was rejected
 	AuthStateRejected AuthorizationState = "REJECTED"
-	// AuthStateRevoked indicates the authorization was revoked
-	AuthStateRevoked AuthorizationState = "REVOKED"
-	// AuthStateCustom indicates a non-standard/custom state which should be resolved by an extension
-	AuthStateCustom AuthorizationState = "CUSTOM"
 )
 
 // ConsentStatus lists allowed consent lifecycle statuses maintained by consent-mgt API
 type ConsentStatus string
 
-const (
+// consent status variables - initialized from config when available, otherwise fall back to defaults
+var (
 	ConsentStatusCreated  ConsentStatus = "CREATED"
 	ConsentStatusActive   ConsentStatus = "ACTIVE"
 	ConsentStatusRejected ConsentStatus = "REJECTED"
 	ConsentStatusRevoked  ConsentStatus = "REVOKED"
 	ConsentStatusExpired  ConsentStatus = "EXPIRED"
 )
+
+// SyncConsentStatusWithConfig updates the package-level consent status variables from the
+// loaded configuration. This is safe to call multiple times; it will only override values
+// when the configuration provides non-empty mappings.
+func SyncConsentStatusWithConfig() {
+	cfg := config.Get()
+	if cfg == nil {
+		return
+	}
+	m := cfg.Consent.StatusMappings
+	if m.CreatedStatus != "" {
+		ConsentStatusCreated = ConsentStatus(m.CreatedStatus)
+	}
+	if m.ActiveStatus != "" {
+		ConsentStatusActive = ConsentStatus(m.ActiveStatus)
+	}
+	if m.RejectedStatus != "" {
+		ConsentStatusRejected = ConsentStatus(m.RejectedStatus)
+	}
+	if m.RevokedStatus != "" {
+		ConsentStatusRevoked = ConsentStatus(m.RevokedStatus)
+	}
+	if m.ExpiredStatus != "" {
+		ConsentStatusExpired = ConsentStatus(m.ExpiredStatus)
+	}
+}
+
+// Attempt to sync at package init. If config isn't loaded yet, SyncConsentStatusWithConfig
+// will be a no-op; callers can invoke SyncConsentStatusWithConfig() after config.Load()
+// to ensure values reflect the configuration.
+func init() {
+	SyncConsentStatusWithConfig()
+}
 
 // DeriveConsentStatusFromAuthState maps an authorization.state value to a ConsentStatus when possible.
 // Returns the derived status and true when derivation succeeded. For custom/unknown states it returns
@@ -113,8 +145,6 @@ func DeriveConsentStatusFromAuthState(authState string) (ConsentStatus, bool) {
 		return ConsentStatusActive, true
 	case strings.ToLower(string(AuthStateRejected)):
 		return ConsentStatusRejected, true
-	case strings.ToLower(string(AuthStateRevoked)):
-		return ConsentStatusRevoked, true
 	case strings.ToLower(string(AuthStateCreated)):
 		return ConsentStatusCreated, true
 	default:

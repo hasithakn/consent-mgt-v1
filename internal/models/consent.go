@@ -125,7 +125,7 @@ func (req *AuthorizationAPIRequest) ToAuthResourceCreateRequest() *ConsentAuthRe
 	// Default status to "approved" if not provided
 	status := req.Status
 	if status == "" {
-		status = string(AuthStateApproved)
+		status = string(AuthStateCreated)
 	}
 
 	return &ConsentAuthResourceCreateRequest{

@@ -322,19 +322,6 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 		return
 	}
 
-	// Validate resource params
-	if req.ResourceParams.Resource == "" || req.ResourceParams.HTTPMethod == "" {
-		response := models.ValidateResponse{
-			IsValid:          false,
-			ModifiedPayload:  nil,
-			ErrorCode:        400,
-			ErrorMessage:     "invalid_request",
-			ErrorDescription: "resourceParams.resource and resourceParams.httpMethod are required",
-		}
-		c.JSON(200, response)
-		return
-	}
-
 	// Get orgID from context
 	orgID := utils.GetOrgIDFromContext(c)
 
@@ -383,15 +370,12 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 	// Check if consent is in active status (config-based)
 	if !cfg.Consent.IsActiveStatus(consent.CurrentStatus) {
 		response := models.ValidateResponse{
-			IsValid:          false,
-			ModifiedPayload:  nil,
-			ErrorCode:        401,
-			ErrorMessage:     "invalid_consent_status",
-			ErrorDescription: fmt.Sprintf("Consent is not in active state. Current status: %s, Expected: %s", consent.CurrentStatus, cfg.Consent.StatusMappings.ActiveStatus),
-			ConsentInformation: map[string]interface{}{
-				"consentId": consent.ConsentID,
-				"status":    consent.CurrentStatus,
-			},
+			IsValid:            false,
+			ModifiedPayload:    nil,
+			ErrorCode:          401,
+			ErrorMessage:       "invalid_consent_status",
+			ErrorDescription:   fmt.Sprintf("Consent is not in active state. Current status: %s, Expected: %s", consent.CurrentStatus, cfg.Consent.StatusMappings.ActiveStatus),
+			ConsentInformation: handlerutils.BuildConsentInformation(c, h.consentPurposeService, consent, orgID),
 		}
 		c.JSON(200, response)
 		return
@@ -402,26 +386,27 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 		// Consent has expired - update the status to expired in DB
 		expiredStatus := cfg.Consent.StatusMappings.ExpiredStatus
 
-		// Create update request with expired status
-		updateRequest := &models.ConsentUpdateRequest{
-			CurrentStatus: expiredStatus,
-		}
-
-		// Update the consent status to expired
-		updatedConsent, err := h.consentService.UpdateConsent(c.Request.Context(), req.ConsentID, orgID, updateRequest)
+		// Use the dedicated UpdateConsentStatus method which safely updates only the status
+		// without needing to provide the full consent payload
+		actionBy := consent.ClientID
+		reason := "Consent expired based on validity time"
+		updatedConsent, err := h.consentService.UpdateConsentStatus(
+			c.Request.Context(),
+			req.ConsentID,
+			orgID,
+			expiredStatus,
+			actionBy,
+			reason,
+		)
 		if err != nil {
 			// Log the error but continue with the expired status response
 			response := models.ValidateResponse{
-				IsValid:          false,
-				ModifiedPayload:  nil,
-				ErrorCode:        401,
-				ErrorMessage:     "consent_expired",
-				ErrorDescription: fmt.Sprintf("Consent has expired. Failed to update status: %s", err.Error()),
-				ConsentInformation: map[string]interface{}{
-					"consentId":    consent.ConsentID,
-					"status":       consent.CurrentStatus,
-					"validityTime": consent.ValidityTime,
-				},
+				IsValid:            false,
+				ModifiedPayload:    nil,
+				ErrorCode:          401,
+				ErrorMessage:       "consent_expired",
+				ErrorDescription:   fmt.Sprintf("Consent has expired. Failed to update status: %s", err.Error()),
+				ConsentInformation: handlerutils.BuildConsentInformation(c, h.consentPurposeService, consent, orgID),
 			}
 			c.JSON(200, response)
 			return
@@ -429,16 +414,12 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 
 		// Return expired response with updated consent data
 		response := models.ValidateResponse{
-			IsValid:          false,
-			ModifiedPayload:  nil,
-			ErrorCode:        401,
-			ErrorMessage:     "consent_expired",
-			ErrorDescription: fmt.Sprintf("Consent has expired. Status updated to: %s", expiredStatus),
-			ConsentInformation: map[string]interface{}{
-				"consentId":    updatedConsent.ConsentID,
-				"status":       updatedConsent.CurrentStatus,
-				"validityTime": updatedConsent.ValidityTime,
-			},
+			IsValid:            false,
+			ModifiedPayload:    nil,
+			ErrorCode:          401,
+			ErrorMessage:       "consent_expired",
+			ErrorDescription:   fmt.Sprintf("Consent has expired. Status updated to: %s", expiredStatus),
+			ConsentInformation: handlerutils.BuildConsentInformation(c, h.consentPurposeService, updatedConsent, orgID),
 		}
 		c.JSON(200, response)
 		return
@@ -451,23 +432,9 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 
 	// Return success with full consent data
 	response := models.ValidateResponse{
-		IsValid:         true,
-		ModifiedPayload: nil,
-		ConsentInformation: map[string]interface{}{
-			"consentId":                  consent.ConsentID,
-			"status":                     consent.CurrentStatus,
-			"consentType":                consent.ConsentType,
-			"clientId":                   consent.ClientID,
-			"validityTime":               consent.ValidityTime,
-			"consentPurpose":             consent.ConsentPurpose,
-			"createdTime":                consent.CreatedTime,
-			"updatedTime":                consent.UpdatedTime,
-			"consentFrequency":           consent.ConsentFrequency,
-			"recurringIndicator":         consent.RecurringIndicator,
-			"dataAccessValidityDuration": consent.DataAccessValidityDuration,
-			"attributes":                 consent.Attributes,
-			"authResources":              consent.AuthResources,
-		},
+		IsValid:            true,
+		ModifiedPayload:    nil,
+		ConsentInformation: handlerutils.BuildConsentInformation(c, h.consentPurposeService, consent, orgID),
 	}
 	c.JSON(200, response)
 }

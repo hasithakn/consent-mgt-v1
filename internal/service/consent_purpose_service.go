@@ -328,6 +328,35 @@ func (s *ConsentPurposeService) GetPurpose(ctx context.Context, purposeID, orgID
 	return s.buildPurposeResponse(purpose), nil
 }
 
+// GetPurposeByName retrieves a consent purpose by name
+func (s *ConsentPurposeService) GetPurposeByName(ctx context.Context, name, orgID string) (*models.ConsentPurposeResponse, error) {
+	// Validate inputs
+	if name == "" {
+		return nil, fmt.Errorf("purpose name is required")
+	}
+
+	if err := utils.ValidateOrgID(orgID); err != nil {
+		return nil, err
+	}
+
+	// Retrieve purpose
+	purpose, err := s.purposeDAO.GetByName(ctx, name, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("purpose not found: %w", err)
+	}
+
+	// Retrieve attributes
+	attributes, err := s.purposeAttributeDAO.GetAttributes(ctx, purpose.ID, orgID)
+	if err != nil {
+		s.logger.WithError(err).Warn("Failed to retrieve purpose attributes")
+		// Don't fail, just warn
+	} else {
+		purpose.Attributes = attributes
+	}
+
+	return s.buildPurposeResponse(purpose), nil
+}
+
 // ListPurposes retrieves all consent purposes for an organization
 func (s *ConsentPurposeService) ListPurposes(ctx context.Context, orgID string, limit, offset int) (*models.ConsentPurposeListResponse, error) {
 	// Validate inputs

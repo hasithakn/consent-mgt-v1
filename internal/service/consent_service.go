@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/wso2/consent-management-api/internal/config"
 	"github.com/wso2/consent-management-api/internal/dao"
 	"github.com/wso2/consent-management-api/internal/database"
 	"github.com/wso2/consent-management-api/internal/models"
@@ -232,6 +233,71 @@ func (s *ConsentService) GetConsent(ctx context.Context, consentID, orgID string
 	purposeMappings, _ := s.consentPurposeDAO.GetMappingsByConsentID(ctx, consentID, orgID)
 
 	return serviceutils.BuildConsentResponse(consent, attributes, authResources, purposeMappings, s.logger), nil
+}
+
+// UpdateConsentStatus updates only the status of a consent and its authorization resources
+// This is a safer method for status-only updates (e.g., expiration) without affecting other fields
+func (s *ConsentService) UpdateConsentStatus(ctx context.Context, consentID, orgID, newStatus, actionBy, reason string) (*models.ConsentResponse, error) {
+	// Validate inputs
+	if err := utils.ValidateConsentID(consentID); err != nil {
+		return nil, err
+	}
+	if err := utils.ValidateOrgID(orgID); err != nil {
+		return nil, err
+	}
+	if newStatus == "" {
+		return nil, fmt.Errorf("status cannot be empty")
+	}
+
+	// Validate that the new status is one of the allowed statuses from config
+	cfg := config.Get()
+	if !cfg.Consent.IsStatusAllowed(newStatus) {
+		return nil, fmt.Errorf("invalid status '%s': must be one of %v", newStatus, cfg.Consent.AllowedStatuses)
+	}
+
+	// Start transaction
+	tx, err := s.db.BeginTx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Get existing consent to capture previous status
+	existingConsent, err := s.consentDAO.GetByIDWithTx(ctx, tx, consentID, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve consent: %w", err)
+	}
+
+	// Update consent status
+	updatedTime := utils.GetCurrentTimeMillis()
+	if err := s.consentDAO.UpdateStatusWithTx(ctx, tx, consentID, orgID, newStatus, updatedTime); err != nil {
+		return nil, fmt.Errorf("failed to update consent status: %w", err)
+	}
+
+	// Create status audit record
+	previousStatus := existingConsent.CurrentStatus
+	audit := &models.ConsentStatusAudit{
+		StatusAuditID:  utils.GenerateAuditID(),
+		ConsentID:      consentID,
+		CurrentStatus:  newStatus,
+		ActionTime:     updatedTime,
+		ActionBy:       &actionBy,
+		PreviousStatus: &previousStatus,
+		Reason:         &reason,
+		OrgID:          orgID,
+	}
+
+	if err := s.statusAuditDAO.CreateWithTx(ctx, tx, audit); err != nil {
+		return nil, fmt.Errorf("failed to create audit record: %w", err)
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	// Return updated consent
+	return s.GetConsent(ctx, consentID, orgID)
 }
 
 // UpdateConsent updates an existing consent

@@ -99,6 +99,27 @@ func (dao *ConsentPurposeDAO) GetByID(ctx context.Context, purposeID, orgID stri
 	return &purpose, nil
 }
 
+// GetByName retrieves a consent purpose by name and organization ID
+func (dao *ConsentPurposeDAO) GetByName(ctx context.Context, name, orgID string) (*models.ConsentPurpose, error) {
+	query := `
+		SELECT ID, NAME, DESCRIPTION, TYPE, ORG_ID
+		FROM CONSENT_PURPOSE
+		WHERE NAME = ? AND ORG_ID = ?
+	`
+
+	var purpose models.ConsentPurpose
+	err := dao.db.GetContext(ctx, &purpose, query, name, orgID)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("consent purpose not found: %s", name)
+		}
+		return nil, fmt.Errorf("failed to get consent purpose: %w", err)
+	}
+
+	return &purpose, nil
+}
+
 // List retrieves all consent purposes for an organization
 func (dao *ConsentPurposeDAO) List(ctx context.Context, orgID string, limit, offset int) ([]models.ConsentPurpose, int, error) {
 	// Get total count

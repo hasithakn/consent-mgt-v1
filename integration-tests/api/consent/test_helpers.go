@@ -97,6 +97,7 @@ func CreateTestPurpose(t *testing.T, env *TestEnvironment, name, description str
 		ID:          "PURPOSE-test-" + name,
 		Name:        name,
 		Description: &description,
+		Type:        "string", // Default type for test purposes
 		OrgID:       "TEST_ORG",
 	}
 	

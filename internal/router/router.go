@@ -68,6 +68,9 @@ func SetupRouter(
 			// Attribute search endpoint (must be before /:consentId)
 			consents.GET("/attributes", consentHandler.SearchConsentsByAttribute)
 			
+			// Validation endpoint (must be before /:consentId)
+			consents.POST("/validate", consentHandler.Validate)
+			
 			// Specific paths before parameterized paths
 			consents.PUT("/:consentId/revoke", consentHandler.RevokeConsent)
 			
@@ -81,9 +84,6 @@ func SetupRouter(
 			consents.GET("/:consentId/authorizations/:authId", authResourceHandler.GetAuthResource)
 			consents.PUT("/:consentId/authorizations/:authId", authResourceHandler.UpdateAuthResource)
 		}
-
-		// Validation endpoint
-		v1.POST("/validate", consentHandler.Validate)
 	}
 
 	return router

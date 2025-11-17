@@ -164,6 +164,27 @@ func (h *ConsentHandler) GetConsent(c *gin.Context) {
 		return
 	}
 
+	// Check if consent is expired based on validity time and update status if needed
+	if consent.ValidityTime != nil && utils.IsExpired(*consent.ValidityTime) {
+		cfg := config.Get()
+		if cfg != nil && !cfg.Consent.IsExpiredStatus(consent.CurrentStatus) {
+			// Update to expired status
+			updatedConsent, err := h.consentService.UpdateConsentStatus(
+				c.Request.Context(),
+				consentID,
+				orgID,
+				cfg.Consent.StatusMappings.ExpiredStatus,
+				"system",
+				"Consent validity time has passed",
+			)
+			if err == nil {
+				// Use the updated consent for response
+				consent = updatedConsent
+			}
+			// If update fails, continue with existing consent (it will show as expired in validation anyway)
+		}
+	}
+
 	// Convert to API response format
 	apiResponse := consent.ToAPIResponse()
 	utils.SendOKResponse(c, apiResponse)
@@ -238,6 +259,26 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 
 	// Derive consent status from authorization statuses
 	updateRequest.CurrentStatus = handlerutils.DeriveConsentStatus(updateRequest.AuthResources)
+
+	// Check if consent is expired based on validity time after deriving status
+	// Get existing consent to check validity time
+	existingConsent, err := h.consentService.GetConsent(c.Request.Context(), consentID, orgID)
+	if err != nil {
+		// If consent not found, let the update service handle it
+		if strings.Contains(err.Error(), "not found") {
+			utils.SendNotFoundError(c, "Consent not found")
+			return
+		}
+	}
+
+	// If existing consent has validity time and it's expired, override status to EXPIRED
+	if existingConsent != nil && existingConsent.ValidityTime != nil {
+		if utils.IsExpired(*existingConsent.ValidityTime) {
+			// Override the derived status with EXPIRED status
+			cfg := config.Get()
+			updateRequest.CurrentStatus = cfg.Consent.StatusMappings.ExpiredStatus
+		}
+	}
 
 	// Update consent with purposes from request body
 	var updatedConsent *models.ConsentResponse

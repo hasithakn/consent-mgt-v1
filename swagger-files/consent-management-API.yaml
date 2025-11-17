@@ -1503,7 +1503,6 @@ components:
         are associated with a consent and whether they are selected/approved.
       required:
         - name
-        - isSelected
       properties:
         name:
           type: string
@@ -1528,8 +1527,9 @@ components:
           description: |
             Indicates whether this purpose is selected/approved for this consent.
             
-            This field is REQUIRED and must be explicitly set to true or false.
+            This field is OPTIONAL. If not provided, it defaults to true.
             It is persisted in the database and returned in all consent responses.
+          default: true
           example: true
     File:
       type: object
@@ -2358,7 +2358,7 @@ components:
           example: "license_read"
         description:
           type: string
-          description: Description of the consent purpose
+          description: Description of the consent purpose (optional)
           example: "Allows accessing license API"
         type:
           type: string
@@ -2377,7 +2377,7 @@ components:
           additionalProperties:
             type: string
           description: |
-            Key-value map of attributes. Content depends on the purpose type:
+            Key-value map of attributes (optional). Content depends on the purpose type:
             - **string type**: Can have any attributes (e.g., value: "license:read")
             - **json-schema type**: Must have `validationSchema` attribute
             - **attribute type**: Must have `resourcePath` and `jsonPath` attributes
@@ -2387,7 +2387,6 @@ components:
         - id
         - name
         - type
-        - attributes
     ConsentPurposeListResponse:
       type: object
       properties:

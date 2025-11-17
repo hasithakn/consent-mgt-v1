@@ -701,3 +701,119 @@ func TestCreateConsent_WithNegativeDataAccessValidityDuration(t *testing.T) {
 
 	t.Log("✓ Correctly rejected negative dataAccessValidityDuration")
 }
+
+// TestCreateConsent_DuplicatePurposeNames tests that consent creation rejects duplicate purpose names
+func TestCreateConsent_DuplicatePurposeNames(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	// Create test purposes
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"test_data_access":   "Test data access purpose",
+		"test_account_info":  "Test account info purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Prepare request with duplicate purpose names
+	validityTime := int64(7776000) // ~90 days in seconds
+
+	createReq := &models.ConsentAPIRequest{
+		Type:         "accounts",
+		ValidityTime: &validityTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test_data_access", Value: "Read account data", IsSelected: BoolPtr(true)},
+			{Name: "test_data_access", Value: "Duplicate purpose", IsSelected: BoolPtr(true)}, // Duplicate!
+			{Name: "test_account_info", Value: "Read account info", IsSelected: BoolPtr(false)},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	// Make request
+	req, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+
+	// Execute request
+	recorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(recorder, req)
+
+	// Assert error response
+	assert.Equal(t, http.StatusBadRequest, recorder.Code, "Expected 400 Bad Request for duplicate purpose names")
+
+	var errorResponse map[string]interface{}
+	err = json.Unmarshal(recorder.Body.Bytes(), &errorResponse)
+	require.NoError(t, err)
+
+	// Verify error mentions duplicate purpose
+	errorText := strings.ToLower(errorResponse["message"].(string))
+	if details, ok := errorResponse["details"].(string); ok {
+		errorText += " " + strings.ToLower(details)
+	}
+	assert.Contains(t, errorText, "duplicate", "Error should mention duplicate")
+	assert.Contains(t, errorText, "test_data_access", "Error should mention the duplicate purpose name")
+
+	t.Log("✓ Correctly rejected duplicate purpose names in create request")
+}
+
+// TestCreateConsent_IsSelectedDefaultsToTrue tests that isSelected defaults to true when not provided
+func TestCreateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	// Create test purposes
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"test_data_access":  "Test data access purpose",
+		"test_account_info": "Test account info purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Prepare request WITHOUT isSelected field
+	validityTime := int64(7776000) // ~90 days in seconds
+
+	createReq := &models.ConsentAPIRequest{
+		Type:         "accounts",
+		ValidityTime: &validityTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test_data_access", Value: "Read account data"}, // isSelected not provided
+			{Name: "test_account_info", Value: "Read account info", IsSelected: BoolPtr(false)}, // explicitly false
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	// Make request
+	req, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+
+	// Execute request
+	recorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(recorder, req)
+
+	// Assert response
+	assert.Equal(t, http.StatusCreated, recorder.Code, "Expected 201 Created status")
+
+	var response models.ConsentAPIResponse
+	err = json.Unmarshal(recorder.Body.Bytes(), &response)
+	require.NoError(t, err)
+
+	// Verify consent purposes - first one should default to true, second should be false
+	require.Len(t, response.ConsentPurpose, 2, "Should have 2 consent purposes")
+	
+	for _, cp := range response.ConsentPurpose {
+		if cp.Name == "test_data_access" {
+			require.NotNil(t, cp.IsSelected, "IsSelected should not be nil")
+			assert.True(t, *cp.IsSelected, "IsSelected should default to true when not provided")
+		} else if cp.Name == "test_account_info" {
+			require.NotNil(t, cp.IsSelected, "IsSelected should not be nil")
+			assert.False(t, *cp.IsSelected, "IsSelected should be false when explicitly set")
+		}
+	}
+
+	t.Log("✓ isSelected correctly defaults to true when not provided in create request")
+}

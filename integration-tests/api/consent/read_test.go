@@ -118,7 +118,213 @@ func TestGetConsent_Success(t *testing.T) {
 	assert.NotNil(t, response.Authorizations, "Authorizations should not be nil")
 	assert.Empty(t, response.Authorizations, "Authorizations should be empty")
 
-	t.Logf("✓ Successfully retrieved consent %s with all fields", response.ID)
+	t.Logf("✓ Successfully retrieved consent with attributes")
+}
+
+// TestGetConsent_AllFieldsReturned tests that all fields are returned even when empty (no omitempty)
+func TestGetConsent_AllFieldsReturned(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	// Create test purpose
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"minimal_purpose": "Minimal purpose for testing",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+	
+	// Create a minimal consent without optional fields
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "minimal_purpose", Value: "test"},
+		},
+		// No Attributes, no Authorizations, no DataAccessValidityDuration
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	consentID := createResp.ID
+
+	// Get the consent
+	getReq, err := http.NewRequest("GET", "/api/v1/consents/"+consentID, nil)
+	require.NoError(t, err)
+	getReq.Header.Set("org-id", "TEST_ORG")
+	getReq.Header.Set("client-id", "TEST_CLIENT")
+
+	getRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(getRecorder, getReq)
+	require.Equal(t, http.StatusOK, getRecorder.Code)
+
+	// Parse response as raw JSON to check field presence
+	var rawResponse map[string]interface{}
+	err = json.Unmarshal(getRecorder.Body.Bytes(), &rawResponse)
+	require.NoError(t, err)
+
+	// Verify that all fields are present in JSON, even if empty
+	assert.Contains(t, rawResponse, "consentPurpose", "consentPurpose field should be present")
+	assert.Contains(t, rawResponse, "dataAccessValidityDuration", "dataAccessValidityDuration field should be present")
+	
+	// Verify consentPurpose is an array (not null) - should have 1 purpose we created
+	consentPurpose, ok := rawResponse["consentPurpose"].([]interface{})
+	assert.True(t, ok, "consentPurpose should be an array")
+	assert.NotNil(t, consentPurpose, "consentPurpose should not be null")
+	assert.Len(t, consentPurpose, 1, "consentPurpose should have 1 purpose")
+	
+	// Verify dataAccessValidityDuration is null (not omitted)
+	assert.Nil(t, rawResponse["dataAccessValidityDuration"], "dataAccessValidityDuration should be null (not omitted)")
+
+	t.Log("✓ All fields are present in response, no fields omitted")
+}
+
+// TestGetConsent_AuthorizationResourcesAlwaysPresent tests that authorization resources are always an object
+func TestGetConsent_AuthorizationResourcesAlwaysPresent(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	// Create test purpose
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"minimal_purpose": "Minimal purpose for testing",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+	
+	// Create consent with authorization but no resources
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "minimal_purpose", Value: "test"},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				Type:   "authorization",
+				Status: "APPROVED",
+				// No Resources field
+			},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+
+	// Verify authorizations are present
+	require.NotNil(t, createResp.Authorizations, "Authorizations should not be nil")
+	require.Len(t, createResp.Authorizations, 1, "Should have 1 authorization")
+	
+	// Verify resources field is present and is an object (not null)
+	auth := createResp.Authorizations[0]
+	assert.NotNil(t, auth.Resources, "Resources should not be nil")
+	
+	// Resources should be an empty object, not null
+	resources, ok := auth.Resources.(map[string]interface{})
+	assert.True(t, ok, "Resources should be a map/object")
+	assert.NotNil(t, resources, "Resources should be an empty object, not null")
+	assert.Len(t, resources, 0, "Resources should be an empty object")
+
+	t.Log("✓ Authorization resources field is always present as an object")
+}
+
+// TestGetConsent_ExpiryCheck tests that expired consents get EXPIRED status during GET
+func TestGetConsent_ExpiryCheck(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	// Create test purpose
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"test_purpose": "Test purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+	
+	// Create a consent with an expired validity time (in the past)
+	expiredValidityTime := int64(1000) // Very old timestamp (1970)
+	createReq := &models.ConsentAPIRequest{
+		Type:         "accounts",
+		ValidityTime: &expiredValidityTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test_purpose", Value: "test"},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				Type:   "authorization",
+				Status: "APPROVED",
+			},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	consentID := createResp.ID
+
+	// Initial status might be APPROVED from authorization
+	t.Logf("Initial consent status: %s", createResp.Status)
+
+	// Get the consent (should detect expiry and update status to EXPIRED)
+	getReq, err := http.NewRequest("GET", "/api/v1/consents/"+consentID, nil)
+	require.NoError(t, err)
+	getReq.Header.Set("org-id", "TEST_ORG")
+	getReq.Header.Set("client-id", "TEST_CLIENT")
+
+	getRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(getRecorder, getReq)
+	require.Equal(t, http.StatusOK, getRecorder.Code)
+
+	var getResp models.ConsentAPIResponse
+	err = json.Unmarshal(getRecorder.Body.Bytes(), &getResp)
+	require.NoError(t, err)
+
+	// Verify status is EXPIRED
+	assert.Equal(t, "EXPIRED", getResp.Status, "Consent status should be EXPIRED due to expired validityTime")
+
+	// Get again to ensure status persisted
+	getRecorder2 := httptest.NewRecorder()
+	env.Router.ServeHTTP(getRecorder2, getReq)
+	require.Equal(t, http.StatusOK, getRecorder2.Code)
+
+	var getResp2 models.ConsentAPIResponse
+	err = json.Unmarshal(getRecorder2.Body.Bytes(), &getResp2)
+	require.NoError(t, err)
+
+	// Verify status is still EXPIRED
+	assert.Equal(t, "EXPIRED", getResp2.Status, "Consent status should remain EXPIRED")
+
+	t.Log("✓ Expired consent correctly gets EXPIRED status during GET and persists")
 }
 
 // TestGetConsent_NotFound tests GET request for non-existent consent

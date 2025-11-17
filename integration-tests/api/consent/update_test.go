@@ -1046,3 +1046,247 @@ func TestUpdateConsent_ChangeAuthStatusFromApprovedToRevoked(t *testing.T) {
 
 	t.Logf("✓ Consent status correctly changed from APPROVED to REVOKED via PUT /consents")
 }
+
+// TestUpdateConsent_DuplicatePurposeNames tests that consent update rejects duplicate purpose names
+func TestUpdateConsent_DuplicatePurposeNames(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	// Create test purposes
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access":    "Data access purpose",
+		"payment_access": "Payment access purpose",
+		"account_info":   "Account info purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create a consent first
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Initial value", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	consentID := createResp.ID
+
+	// Attempt to update with duplicate purpose names
+	updateReq := &models.ConsentAPIUpdateRequest{
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Updated value", IsSelected: BoolPtr(true)},
+			{Name: "payment_access", Value: "Payment info", IsSelected: BoolPtr(true)},
+			{Name: "payment_access", Value: "Duplicate payment", IsSelected: BoolPtr(false)}, // Duplicate!
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+consentID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	// Assert error response
+	assert.Equal(t, http.StatusBadRequest, updateRecorder.Code, "Expected 400 Bad Request for duplicate purpose names")
+
+	var errorResponse map[string]interface{}
+	err = json.Unmarshal(updateRecorder.Body.Bytes(), &errorResponse)
+	require.NoError(t, err)
+
+	// Verify error mentions duplicate purpose
+	errorMsg := errorResponse["message"].(string)
+	var errorText string
+	if errorMsg != "" {
+		errorText = errorMsg
+	}
+	if details, ok := errorResponse["details"].(string); ok {
+		errorText += " " + details
+	}
+	
+	assert.Contains(t, errorText, "duplicate", "Error should mention duplicate")
+	assert.Contains(t, errorText, "payment_access", "Error should mention the duplicate purpose name")
+
+	t.Log("✓ Correctly rejected duplicate purpose names in update request")
+}
+
+// TestUpdateConsent_IsSelectedDefaultsToTrue tests that isSelected defaults to true when not provided in update
+func TestUpdateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	// Create test purposes
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access":    "Data access purpose",
+		"payment_access": "Payment access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create a consent first
+	createReq := &models.ConsentAPIRequest{
+		Type: "accounts",
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Initial value", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	consentID := createResp.ID
+
+	// Update without providing isSelected
+	updateReq := &models.ConsentAPIUpdateRequest{
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Updated value"}, // isSelected not provided
+			{Name: "payment_access", Value: "Payment info", IsSelected: BoolPtr(false)}, // explicitly false
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+consentID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	// Assert successful update
+	assert.Equal(t, http.StatusOK, updateRecorder.Code, "Expected 200 OK for update")
+
+	var updateResp models.ConsentAPIResponse
+	err = json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp)
+	require.NoError(t, err)
+
+	// Verify consent purposes - first one should default to true, second should be false
+	require.Len(t, updateResp.ConsentPurpose, 2, "Should have 2 consent purposes")
+	
+	for _, cp := range updateResp.ConsentPurpose {
+		if cp.Name == "data_access" {
+			require.NotNil(t, cp.IsSelected, "IsSelected should not be nil")
+			assert.True(t, *cp.IsSelected, "IsSelected should default to true when not provided")
+		} else if cp.Name == "payment_access" {
+			require.NotNil(t, cp.IsSelected, "IsSelected should not be nil")
+			assert.False(t, *cp.IsSelected, "IsSelected should be false when explicitly set")
+		}
+	}
+
+	t.Log("✓ isSelected correctly defaults to true when not provided in update request")
+}
+
+// TestUpdateConsent_ExpiryCheck tests that expired consents get EXPIRED status during update
+func TestUpdateConsent_ExpiryCheck(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	// Create test purposes
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"data_access": "Data access purpose",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create a consent with an expired validity time (in the past)
+	expiredValidityTime := int64(1000) // Very old timestamp (1970)
+	createReq := &models.ConsentAPIRequest{
+		Type:         "accounts",
+		ValidityTime: &expiredValidityTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Initial value", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				Type:   "authorization",
+				Status: "APPROVED",
+			},
+		},
+	}
+
+	reqBody, err := json.Marshal(createReq)
+	require.NoError(t, err)
+
+	createHTTPReq, err := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	require.NoError(t, err)
+	createHTTPReq.Header.Set("Content-Type", "application/json")
+	createHTTPReq.Header.Set("org-id", "TEST_ORG")
+	createHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	createRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(createRecorder, createHTTPReq)
+	require.Equal(t, http.StatusCreated, createRecorder.Code)
+
+	var createResp models.ConsentAPIResponse
+	err = json.Unmarshal(createRecorder.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	consentID := createResp.ID
+
+	// Update the consent (should detect expiry and set EXPIRED status)
+	updateReq := &models.ConsentAPIUpdateRequest{
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "data_access", Value: "Updated value", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				Type:   "authorization",
+				Status: "APPROVED", // Even though auth is APPROVED, consent should be EXPIRED
+			},
+		},
+	}
+
+	updateBody, err := json.Marshal(updateReq)
+	require.NoError(t, err)
+
+	updateHTTPReq, err := http.NewRequest("PUT", "/api/v1/consents/"+consentID, bytes.NewBuffer(updateBody))
+	require.NoError(t, err)
+	updateHTTPReq.Header.Set("Content-Type", "application/json")
+	updateHTTPReq.Header.Set("org-id", "TEST_ORG")
+	updateHTTPReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHTTPReq)
+
+	// Assert successful update
+	assert.Equal(t, http.StatusOK, updateRecorder.Code, "Expected 200 OK for update")
+
+	var updateResp models.ConsentAPIResponse
+	err = json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp)
+	require.NoError(t, err)
+
+	// Verify status is EXPIRED (not APPROVED from authorization)
+	assert.Equal(t, "EXPIRED", updateResp.Status, "Consent status should be EXPIRED due to expired validityTime")
+
+	t.Log("✓ Expired consent correctly gets EXPIRED status during update")
+}

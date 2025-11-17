@@ -272,6 +272,16 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 		}
 	}
 
+	// Validate no duplicate purpose names
+	purposeNames := make(map[string]bool)
+	for _, cp := range consentPurposes {
+		purposeName := cp.Name
+		if purposeNames[purposeName] {
+			return nil, fmt.Errorf("duplicate purpose name found: %s", purposeName)
+		}
+		purposeNames[purposeName] = true
+	}
+
 	createReq := &ConsentCreateRequest{
 		ConsentPurpose:             consentPurposes,
 		ConsentType:                req.Type,
@@ -313,8 +323,32 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 // ToConsentUpdateRequest converts API update request format to internal format
 // Note: CurrentStatus will be set by the handler based on authorization states
 func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequest, error) {
+	// Apply default isSelected=true to purposes where it's not provided
+	var consentPurposes []ConsentPurposeItem
+	if req.ConsentPurpose != nil {
+		consentPurposes = make([]ConsentPurposeItem, len(req.ConsentPurpose))
+		for i, cp := range req.ConsentPurpose {
+			consentPurposes[i] = cp
+			if consentPurposes[i].IsSelected == nil {
+				// Default to true when not provided
+				trueVal := true
+				consentPurposes[i].IsSelected = &trueVal
+			}
+		}
+
+		// Validate no duplicate purpose names
+		purposeNames := make(map[string]bool)
+		for _, cp := range consentPurposes {
+			purposeName := cp.Name
+			if purposeNames[purposeName] {
+				return nil, fmt.Errorf("duplicate purpose name found: %s", purposeName)
+			}
+			purposeNames[purposeName] = true
+		}
+	}
+
 	updateReq := &ConsentUpdateRequest{
-		ConsentPurpose:             req.ConsentPurpose,
+		ConsentPurpose:             consentPurposes,
 		ConsentType:                req.Type,
 		CurrentStatus:              "", // Will be set by handler based on auth states
 		Attributes:                 req.Attributes,
@@ -355,7 +389,7 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 // ConsentAPIResponse represents the API response format for consent (external format)
 type ConsentAPIResponse struct {
 	ID                         string                     `json:"id"`
-	ConsentPurpose             []ConsentPurposeItem       `json:"consentPurpose,omitempty"`
+	ConsentPurpose             []ConsentPurposeItem       `json:"consentPurpose"`
 	CreatedTime                int64                      `json:"createdTime"`
 	UpdatedTime                int64                      `json:"updatedTime"`
 	ClientID                   string                     `json:"clientId"`
@@ -364,7 +398,7 @@ type ConsentAPIResponse struct {
 	Frequency                  *int                       `json:"frequency"`
 	ValidityTime               *int64                     `json:"validityTime"`
 	RecurringIndicator         *bool                      `json:"recurringIndicator"`
-	DataAccessValidityDuration *int64                     `json:"dataAccessValidityDuration,omitempty"`
+	DataAccessValidityDuration *int64                     `json:"dataAccessValidityDuration"`
 	Attributes                 map[string]string          `json:"attributes"`
 	Authorizations             []AuthorizationAPIResponse `json:"authorizations"`
 	ModifiedResponse           map[string]interface{}     `json:"modifiedResponse"`
@@ -377,7 +411,7 @@ type AuthorizationAPIResponse struct {
 	Type        string      `json:"type"`
 	Status      string      `json:"status"`
 	UpdatedTime int64       `json:"updatedTime"`
-	Resources   interface{} `json:"resources,omitempty"`
+	Resources   interface{} `json:"resources"`
 }
 
 // ToAPIResponse converts internal response format to API response format
@@ -388,9 +422,15 @@ func (resp *ConsentResponse) ToAPIResponse() *ConsentAPIResponse {
 		attributes = make(map[string]string)
 	}
 
+	// Initialize ConsentPurpose with empty array if nil
+	consentPurpose := resp.ConsentPurpose
+	if consentPurpose == nil {
+		consentPurpose = make([]ConsentPurposeItem, 0)
+	}
+
 	apiResp := &ConsentAPIResponse{
 		ID:                         resp.ConsentID,
-		ConsentPurpose:             resp.ConsentPurpose,
+		ConsentPurpose:             consentPurpose,
 		CreatedTime:                resp.CreatedTime,
 		UpdatedTime:                resp.UpdatedTime,
 		ClientID:                   resp.ClientID,
@@ -412,9 +452,13 @@ func (resp *ConsentResponse) ToAPIResponse() *ConsentAPIResponse {
 			// Parse resources JSON string to interface
 			var resources interface{}
 			if auth.Resources != nil && *auth.Resources != "" {
-				if err := json.Unmarshal([]byte(*auth.Resources), &resources); err == nil {
-					// Successfully parsed
+				if err := json.Unmarshal([]byte(*auth.Resources), &resources); err != nil {
+					// If parsing fails, set to empty object
+					resources = make(map[string]interface{})
 				}
+			} else {
+				// If resources is nil or empty, set to empty object
+				resources = make(map[string]interface{})
 			}
 
 			apiResp.Authorizations[i] = AuthorizationAPIResponse{

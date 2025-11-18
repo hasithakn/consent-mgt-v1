@@ -1456,6 +1456,11 @@ paths:
         
         If the consent has expired, the endpoint automatically updates the consent status to EXPIRED.
         
+        **Response includes enriched consent information:**
+        - Complete consent details with all fields
+        - Consent purposes enriched with type, description, and attributes from purpose definitions
+        - Excludes the `modifiedResponse` field (present only in GET/POST/PUT responses)
+        
         **Note:** All responses return HTTP 200. Check the `isValid` field and `httpCode` in the response body to determine the actual validation result.
       operationId: consents-validate-POST
       tags:
@@ -2224,13 +2229,156 @@ components:
           type: object
           nullable: true
         errorCode:
-          description: Error code if validation failed (e.g., "Unauthorized", "Expired", "NotFound").
-          type: string
-          example: "Unauthorized"
+          description: HTTP status code if validation failed (e.g., 401, 404, 500).
+          type: integer
+          example: 401
         errorMessage:
-          description: Human-readable error message if validation failed.
+          description: Error type/code if validation failed (e.g., "invalid_consent_status", "consent_expired", "consent_not_found").
           type: string
-          example: "Consent validation failed"
+          example: "consent_expired"
+        errorDescription:
+          description: Human-readable detailed error description if validation failed.
+          type: string
+          example: "Consent has expired. Status updated to: EXPIRED"
+        consentInformation:
+          description: |
+            Complete consent information (excludes modifiedResponse field).
+            
+            **Includes enriched consent purpose details:**
+            - Each consent purpose includes type, description, and attributes from the purpose definition
+            - This allows clients to understand what each purpose means without additional API calls
+            
+            Always present in the response, regardless of validation result.
+          allOf:
+            - $ref: "#/components/schemas/ValidateConsentAPIResponse"
+    ValidateConsentAPIResponse:
+      type: object
+      description: Consent information in validate response (same as ConsentAPIResponse but excludes modifiedResponse field)
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the consent (UUID with CONSENT- prefix)
+          example: "CONSENT-123e4567-e89b-12d3-a456-426614174000"
+        type:
+          type: string
+          description: The consent type (e.g., accounts, payments, etc.)
+          example: "accounts"
+        clientId:
+          type: string
+          description: Client ID of the application that created the consent
+          example: "client-app-123"
+        status:
+          type: string
+          description: Current status of the consent (CREATED, ACTIVE, EXPIRED, REVOKED, REJECTED, etc.)
+          example: "ACTIVE"
+        createdTime:
+          type: integer
+          format: int64
+          description: Unix timestamp (seconds) when the consent was created
+          example: 1699564800
+        updatedTime:
+          type: integer
+          format: int64
+          description: Unix timestamp (seconds) when the consent was last updated
+          example: 1699651200
+        validityTime:
+          type: integer
+          format: int64
+          nullable: true
+          description: Unix timestamp (seconds) until which the consent is valid. If expired, status will be EXPIRED.
+          example: 1707340800
+        recurringIndicator:
+          type: boolean
+          nullable: true
+          description: Indicates if the consent can be used repeatedly
+          example: true
+        frequency:
+          type: integer
+          nullable: true
+          description: Number of times the consent can be used (if recurringIndicator is true)
+          example: 10
+        dataAccessValidityDuration:
+          type: integer
+          format: int64
+          nullable: true
+          description: Duration in seconds for which data access is valid after each authorization
+          example: 86400
+        consentPurpose:
+          type: array
+          description: |
+            List of consent purposes with their selection state and **enriched details from purpose definitions**.
+            Each purpose includes:
+            - name: Purpose identifier
+            - value: User-provided value for this purpose (if any)
+            - isSelected: Whether the purpose is selected (boolean)
+            - type: Purpose type from definition (string, json-schema, or attribute)
+            - description: Purpose description from definition
+            - attributes: Purpose attributes from definition (e.g., validationSchema, resourcePath, jsonPath)
+          items:
+            allOf:
+              - $ref: "#/components/schemas/ConsentPurposeItem"
+              - type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [string, json-schema, attribute]
+                    description: Purpose type from the consent purpose definition
+                    example: "string"
+                  description:
+                    type: string
+                    description: Purpose description from the consent purpose definition
+                    example: "Allows accessing utility API"
+                  attributes:
+                    type: object
+                    additionalProperties:
+                      type: string
+                    description: Purpose attributes from the consent purpose definition
+                    example:
+                      value: "utility:read"
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+          description: Custom key-value attributes associated with the consent
+          example:
+            channel: "mobile"
+            region: "US"
+        authorizations:
+          type: array
+          description: List of authorizations associated with this consent
+          items:
+            type: object
+            properties:
+              authId:
+                type: string
+                example: "AUTH-123e4567-e89b-12d3-a456-426614174000"
+              userId:
+                type: string
+                nullable: true
+                example: "user-456"
+              type:
+                type: string
+                example: "authorization"
+              status:
+                type: string
+                example: "APPROVED"
+              resources:
+                type: object
+                description: Authorization resources (always present, empty object if not set)
+                example:
+                  accountIds: ["123456", "789012"]
+              updatedTime:
+                type: integer
+                format: int64
+                example: 1699651200
+      required:
+        - id
+        - type
+        - clientId
+        - status
+        - createdTime
+        - updatedTime
+        - consentPurpose
     ConsentIdsResponse:
       type: object
       description: Response payload containing consent IDs matching the attribute search criteria.

@@ -101,8 +101,8 @@ func (h *ConsentHandler) CreateConsent(c *gin.Context) {
 		}
 	}
 
-	// Derive consent status from authorization statuses
-	request.CurrentStatus = handlerutils.DeriveConsentStatus(request.AuthResources)
+	// Derive consent status from authorization statuses (no existing status for create)
+	request.CurrentStatus = handlerutils.DeriveConsentStatus(request.AuthResources, "")
 
 	// Create consent with purpose validation
 	var consent *models.ConsentResponse
@@ -257,11 +257,7 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 		}
 	}
 
-	// Derive consent status from authorization statuses
-	updateRequest.CurrentStatus = handlerutils.DeriveConsentStatus(updateRequest.AuthResources)
-
-	// Check if consent is expired based on validity time after deriving status
-	// Get existing consent to check validity time
+	// Get existing consent first to check validity time and preserve status for custom auth states
 	existingConsent, err := h.consentService.GetConsent(c.Request.Context(), consentID, orgID)
 	if err != nil {
 		// If consent not found, let the update service handle it
@@ -270,6 +266,13 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 			return
 		}
 	}
+
+	// Derive consent status from authorization statuses, preserving existing status for custom auth states
+	var existingStatus string
+	if existingConsent != nil {
+		existingStatus = existingConsent.CurrentStatus
+	}
+	updateRequest.CurrentStatus = handlerutils.DeriveConsentStatus(updateRequest.AuthResources, existingStatus)
 
 	// If existing consent has validity time and it's expired, override status to EXPIRED
 	if existingConsent != nil && existingConsent.ValidityTime != nil {
@@ -416,7 +419,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 			ErrorCode:          401,
 			ErrorMessage:       "invalid_consent_status",
 			ErrorDescription:   fmt.Sprintf("Consent is not in active state. Current status: %s, Expected: %s", consent.CurrentStatus, cfg.Consent.StatusMappings.ActiveStatus),
-			ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, consent, orgID),
+			ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, consent, orgID).ToValidateConsentAPIResponse(),
 		}
 		c.JSON(200, response)
 		return
@@ -447,7 +450,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 				ErrorCode:          401,
 				ErrorMessage:       "consent_expired",
 				ErrorDescription:   fmt.Sprintf("Consent has expired. Failed to update status: %s", err.Error()),
-				ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, consent, orgID),
+				ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, consent, orgID).ToValidateConsentAPIResponse(),
 			}
 			c.JSON(200, response)
 			return
@@ -460,7 +463,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 			ErrorCode:          401,
 			ErrorMessage:       "consent_expired",
 			ErrorDescription:   fmt.Sprintf("Consent has expired. Status updated to: %s", expiredStatus),
-			ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, updatedConsent, orgID),
+			ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, updatedConsent, orgID).ToValidateConsentAPIResponse(),
 		}
 		c.JSON(200, response)
 		return
@@ -475,7 +478,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 	response := models.ValidateResponse{
 		IsValid:            true,
 		ModifiedPayload:    nil,
-		ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, consent, orgID),
+		ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, consent, orgID).ToValidateConsentAPIResponse(),
 	}
 	c.JSON(200, response)
 }

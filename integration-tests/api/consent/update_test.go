@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -947,8 +948,8 @@ func TestUpdateConsent_AddMultipleAuthResourcesWithMixedStatuses(t *testing.T) {
 	t.Logf("✓ Consent status correctly set to REJECTED (highest priority)")
 }
 
-// TestUpdateConsent_ChangeAuthStatusFromApprovedToRevoked tests status priority when changing from APPROVED to REVOKED
-func TestUpdateConsent_ChangeAuthStatusFromApprovedToRevoked(t *testing.T) {
+// TestUpdateConsent_ChangeAuthStatusFromApprovedToRejected tests status change when authorization is rejected
+func TestUpdateConsent_ChangeAuthStatusFromApprovedToRejected(t *testing.T) {
 	env := SetupTestEnvironment(t)
 	
 	purposes := CreateTestPurposes(t, env, map[string]string{
@@ -993,7 +994,8 @@ func TestUpdateConsent_ChangeAuthStatusFromApprovedToRevoked(t *testing.T) {
 	require.Len(t, createResp.Authorizations, 1)
 	assert.Equal(t, "ACTIVE", createResp.Status, "Initial status should be ACTIVE (APPROVED auth -> ACTIVE consent)")
 
-	// Update consent with authorization changed to REVOKED via PUT /consents
+	// Update consent with authorization changed to REJECTED via PUT /consents
+	// Note: Use "rejected" as authorization status, not "REVOKED" (REVOKED is a consent status, not auth status)
 	updateReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
@@ -1003,7 +1005,7 @@ func TestUpdateConsent_ChangeAuthStatusFromApprovedToRevoked(t *testing.T) {
 			{
 				UserID: "user-123",
 				Type:   "authorization_code",
-				Status: "REVOKED",
+				Status: "rejected", // Valid auth status (approved, rejected, created)
 			},
 		},
 	}
@@ -1026,8 +1028,8 @@ func TestUpdateConsent_ChangeAuthStatusFromApprovedToRevoked(t *testing.T) {
 	err = json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp)
 	require.NoError(t, err)
 
-	// Verify status changed to REVOKED
-	assert.Equal(t, "REVOKED", updateResp.Status, "Consent status should be REVOKED when authorization is revoked")
+	// Verify status changed to REJECTED (rejected auth -> REJECTED consent)
+	assert.Equal(t, "REJECTED", updateResp.Status, "Consent status should be REJECTED when authorization is rejected")
 
 	// GET consent and verify status persists
 	getReq, err := http.NewRequest("GET", "/api/v1/consents/"+createResp.ID, nil)
@@ -1042,9 +1044,9 @@ func TestUpdateConsent_ChangeAuthStatusFromApprovedToRevoked(t *testing.T) {
 	err = json.Unmarshal(getRecorder.Body.Bytes(), &getResp)
 	require.NoError(t, err)
 
-	assert.Equal(t, "REVOKED", getResp.Status, "Consent status should remain REVOKED")
+	assert.Equal(t, "REJECTED", getResp.Status, "Consent status should remain REJECTED")
 
-	t.Logf("✓ Consent status correctly changed from APPROVED to REVOKED via PUT /consents")
+	t.Logf("✓ Consent status correctly changed from APPROVED to REJECTED via PUT /consents")
 }
 
 // TestUpdateConsent_DuplicatePurposeNames tests that consent update rejects duplicate purpose names
@@ -1289,4 +1291,167 @@ func TestUpdateConsent_ExpiryCheck(t *testing.T) {
 	assert.Equal(t, "EXPIRED", updateResp.Status, "Consent status should be EXPIRED due to expired validityTime")
 
 	t.Log("✓ Expired consent correctly gets EXPIRED status during update")
+}
+
+// TestUpdateConsent_CustomAuthStatusPreservesCreatedStatus tests that adding a custom authorization status
+// preserves the CREATED consent status (doesn't change to ACTIVE)
+func TestUpdateConsent_CustomAuthStatusPreservesCreatedStatus(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	// Create test purpose
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"test_purpose": "Test purpose for custom auth status",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent WITHOUT authorization (status should be CREATED)
+	validityTime := time.Now().Add(90 * 24 * time.Hour).UnixMilli()
+	createReq := &models.ConsentAPIRequest{
+		Type:         "accounts",
+		ValidityTime: &validityTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test_purpose", Value: "Test value", IsSelected: BoolPtr(true)},
+		},
+	}
+
+	reqBody, _ := json.Marshal(createReq)
+	req, _ := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+
+	recorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(recorder, req)
+	
+	assert.Equal(t, http.StatusCreated, recorder.Code)
+	
+	var createResponse models.ConsentAPIResponse
+	json.Unmarshal(recorder.Body.Bytes(), &createResponse)
+	defer CleanupTestData(t, env, createResponse.ID)
+	
+	assert.Equal(t, "CREATED", createResponse.Status, "Initial consent status should be CREATED")
+	t.Logf("✓ Created consent with CREATED status: %s", createResponse.ID)
+
+	// Update consent to add custom authorization status
+	updateReq := &models.ConsentAPIRequest{
+		Type:         "accounts",
+		ValidityTime: &validityTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test_purpose", Value: "Test value", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				UserID: "user-456",
+				Type:   "authorization_code",
+				Status: "custom_pending", // Custom status (not approved/rejected/created)
+			},
+		},
+	}
+
+	updateBody, _ := json.Marshal(updateReq)
+	updateHttpReq, _ := http.NewRequest("PUT", "/api/v1/consents/"+createResponse.ID, bytes.NewBuffer(updateBody))
+	updateHttpReq.Header.Set("Content-Type", "application/json")
+	updateHttpReq.Header.Set("org-id", "TEST_ORG")
+	updateHttpReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHttpReq)
+	
+	assert.Equal(t, http.StatusOK, updateRecorder.Code)
+	
+	var updateResponse models.ConsentAPIResponse
+	json.Unmarshal(updateRecorder.Body.Bytes(), &updateResponse)
+	
+	// Verify status is still CREATED (not changed to ACTIVE)
+	assert.Equal(t, "CREATED", updateResponse.Status, "Consent status should remain CREATED when custom auth status is added")
+	assert.Len(t, updateResponse.Authorizations, 1, "Should have 1 authorization")
+	assert.Equal(t, "custom_pending", updateResponse.Authorizations[0].Status, "Authorization status should be custom_pending")
+	
+	t.Logf("✓ Consent status remains CREATED after adding custom authorization status")
+	t.Logf("✓ Custom authorization status preserved existing consent status (bug fix verified)")
+}
+
+// TestUpdateConsent_CustomAuthStatusPreservesActiveStatus tests that adding a custom authorization status
+// to an ACTIVE consent preserves the ACTIVE status
+func TestUpdateConsent_CustomAuthStatusPreservesActiveStatus(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	// Create test purpose
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"test_purpose": "Test purpose for custom auth status",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent with approved authorization (status should be ACTIVE)
+	validityTime := time.Now().Add(90 * 24 * time.Hour).UnixMilli()
+	createReq := &models.ConsentAPIRequest{
+		Type:         "accounts",
+		ValidityTime: &validityTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test_purpose", Value: "Test value", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				UserID: "user-123",
+				Type:   "authorization_code",
+				Status: "approved",
+			},
+		},
+	}
+
+	reqBody, _ := json.Marshal(createReq)
+	req, _ := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+
+	recorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(recorder, req)
+	
+	assert.Equal(t, http.StatusCreated, recorder.Code)
+	
+	var createResponse models.ConsentAPIResponse
+	json.Unmarshal(recorder.Body.Bytes(), &createResponse)
+	defer CleanupTestData(t, env, createResponse.ID)
+	
+	assert.Equal(t, "ACTIVE", createResponse.Status, "Initial consent status should be ACTIVE (has approved auth)")
+	t.Logf("✓ Created consent with ACTIVE status: %s", createResponse.ID)
+
+	// Update consent to change authorization to custom status
+	updateReq := &models.ConsentAPIRequest{
+		Type:         "accounts",
+		ValidityTime: &validityTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test_purpose", Value: "Test value", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				UserID: "user-123",
+				Type:   "authorization_code",
+				Status: "custom_processing", // Custom status (not approved/rejected/created)
+			},
+		},
+	}
+
+	updateBody, _ := json.Marshal(updateReq)
+	updateHttpReq, _ := http.NewRequest("PUT", "/api/v1/consents/"+createResponse.ID, bytes.NewBuffer(updateBody))
+	updateHttpReq.Header.Set("Content-Type", "application/json")
+	updateHttpReq.Header.Set("org-id", "TEST_ORG")
+	updateHttpReq.Header.Set("client-id", "TEST_CLIENT")
+
+	updateRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(updateRecorder, updateHttpReq)
+	
+	assert.Equal(t, http.StatusOK, updateRecorder.Code)
+	
+	var updateResponse models.ConsentAPIResponse
+	json.Unmarshal(updateRecorder.Body.Bytes(), &updateResponse)
+	
+	// Verify status is still ACTIVE (not changed to CREATED or other)
+	assert.Equal(t, "ACTIVE", updateResponse.Status, "Consent status should remain ACTIVE when changing to custom auth status")
+	assert.Len(t, updateResponse.Authorizations, 1, "Should have 1 authorization")
+	assert.Equal(t, "custom_processing", updateResponse.Authorizations[0].Status, "Authorization status should be custom_processing")
+	
+	t.Logf("✓ Consent status remains ACTIVE after changing to custom authorization status")
+	t.Logf("✓ Custom authorization status preserved existing consent status (bug fix verified)")
 }

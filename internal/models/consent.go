@@ -401,7 +401,7 @@ type ConsentAPIResponse struct {
 	DataAccessValidityDuration *int64                     `json:"dataAccessValidityDuration"`
 	Attributes                 map[string]string          `json:"attributes"`
 	Authorizations             []AuthorizationAPIResponse `json:"authorizations"`
-	ModifiedResponse           map[string]interface{}     `json:"modifiedResponse"`
+	ModifiedResponse           interface{}                `json:"modifiedResponse"` // Present in GET/POST/PUT, excluded in validate
 }
 
 // AuthorizationAPIResponse represents the API response format for authorization resource (external format)
@@ -492,12 +492,51 @@ type ValidateRequest struct {
 
 // ValidateResponse represents the response for validation API
 type ValidateResponse struct {
-	IsValid            bool                `json:"isValid"`
-	ModifiedPayload    interface{}         `json:"modifiedPayload,omitempty"`
-	ErrorCode          int                 `json:"errorCode,omitempty"`
-	ErrorMessage       string              `json:"errorMessage,omitempty"`
-	ErrorDescription   string              `json:"errorDescription,omitempty"`
-	ConsentInformation *ConsentAPIResponse `json:"consentInformation,omitempty"`
+	IsValid            bool                            `json:"isValid"`
+	ModifiedPayload    interface{}                     `json:"modifiedPayload,omitempty"`
+	ErrorCode          int                             `json:"errorCode,omitempty"`
+	ErrorMessage       string                          `json:"errorMessage,omitempty"`
+	ErrorDescription   string                          `json:"errorDescription,omitempty"`
+	ConsentInformation *ValidateConsentAPIResponse `json:"consentInformation,omitempty"`
+}
+
+// ValidateConsentAPIResponse represents consent information in validate response (excludes modifiedResponse)
+type ValidateConsentAPIResponse struct {
+	ID                         string                        `json:"id"`
+	Type                       string                        `json:"type"`
+	ClientID                   string                        `json:"clientId"`
+	Status                     string                        `json:"status"`
+	CreatedTime                int64                         `json:"createdTime"`
+	UpdatedTime                int64                         `json:"updatedTime"`
+	ValidityTime               *int64                        `json:"validityTime"`
+	RecurringIndicator         *bool                         `json:"recurringIndicator"`
+	Frequency                  *int                          `json:"frequency"`
+	DataAccessValidityDuration *int64                        `json:"dataAccessValidityDuration"`
+	ConsentPurpose             []ConsentPurposeItem          `json:"consentPurpose"`
+	Attributes                 map[string]string             `json:"attributes,omitempty"`
+	Authorizations             []AuthorizationAPIResponse    `json:"authorizations,omitempty"`
+}
+
+// ToValidateConsentAPIResponse converts ConsentAPIResponse to ValidateConsentAPIResponse (excludes modifiedResponse)
+func (c *ConsentAPIResponse) ToValidateConsentAPIResponse() *ValidateConsentAPIResponse {
+	if c == nil {
+		return nil
+	}
+	return &ValidateConsentAPIResponse{
+		ID:                         c.ID,
+		Type:                       c.Type,
+		ClientID:                   c.ClientID,
+		Status:                     c.Status,
+		CreatedTime:                c.CreatedTime,
+		UpdatedTime:                c.UpdatedTime,
+		ValidityTime:               c.ValidityTime,
+		RecurringIndicator:         c.RecurringIndicator,
+		Frequency:                  c.Frequency,
+		DataAccessValidityDuration: c.DataAccessValidityDuration,
+		ConsentPurpose:             c.ConsentPurpose,
+		Attributes:                 c.Attributes,
+		Authorizations:             c.Authorizations,
+	}
 }
 
 // ConsentRevokeResponse represents the response after revoking a consent

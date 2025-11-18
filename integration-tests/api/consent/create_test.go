@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,7 +27,9 @@ func TestCreateConsent_Success(t *testing.T) {
 	defer CleanupTestPurposes(t, env, purposes)
 
 	// Prepare request with isSelected field
-	validityTime := int64(7776000) // ~90 days in seconds
+	// validityTime should be a future timestamp (in milliseconds or seconds from epoch)
+	// Set to 90 days from now in milliseconds
+	validityTime := time.Now().Add(90 * 24 * time.Hour).UnixMilli()
 	frequency := 1
 	recurringIndicator := false
 
@@ -181,7 +184,7 @@ func TestCreateConsent_WithAuthResources(t *testing.T) {
 	})
 	defer CleanupTestPurposes(t, env, purposes)
 
-	validityTime := int64(2592000) // ~30 days in seconds
+	validityTime := time.Now().Add(30 * 24 * time.Hour).UnixMilli() // 30 days from now in milliseconds
 	recurringIndicator := true
 	frequency := 5
 

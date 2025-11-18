@@ -221,7 +221,8 @@ func TestValidateConsent_ExpiredConsentUpdatesStatus(t *testing.T) {
 	consent := createConsentWithAuthStatus(t, env, purposes, "approved", &validityTime)
 	defer CleanupTestData(t, env, consent.ID)
 
-	// Verify consent is initially in ACTIVE status
+	// Note: The GET endpoint now automatically detects and updates expired consents,
+	// so the consent will already be EXPIRED when we first retrieve it
 	req, _ := http.NewRequest("GET", "/api/v1/consents/"+consent.ID, nil)
 	req.Header.Set("org-id", "TEST_ORG")
 
@@ -232,8 +233,9 @@ func TestValidateConsent_ExpiredConsentUpdatesStatus(t *testing.T) {
 	json.Unmarshal(recorder.Body.Bytes(), &getResponse1)
 	
 	assert.Equal(t, http.StatusOK, recorder.Code)
-	assert.Equal(t, "ACTIVE", getResponse1.Status, "Consent should initially be ACTIVE")
-	t.Logf("✓ Consent initially has status: %s", getResponse1.Status)
+	// With the new expiry check in GET, expired consents are immediately updated to EXPIRED
+	assert.Equal(t, "EXPIRED", getResponse1.Status, "Consent should be EXPIRED after GET detects expiry")
+	t.Logf("✓ Consent status after GET (with expiry check): %s", getResponse1.Status)
 
 	// Call validate endpoint with the expired consent
 	validateRequest := models.ValidateRequest{
@@ -265,9 +267,9 @@ func TestValidateConsent_ExpiredConsentUpdatesStatus(t *testing.T) {
 	// Verify validation failed due to expiry
 	assert.False(t, validateResponse.IsValid)
 	assert.Equal(t, 401, validateResponse.ErrorCode)
-	assert.Equal(t, "consent_expired", validateResponse.ErrorMessage)
-	assert.Contains(t, validateResponse.ErrorDescription, "expired")
-	t.Logf("✓ Validate correctly returned consent_expired error")
+	assert.Equal(t, "invalid_consent_status", validateResponse.ErrorMessage, "Since consent is already EXPIRED from GET, validate returns invalid_consent_status")
+	assert.Contains(t, validateResponse.ErrorDescription, "EXPIRED")
+	t.Logf("✓ Validate correctly returned invalid_consent_status error (consent already EXPIRED)")
 
 	// Verify the consent information includes updated status
 	assert.NotNil(t, validateResponse.ConsentInformation)
@@ -286,9 +288,9 @@ func TestValidateConsent_ExpiredConsentUpdatesStatus(t *testing.T) {
 	json.Unmarshal(recorder.Body.Bytes(), &getResponse2)
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
-	assert.Equal(t, "EXPIRED", getResponse2.Status, "Consent status should be updated to EXPIRED in database")
-	t.Logf("✓ Database shows updated status: %s", getResponse2.Status)
-	t.Logf("✓ Consent status successfully updated from ACTIVE to EXPIRED after validation")
+	assert.Equal(t, "EXPIRED", getResponse2.Status, "Consent status should remain EXPIRED in database")
+	t.Logf("✓ Database confirms status remains: %s", getResponse2.Status)
+	t.Logf("✓ Expiry check works correctly - GET detects expired consent and updates status to EXPIRED")
 }
 
 // TestValidateConsent_NotFound tests validation with non-existent consent
@@ -666,5 +668,105 @@ func TestValidateConsent_FullConsentInformationResponse(t *testing.T) {
 	t.Logf("✓ Validate response consentInformation exactly matches GET /consents/{id} response")
 	t.Logf("✓ All core fields, optional fields, attributes, purposes, and authorizations validated")
 	t.Logf("✓ Consent purposes enriched with type, description, and attributes from definitions")
+}
+
+// TestValidateConsent_NoModifiedResponseField tests that validate response does not contain modifiedResponse
+// but GET/POST responses DO contain it (even if empty)
+func TestValidateConsent_NoModifiedResponseField(t *testing.T) {
+	env := SetupTestEnvironment(t)
+	
+	// Create test purpose
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"test_purpose": "Test purpose for modified response check",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent with authorization
+	validityTime := time.Now().Add(90 * 24 * time.Hour).UnixMilli()
+	createReq := &models.ConsentAPIRequest{
+		Type:         "accounts",
+		ValidityTime: &validityTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test_purpose", Value: "Test value", IsSelected: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{
+				UserID: "user-123",
+				Type:   "authorization_code",
+				Status: "approved",
+			},
+		},
+	}
+
+	reqBody, _ := json.Marshal(createReq)
+	req, _ := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+
+	recorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(recorder, req)
+	
+	assert.Equal(t, http.StatusCreated, recorder.Code)
+	
+	var createResponse models.ConsentAPIResponse
+	json.Unmarshal(recorder.Body.Bytes(), &createResponse)
+	defer CleanupTestData(t, env, createResponse.ID)
+
+	// Verify POST response contains modifiedResponse field (even if empty)
+	createResponseMap := make(map[string]interface{})
+	json.Unmarshal(recorder.Body.Bytes(), &createResponseMap)
+	assert.Contains(t, createResponseMap, "modifiedResponse", "POST response should contain modifiedResponse field")
+	t.Logf("✓ POST /consents response contains modifiedResponse field")
+
+	// Verify GET response contains modifiedResponse field (even if empty)
+	getReq, _ := http.NewRequest("GET", "/api/v1/consents/"+createResponse.ID, nil)
+	getReq.Header.Set("org-id", "TEST_ORG")
+	getReq.Header.Set("client-id", "TEST_CLIENT")
+	
+	getRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(getRecorder, getReq)
+	
+	assert.Equal(t, http.StatusOK, getRecorder.Code)
+	
+	getResponseMap := make(map[string]interface{})
+	json.Unmarshal(getRecorder.Body.Bytes(), &getResponseMap)
+	assert.Contains(t, getResponseMap, "modifiedResponse", "GET response should contain modifiedResponse field")
+	t.Logf("✓ GET /consents/{id} response contains modifiedResponse field")
+
+	// Verify VALIDATE response does NOT contain modifiedResponse
+	validateReq := &models.ValidateRequest{
+		ConsentID: createResponse.ID,
+		UserID:    "user-123",
+	}
+	
+	validateBody, _ := json.Marshal(validateReq)
+	valReq, _ := http.NewRequest("POST", "/api/v1/consents/validate", bytes.NewBuffer(validateBody))
+	valReq.Header.Set("Content-Type", "application/json")
+	valReq.Header.Set("org-id", "TEST_ORG")
+	valReq.Header.Set("client-id", "TEST_CLIENT")
+	
+	valRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(valRecorder, valReq)
+	
+	assert.Equal(t, http.StatusOK, valRecorder.Code)
+	
+	var validateResponse models.ValidateResponse
+	json.Unmarshal(valRecorder.Body.Bytes(), &validateResponse)
+	assert.True(t, validateResponse.IsValid, "Consent should be valid")
+	
+	// Verify consentInformation does NOT contain modifiedResponse field
+	consentInfoBytes, _ := json.Marshal(validateResponse.ConsentInformation)
+	consentInfoMap := make(map[string]interface{})
+	json.Unmarshal(consentInfoBytes, &consentInfoMap)
+	
+	assert.NotContains(t, consentInfoMap, "modifiedResponse", "Validate response consentInformation should NOT contain modifiedResponse")
+	t.Logf("✓ POST /consents/validate response does NOT contain modifiedResponse field in consentInformation")
+	
+	// Verify the entire validate response doesn't contain modifiedResponse at any level
+	validateResponseMap := make(map[string]interface{})
+	json.Unmarshal(valRecorder.Body.Bytes(), &validateResponseMap)
+	assert.NotContains(t, validateResponseMap, "modifiedResponse", "Validate response should NOT contain modifiedResponse at top level")
+	t.Logf("✓ Bug fix verified: modifiedResponse present in GET/POST but absent in VALIDATE")
 }
 

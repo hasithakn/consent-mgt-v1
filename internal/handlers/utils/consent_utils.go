@@ -14,7 +14,10 @@ import (
 // - If all auths have status "approved" (or empty) -> consent status is "active"
 // - For custom states -> TODO: call extension to resolve (for now treat as active)
 // Priority: rejected > revoked > created > custom/active
-func DeriveConsentStatus(authResources []models.ConsentAuthResourceCreateRequest) string {
+// DeriveConsentStatus derives the consent status from authorization statuses
+// If existingStatus is provided and a custom authorization status is encountered,
+// the existing status is preserved instead of defaulting to ACTIVE
+func DeriveConsentStatus(authResources []models.ConsentAuthResourceCreateRequest, existingStatus string) string {
 	if len(authResources) == 0 {
 		// No authorizations: default to created
 		return string(models.ConsentStatusCreated)
@@ -32,7 +35,7 @@ func DeriveConsentStatus(authResources []models.ConsentAuthResourceCreateRequest
 			// Custom/unknown state
 			hasCustom = true
 			// TODO: Call extension service to resolve custom state to known consent status
-			// For now, we'll treat custom states as active after all checks
+			// For now, we'll preserve existing status or default to created if no existing status
 			continue
 		}
 
@@ -46,7 +49,7 @@ func DeriveConsentStatus(authResources []models.ConsentAuthResourceCreateRequest
 		}
 	}
 
-	// Priority: rejected > revoked > created > custom/active
+	// Priority: rejected > revoked > created > custom (preserve existing) > active
 	if hasRejected {
 		return string(models.ConsentStatusRejected)
 	}
@@ -58,8 +61,11 @@ func DeriveConsentStatus(authResources []models.ConsentAuthResourceCreateRequest
 	}
 	if hasCustom {
 		// TODO: Extension resolution for custom states
-		// For now, default to active
-		return string(models.ConsentStatusActive)
+		// If we have an existing status, preserve it; otherwise default to created
+		if existingStatus != "" {
+			return existingStatus
+		}
+		return string(models.ConsentStatusCreated)
 	}
 
 	// All approved or empty -> active

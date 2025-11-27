@@ -427,7 +427,8 @@ func TestCreateConsent_InvalidRequest(t *testing.T) {
 	}
 }
 
-// TestCreateConsent_MissingIsSelected tests that isUserApproved field defaults properly
+// TestCreateConsent_MissingIsSelected tests that omitting both fields fails validation
+// (defaults isMandatory=true, isUserApproved=false violate the validation rule)
 func TestCreateConsent_MissingIsSelected(t *testing.T) {
 	env := SetupTestEnvironment(t)
 
@@ -447,7 +448,7 @@ func TestCreateConsent_MissingIsSelected(t *testing.T) {
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "test_missing_selected", Value: "Test without isUserApproved"}, // isUserApproved not provided
+			{Name: "test_missing_selected", Value: "Test without isUserApproved"}, // Both fields omitted
 		},
 	}
 
@@ -463,40 +464,21 @@ func TestCreateConsent_MissingIsSelected(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	env.Router.ServeHTTP(recorder, req)
 
-	assert.Equal(t, http.StatusCreated, recorder.Code)
+	// Should fail because defaults (isMandatory=true, isUserApproved=false) violate validation
+	assert.Equal(t, http.StatusBadRequest, recorder.Code, "Should return 400 for validation failure")
 
-	var response models.ConsentAPIResponse
-	err = json.Unmarshal(recorder.Body.Bytes(), &response)
+	var errorResponse map[string]interface{}
+	err = json.Unmarshal(recorder.Body.Bytes(), &errorResponse)
 	require.NoError(t, err)
 
-	// Verify all response fields
-	assert.NotEmpty(t, response.ID, "Consent ID should not be empty")
-	assert.Equal(t, "accounts", response.Type, "Type should match")
-	assert.Equal(t, "TEST_CLIENT", response.ClientID, "ClientID should match")
-	assert.Equal(t, "CREATED", response.Status, "Status should be CREATED")
+	// Verify error mentions the validation rule
+	errorText := strings.ToLower(errorResponse["message"].(string))
+	if details, ok := errorResponse["details"].(string); ok {
+		errorText += " " + strings.ToLower(details)
+	}
+	assert.Contains(t, errorText, "mandatory", "Error should mention mandatory")
 
-	// Verify timestamps
-	assert.Greater(t, response.CreatedTime, int64(0), "CreatedTime should be positive")
-	assert.Greater(t, response.UpdatedTime, int64(0), "UpdatedTime should be positive")
-
-	// Verify consent metadata
-	assert.NotNil(t, response.ValidityTime, "ValidityTime should not be nil")
-	assert.Equal(t, validityTime, *response.ValidityTime, "ValidityTime should match")
-	assert.NotNil(t, response.RecurringIndicator, "RecurringIndicator should not be nil")
-	assert.Equal(t, recurringIndicator, *response.RecurringIndicator, "RecurringIndicator should match")
-	assert.NotNil(t, response.Frequency, "Frequency should not be nil")
-	assert.Equal(t, frequency, *response.Frequency, "Frequency should match")
-
-	// Verify isUserApproved defaults to true when not provided
-	assert.NotNil(t, response.ConsentPurpose, "ConsentPurpose should not be nil")
-	assert.Len(t, response.ConsentPurpose, 1, "Should have 1 consent purpose")
-	assert.Equal(t, "test_missing_selected", response.ConsentPurpose[0].Name, "Purpose name should match")
-	assert.Equal(t, "Test without isUserApproved", response.ConsentPurpose[0].Value, "Purpose value should match")
-	assert.NotNil(t, response.ConsentPurpose[0].IsUserApproved, "IsUserApproved should not be nil")
-	assert.True(t, *response.ConsentPurpose[0].IsUserApproved, "IsUserApproved should default to true when not provided")
-	t.Logf("✓ IsUserApproved correctly defaults to true when not provided: %v", *response.ConsentPurpose[0].IsUserApproved)
-
-	CleanupTestData(t, env, response.ID)
+	t.Log("✓ Correctly rejected request with default values that violate validation rule")
 }
 
 // TestCreateConsent_WithDataAccessValidityDuration tests consent creation with dataAccessValidityDuration
@@ -771,7 +753,7 @@ func TestCreateConsent_DuplicatePurposeNames(t *testing.T) {
 	t.Log("✓ Correctly rejected duplicate purpose names in create request")
 }
 
-// TestCreateConsent_IsSelectedDefaultsToTrue tests that isUserApproved defaults to true when not provided
+// TestCreateConsent_IsSelectedDefaultsToTrue tests valid combinations with explicit field values
 func TestCreateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	env := SetupTestEnvironment(t)
 
@@ -782,15 +764,16 @@ func TestCreateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	})
 	defer CleanupTestPurposes(t, env, purposes)
 
-	// Prepare request WITHOUT isUserApproved field
+	// Prepare request with explicit values that satisfy validation
 	validityTime := int64(7776000) // ~90 days in seconds
 
 	createReq := &models.ConsentAPIRequest{
 		Type:         "accounts",
 		ValidityTime: &validityTime,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "test_data_access", Value: "Read account data"},                                                               // isUserApproved not provided
-			{Name: "test_account_info", Value: "Read account info", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)}, // explicitly false
+			// Provide isUserApproved=true to satisfy validation when isMandatory defaults to true
+			{Name: "test_data_access", Value: "Read account data", IsUserApproved: BoolPtr(true)},
+			{Name: "test_account_info", Value: "Read account info", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)},
 		},
 	}
 
@@ -815,18 +798,23 @@ func TestCreateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	err = json.Unmarshal(recorder.Body.Bytes(), &response)
 	require.NoError(t, err)
 
-	// Verify consent purposes - first one should default to true, second should be false
+	// Verify consent purposes
 	require.Len(t, response.ConsentPurpose, 2, "Should have 2 consent purposes")
 
 	for _, cp := range response.ConsentPurpose {
 		if cp.Name == "test_data_access" {
 			require.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil")
-			assert.True(t, *cp.IsUserApproved, "IsUserApproved should default to true when not provided")
+			assert.True(t, *cp.IsUserApproved, "IsUserApproved should be true")
+			require.NotNil(t, cp.IsMandatory, "IsMandatory should not be nil")
+			assert.True(t, *cp.IsMandatory, "IsMandatory should default to true")
 		} else if cp.Name == "test_account_info" {
 			require.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil")
 			assert.False(t, *cp.IsUserApproved, "IsUserApproved should be false when explicitly set")
+			require.NotNil(t, cp.IsMandatory, "IsMandatory should not be nil")
+			assert.False(t, *cp.IsMandatory, "IsMandatory should be false when explicitly set")
 		}
 	}
 
-	t.Log("✓ isUserApproved correctly defaults to true when not provided in create request")
+	t.Log("✓ Successfully created consent with valid field combinations")
+	CleanupTestData(t, env, response.ID)
 }

@@ -54,8 +54,10 @@ func TestUpdateConsentPurpose_NameChangeWithBindings(t *testing.T) {
 		"type": "SHARING",
 		"consentPurpose": []map[string]interface{}{
 			{
-				"name":  purposeName,
-				"value": "account:read:write",
+				"name":            purposeName,
+				"value":           "account:read:write",
+				"isUserApproved":  true,
+				"isMandatory":     true,
 			},
 		},
 		"authorizations": []map[string]interface{}{
@@ -159,8 +161,10 @@ func TestUpdateConsentPurpose_DescriptionChangeWithBindings(t *testing.T) {
 		"type": "SHARING",
 		"consentPurpose": []map[string]interface{}{
 			{
-				"name":  purposeName,
-				"value": "profile:read:write",
+				"name":            purposeName,
+				"value":           "profile:read:write",
+				"isUserApproved":  true,
+				"isMandatory":     true,
 			},
 		},
 		"authorizations": []map[string]interface{}{
@@ -263,13 +267,15 @@ func TestDeleteConsentPurpose_WithBindings(t *testing.T) {
 
 	t.Logf("✓ Created consent purpose: %s", purposeID)
 
-	// Step 2: Create a consent that uses this purpose
+	// Step 2: Create a consent using this purpose (binding)
 	createConsentReq := map[string]interface{}{
 		"type": "SHARING",
 		"consentPurpose": []map[string]interface{}{
 			{
-				"name":  purposeName,
-				"value": "payment:read:write",
+				"name":            purposeName,
+				"value":           "test:value",
+				"isUserApproved":  true,
+				"isMandatory":     true,
 			},
 		},
 		"authorizations": []map[string]interface{}{

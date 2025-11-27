@@ -1172,10 +1172,10 @@ func TestUpdateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	require.NoError(t, err)
 	consentID := createResp.ID
 
-	// Update without providing isUserApproved
+	// Update with valid field combinations
 	updateReq := &models.ConsentAPIUpdateRequest{
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Updated value"}, // isUserApproved not provided
+			{Name: "data_access", Value: "Updated value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)}, // explicitly valid combination
 			{Name: "payment_access", Value: "Payment info", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)}, // explicitly false
 		},
 	}
@@ -1199,20 +1199,24 @@ func TestUpdateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	err = json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp)
 	require.NoError(t, err)
 
-	// Verify consent purposes - first one should default to true, second should be false
+	// Verify consent purposes - first one should be true, second should be false
 	require.Len(t, updateResp.ConsentPurpose, 2, "Should have 2 consent purposes")
 	
 	for _, cp := range updateResp.ConsentPurpose {
 		if cp.Name == "data_access" {
 			require.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil")
-			assert.True(t, *cp.IsUserApproved, "IsUserApproved should default to true when not provided")
+			assert.True(t, *cp.IsUserApproved, "IsUserApproved should be true")
+			require.NotNil(t, cp.IsMandatory, "IsMandatory should not be nil")
+			assert.True(t, *cp.IsMandatory, "IsMandatory should be true")
 		} else if cp.Name == "payment_access" {
 			require.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil")
 			assert.False(t, *cp.IsUserApproved, "IsUserApproved should be false when explicitly set")
+			require.NotNil(t, cp.IsMandatory, "IsMandatory should not be nil")
+			assert.False(t, *cp.IsMandatory, "IsMandatory should be false when explicitly set")
 		}
 	}
 
-	t.Log("✓ isUserApproved correctly defaults to true when not provided in update request")
+	t.Log("✓ Successfully updated consent with valid field combinations")
 }
 
 // TestUpdateConsent_ExpiryCheck tests that expired consents get EXPIRED status during update

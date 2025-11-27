@@ -139,7 +139,7 @@ func TestGetConsent_AllFieldsReturned(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "minimal_purpose", Value: "test"},
+			{Name: "minimal_purpose", Value: "test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		// No Attributes, no Authorizations, no DataAccessValidityDuration
 	}
@@ -207,7 +207,7 @@ func TestGetConsent_AuthorizationResourcesAlwaysPresent(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "minimal_purpose", Value: "test"},
+			{Name: "minimal_purpose", Value: "test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -268,7 +268,7 @@ func TestGetConsent_ExpiryCheck(t *testing.T) {
 		Type:         "accounts",
 		ValidityTime: &expiredValidityTime,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "test_purpose", Value: "test"},
+			{Name: "test_purpose", Value: "test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{

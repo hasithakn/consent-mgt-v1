@@ -125,7 +125,7 @@ func TestGetConsent_Success(t *testing.T) {
 	t.Logf("✓ Successfully retrieved consent with attributes")
 }
 
-// TestGetConsent_AllFieldsReturned tests that all fields are returned even when empty (no omitempty)
+// TestGetConsent_AllFieldsReturned tests that required fields are always present, but null optional fields are omitted
 func TestGetConsent_AllFieldsReturned(t *testing.T) {
 	env := SetupTestEnvironment(t)
 	
@@ -177,9 +177,10 @@ func TestGetConsent_AllFieldsReturned(t *testing.T) {
 	err = json.Unmarshal(getRecorder.Body.Bytes(), &rawResponse)
 	require.NoError(t, err)
 
-	// Verify that all fields are present in JSON, even if empty
+	// Verify that required fields are always present
 	assert.Contains(t, rawResponse, "consentPurpose", "consentPurpose field should be present")
-	assert.Contains(t, rawResponse, "dataAccessValidityDuration", "dataAccessValidityDuration field should be present")
+	assert.Contains(t, rawResponse, "attributes", "attributes field should be present (empty map, not omitted)")
+	assert.Contains(t, rawResponse, "authorizations", "authorizations field should be present (empty array, not omitted)")
 	
 	// Verify consentPurpose is an array (not null) - should have 1 purpose we created
 	consentPurpose, ok := rawResponse["consentPurpose"].([]interface{})
@@ -187,10 +188,13 @@ func TestGetConsent_AllFieldsReturned(t *testing.T) {
 	assert.NotNil(t, consentPurpose, "consentPurpose should not be null")
 	assert.Len(t, consentPurpose, 1, "consentPurpose should have 1 purpose")
 	
-	// Verify dataAccessValidityDuration is null (not omitted)
-	assert.Nil(t, rawResponse["dataAccessValidityDuration"], "dataAccessValidityDuration should be null (not omitted)")
+	// Verify null optional fields are omitted (not present in JSON)
+	assert.NotContains(t, rawResponse, "dataAccessValidityDuration", "dataAccessValidityDuration should be omitted when null")
+	assert.NotContains(t, rawResponse, "frequency", "frequency should be omitted when null")
+	assert.NotContains(t, rawResponse, "validityTime", "validityTime should be omitted when null")
+	assert.NotContains(t, rawResponse, "recurringIndicator", "recurringIndicator should be omitted when null")
 
-	t.Log("✓ All fields are present in response, no fields omitted")
+	t.Log("✓ Required fields present, null optional fields omitted, empty collections preserved")
 }
 
 // TestGetConsent_AuthorizationResourcesAlwaysPresent tests that authorization resources are always an object

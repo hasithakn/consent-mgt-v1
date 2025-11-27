@@ -2299,23 +2299,23 @@ components:
           type: integer
           format: int64
           nullable: true
-          description: Unix timestamp (seconds) until which the consent is valid. If expired, status will be EXPIRED.
+          description: Unix timestamp (seconds) until which the consent is valid. If expired, status will be EXPIRED. Omitted from response when null.
           example: 1707340800
         recurringIndicator:
           type: boolean
           nullable: true
-          description: Indicates if the consent can be used repeatedly
+          description: Indicates if the consent can be used repeatedly. Omitted from response when null.
           example: true
         frequency:
           type: integer
           nullable: true
-          description: Number of times the consent can be used (if recurringIndicator is true)
+          description: Number of times the consent can be used (if recurringIndicator is true). Omitted from response when null.
           example: 10
         dataAccessValidityDuration:
           type: integer
           format: int64
           nullable: true
-          description: Duration in seconds for which data access is valid after each authorization
+          description: Duration in seconds for which data access is valid after each authorization. Omitted from response when null.
           example: 86400
         consentPurpose:
           type: array
@@ -2370,6 +2370,7 @@ components:
               userId:
                 type: string
                 nullable: true
+                description: User identifier. Omitted from response when null.
                 example: "user-456"
               type:
                 type: string

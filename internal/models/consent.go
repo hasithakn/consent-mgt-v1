@@ -86,7 +86,7 @@ func (j *JSON) UnmarshalJSON(data []byte) error {
 // ConsentPurposeItem represents a single consent purpose with name, value, and selection status
 type ConsentPurposeItem struct {
 	Name           string                 `json:"name"`
-	Value          interface{}            `json:"value"`                    // Can be string, object, or array
+	Value          interface{}            `json:"value,omitempty"`          // Can be string, object, or array - omitted when nil
 	IsUserApproved *bool                  `json:"isUserApproved,omitempty"` // Optional: defaults to false if not provided
 	IsMandatory    *bool                  `json:"isMandatory,omitempty"`    // Optional: defaults to true if not provided
 	Type           *string                `json:"type,omitempty"`           // Enriched from purpose definition (optional)
@@ -420,19 +420,19 @@ type ConsentAPIResponse struct {
 	ClientID                   string                     `json:"clientId"`
 	Type                       string                     `json:"type"`
 	Status                     string                     `json:"status"`
-	Frequency                  *int                       `json:"frequency"`
-	ValidityTime               *int64                     `json:"validityTime"`
-	RecurringIndicator         *bool                      `json:"recurringIndicator"`
-	DataAccessValidityDuration *int64                     `json:"dataAccessValidityDuration"`
+	Frequency                  *int                       `json:"frequency,omitempty"`
+	ValidityTime               *int64                     `json:"validityTime,omitempty"`
+	RecurringIndicator         *bool                      `json:"recurringIndicator,omitempty"`
+	DataAccessValidityDuration *int64                     `json:"dataAccessValidityDuration,omitempty"`
 	Attributes                 map[string]string          `json:"attributes"`
 	Authorizations             []AuthorizationAPIResponse `json:"authorizations"`
-	ModifiedResponse           interface{}                `json:"modifiedResponse"` // Present in GET/POST/PUT, excluded in validate
+	ModifiedResponse           interface{}                `json:"modifiedResponse,omitempty"` // Present in GET/POST/PUT, excluded in validate
 }
 
 // AuthorizationAPIResponse represents the API response format for authorization resource (external format)
 type AuthorizationAPIResponse struct {
 	ID          string      `json:"id"`
-	UserID      *string     `json:"userId"`
+	UserID      *string     `json:"userId,omitempty"`
 	Type        string      `json:"type"`
 	Status      string      `json:"status"`
 	UpdatedTime int64       `json:"updatedTime"`

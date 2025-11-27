@@ -386,3 +386,35 @@ func (dao *AuthResourceDAO) GetByUserID(ctx context.Context, userID, orgID strin
 
 	return authResources, nil
 }
+
+// UpdateAllStatusByConsentID updates the status of all authorization resources for a consent
+func (dao *AuthResourceDAO) UpdateAllStatusByConsentID(ctx context.Context, consentID, orgID, status string, updatedTime int64) error {
+	query := `
+		UPDATE CONSENT_AUTH_RESOURCE
+		SET AUTH_STATUS = ?, UPDATED_TIME = ?
+		WHERE CONSENT_ID = ? AND ORG_ID = ?
+	`
+
+	_, err := dao.db.ExecContext(ctx, query, status, updatedTime, consentID, orgID)
+	if err != nil {
+		return fmt.Errorf("failed to update all auth resource statuses for consent: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateAllStatusByConsentIDWithTx updates the status of all authorization resources for a consent within a transaction
+func (dao *AuthResourceDAO) UpdateAllStatusByConsentIDWithTx(ctx context.Context, tx *database.Transaction, consentID, orgID, status string, updatedTime int64) error {
+	query := `
+		UPDATE CONSENT_AUTH_RESOURCE
+		SET AUTH_STATUS = ?, UPDATED_TIME = ?
+		WHERE CONSENT_ID = ? AND ORG_ID = ?
+	`
+
+	_, err := tx.ExecContext(ctx, query, status, updatedTime, consentID, orgID)
+	if err != nil {
+		return fmt.Errorf("failed to update all auth resource statuses for consent: %w", err)
+	}
+
+	return nil
+}

@@ -275,11 +275,19 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 	updateRequest.CurrentStatus = handlerutils.DeriveConsentStatus(updateRequest.AuthResources, existingStatus)
 
 	// If existing consent has validity time and it's expired, override status to EXPIRED
+	// and update all auth resource statuses to SYS_EXPIRED
 	if existingConsent != nil && existingConsent.ValidityTime != nil {
 		if utils.IsExpired(*existingConsent.ValidityTime) {
-			// Override the derived status with EXPIRED status
 			cfg := config.Get()
-			updateRequest.CurrentStatus = cfg.Consent.StatusMappings.ExpiredStatus
+			if cfg != nil {
+				updateRequest.CurrentStatus = cfg.Consent.StatusMappings.ExpiredStatus
+				// Update all auth resources status to SYS_EXPIRED if they are provided in the request
+				if updateRequest.AuthResources != nil {
+					for i := range updateRequest.AuthResources {
+						updateRequest.AuthResources[i].AuthStatus = string(models.AuthStateSysExpired)
+					}
+				}
+			}
 		}
 	}
 

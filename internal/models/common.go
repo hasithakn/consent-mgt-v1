@@ -84,6 +84,10 @@ const (
 	AuthStateApproved AuthorizationState = "APPROVED"
 	// AuthStateRejected indicates the authorization was rejected
 	AuthStateRejected AuthorizationState = "REJECTED"
+	// AuthStateSysExpired indicates the authorization was system-expired due to consent expiry
+	AuthStateSysExpired AuthorizationState = "SYS_EXPIRED"
+	// AuthStateSysRevoked indicates the authorization was system-revoked due to consent revocation
+	AuthStateSysRevoked AuthorizationState = "SYS_REVOKED"
 )
 
 // ConsentStatus lists allowed consent lifecycle statuses maintained by consent-mgt API

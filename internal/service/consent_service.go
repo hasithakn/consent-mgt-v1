@@ -279,6 +279,19 @@ func (s *ConsentService) UpdateConsentStatus(ctx context.Context, consentID, org
 		return nil, fmt.Errorf("failed to update consent status: %w", err)
 	}
 
+	// Update authorization statuses when consent is expired or revoked
+	if cfg.Consent.IsExpiredStatus(newStatus) {
+		// Update all authorization statuses to SYS_EXPIRED
+		if err := s.authResourceDAO.UpdateAllStatusByConsentIDWithTx(ctx, tx, consentID, orgID, string(models.AuthStateSysExpired), updatedTime); err != nil {
+			return nil, fmt.Errorf("failed to update authorization statuses to SYS_EXPIRED: %w", err)
+		}
+	} else if cfg.Consent.IsRevokedStatus(newStatus) {
+		// Update all authorization statuses to SYS_REVOKED
+		if err := s.authResourceDAO.UpdateAllStatusByConsentIDWithTx(ctx, tx, consentID, orgID, string(models.AuthStateSysRevoked), updatedTime); err != nil {
+			return nil, fmt.Errorf("failed to update authorization statuses to SYS_REVOKED: %w", err)
+		}
+	}
+
 	// Create status audit record
 	previousStatus := existingConsent.CurrentStatus
 	audit := &models.ConsentStatusAudit{
@@ -426,15 +439,18 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 		}
 	}
 
-	// Derive consent status from authorization states (if auth resources were provided)
+	// Derive consent status from authorization states
 	var statusChanged bool
 	previousStatus := existingConsent.CurrentStatus
-	if request.AuthResources != nil {
-		// Status is derived in the handler and passed in CurrentStatus
-		if request.CurrentStatus != "" && updatedConsent.CurrentStatus != request.CurrentStatus {
-			updatedConsent.CurrentStatus = request.CurrentStatus
-			statusChanged = true
-		}
+	
+	// Check if status changed - can happen with or without auth resources provided
+	// (e.g., expiry detection in handler, or status derived from auth states)
+	if request.CurrentStatus != "" && updatedConsent.CurrentStatus != request.CurrentStatus {
+		updatedConsent.CurrentStatus = request.CurrentStatus
+		statusChanged = true
+	} else if request.AuthResources != nil {
+		// If auth resources were provided but status wasn't explicitly set,
+		// the status derivation already happened in the handler
 	}
 
 	// Update consent with potentially new status
@@ -560,6 +576,11 @@ func (s *ConsentService) RevokeConsent(ctx context.Context, consentID, orgID str
 
 	if err := s.consentDAO.UpdateStatusWithTx(ctx, tx, consentID, orgID, newStatus, currentTime); err != nil {
 		return nil, fmt.Errorf("failed to update status: %w", err)
+	}
+
+	// Update all authorization statuses to SYS_REVOKED
+	if err := s.authResourceDAO.UpdateAllStatusByConsentIDWithTx(ctx, tx, consentID, orgID, string(models.AuthStateSysRevoked), currentTime); err != nil {
+		return nil, fmt.Errorf("failed to update authorization statuses: %w", err)
 	}
 
 	audit := &models.ConsentStatusAudit{

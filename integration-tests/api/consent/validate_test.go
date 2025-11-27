@@ -1144,3 +1144,85 @@ func TestCreateConsent_MixedWithOneInvalid(t *testing.T) {
 
 	t.Log("✓ Correctly rejected request with one invalid purpose among valid ones")
 }
+
+// TestValidateConsent_ExpiredWithAuthUpdatesAllStatuses tests that when validate checks an expired consent,
+// it updates the consent status to EXPIRED and all authorization statuses to SYS_EXPIRED
+func TestValidateConsent_ExpiredWithAuthUpdatesAllStatuses(t *testing.T) {
+	env := SetupTestEnvironment(t)
+
+	// Create test purpose
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"test_purpose": "Test purpose for expired consent",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create consent with expired validity time and authorizations
+	expiredTime := time.Now().Add(-24 * time.Hour).UnixMilli() // 1 day ago
+	createReq := &models.ConsentAPIRequest{
+		Type:         "accounts",
+		ValidityTime: &expiredTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "test_purpose", Value: "test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{UserID: "user-123", Type: "authorization_code", Status: "approved"},
+			{UserID: "user-456", Type: "authorization_code", Status: "approved"},
+		},
+	}
+
+	reqBody, _ := json.Marshal(createReq)
+	req, _ := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+
+	recorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(recorder, req)
+	require.Equal(t, http.StatusCreated, recorder.Code)
+
+	var createResponse models.ConsentAPIResponse
+	json.Unmarshal(recorder.Body.Bytes(), &createResponse)
+	defer CleanupTestData(t, env, createResponse.ID)
+
+	// Verify initial consent status is ACTIVE (from approved auths) and auth statuses are approved
+	assert.Equal(t, "ACTIVE", createResponse.Status, "Initial consent status should be ACTIVE")
+	require.Len(t, createResponse.Authorizations, 2, "Should have 2 authorizations")
+	for i, auth := range createResponse.Authorizations {
+		assert.Equal(t, "approved", auth.Status, "Authorization %d initial status should be approved", i)
+	}
+
+	// Validate the consent - should trigger expiry update
+	validateReq := &models.ValidateRequest{
+		ConsentID: createResponse.ID,
+		UserID:    "user-123",
+	}
+
+	validateBody, _ := json.Marshal(validateReq)
+	valReq, _ := http.NewRequest("POST", "/api/v1/consents/validate", bytes.NewBuffer(validateBody))
+	valReq.Header.Set("Content-Type", "application/json")
+	valReq.Header.Set("org-id", "TEST_ORG")
+	valReq.Header.Set("client-id", "TEST_CLIENT")
+
+	valRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(valRecorder, valReq)
+	require.Equal(t, http.StatusOK, valRecorder.Code)
+
+	var validateResponse models.ValidateResponse
+	json.Unmarshal(valRecorder.Body.Bytes(), &validateResponse)
+
+	// Verify validation failed due to expiry
+	assert.False(t, validateResponse.IsValid, "Validation should fail for expired consent")
+	assert.Equal(t, "consent_expired", validateResponse.ErrorMessage)
+
+	// Verify consent information has EXPIRED status
+	require.NotNil(t, validateResponse.ConsentInformation)
+	assert.Equal(t, "EXPIRED", validateResponse.ConsentInformation.Status, "Consent status should be EXPIRED")
+
+	// Verify all authorization statuses are SYS_EXPIRED in the returned consent information
+	require.Len(t, validateResponse.ConsentInformation.Authorizations, 2, "Should have 2 authorizations")
+	for i, auth := range validateResponse.ConsentInformation.Authorizations {
+		assert.Equal(t, string(models.AuthStateSysExpired), auth.Status, "Authorization %d status should be SYS_EXPIRED", i)
+	}
+
+	t.Log("✓ Validate expired consent: consent status updated to EXPIRED and all auth statuses updated to SYS_EXPIRED")
+}

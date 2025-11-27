@@ -442,7 +442,7 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 	// Derive consent status from authorization states
 	var statusChanged bool
 	previousStatus := existingConsent.CurrentStatus
-	
+
 	// Check if status changed - can happen with or without auth resources provided
 	// (e.g., expiry detection in handler, or status derived from auth states)
 	if request.CurrentStatus != "" && updatedConsent.CurrentStatus != request.CurrentStatus {

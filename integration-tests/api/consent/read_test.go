@@ -129,13 +129,13 @@ func TestGetConsent_Success(t *testing.T) {
 // TestGetConsent_AllFieldsReturned tests that required fields are always present, but null optional fields are omitted
 func TestGetConsent_AllFieldsReturned(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	// Create test purpose
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"minimal_purpose": "Minimal purpose for testing",
 	})
 	defer CleanupTestPurposes(t, env, purposes)
-	
+
 	// Create a minimal consent without optional fields
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
@@ -182,13 +182,13 @@ func TestGetConsent_AllFieldsReturned(t *testing.T) {
 	assert.Contains(t, rawResponse, "consentPurpose", "consentPurpose field should be present")
 	assert.Contains(t, rawResponse, "attributes", "attributes field should be present (empty map, not omitted)")
 	assert.Contains(t, rawResponse, "authorizations", "authorizations field should be present (empty array, not omitted)")
-	
+
 	// Verify consentPurpose is an array (not null) - should have 1 purpose we created
 	consentPurpose, ok := rawResponse["consentPurpose"].([]interface{})
 	assert.True(t, ok, "consentPurpose should be an array")
 	assert.NotNil(t, consentPurpose, "consentPurpose should not be null")
 	assert.Len(t, consentPurpose, 1, "consentPurpose should have 1 purpose")
-	
+
 	// Verify null optional fields are omitted (not present in JSON)
 	assert.NotContains(t, rawResponse, "dataAccessValidityDuration", "dataAccessValidityDuration should be omitted when null")
 	assert.NotContains(t, rawResponse, "frequency", "frequency should be omitted when null")
@@ -201,13 +201,13 @@ func TestGetConsent_AllFieldsReturned(t *testing.T) {
 // TestGetConsent_AuthorizationResourcesAlwaysPresent tests that authorization resources are always an object
 func TestGetConsent_AuthorizationResourcesAlwaysPresent(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	// Create test purpose
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"minimal_purpose": "Minimal purpose for testing",
 	})
 	defer CleanupTestPurposes(t, env, purposes)
-	
+
 	// Create consent with authorization but no resources
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
@@ -243,11 +243,11 @@ func TestGetConsent_AuthorizationResourcesAlwaysPresent(t *testing.T) {
 	// Verify authorizations are present
 	require.NotNil(t, createResp.Authorizations, "Authorizations should not be nil")
 	require.Len(t, createResp.Authorizations, 1, "Should have 1 authorization")
-	
+
 	// Verify resources field is present and is an object (not null)
 	auth := createResp.Authorizations[0]
 	assert.NotNil(t, auth.Resources, "Resources should not be nil")
-	
+
 	// Resources should be an empty object, not null
 	resources, ok := auth.Resources.(map[string]interface{})
 	assert.True(t, ok, "Resources should be a map/object")
@@ -260,13 +260,13 @@ func TestGetConsent_AuthorizationResourcesAlwaysPresent(t *testing.T) {
 // TestGetConsent_ExpiryCheck tests that expired consents get EXPIRED status during GET
 func TestGetConsent_ExpiryCheck(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	// Create test purpose
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"test_purpose": "Test purpose",
 	})
 	defer CleanupTestPurposes(t, env, purposes)
-	
+
 	// Create a consent with an expired validity time (in the past)
 	expiredValidityTime := int64(1000) // Very old timestamp (1970)
 	createReq := &models.ConsentAPIRequest{
@@ -542,7 +542,7 @@ func TestGetConsent_WithDataAccessValidityDuration(t *testing.T) {
 // TestGetConsent_WithAuthorizationResources tests retrieval of consent with detailed authorization resources
 func TestGetConsent_WithAuthorizationResources(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"payment_initiation": "Payment initiation purpose",
 	})
@@ -603,7 +603,7 @@ func TestGetConsent_WithAuthorizationResources(t *testing.T) {
 
 	// Assert authorizations
 	require.Len(t, response.Authorizations, 1, "Should have 1 authorization")
-	
+
 	auth := response.Authorizations[0]
 	assert.NotEmpty(t, auth.ID, "Authorization ID should not be empty")
 	assert.NotNil(t, auth.UserID, "UserID should not be nil")
@@ -618,7 +618,7 @@ func TestGetConsent_WithAuthorizationResources(t *testing.T) {
 // TestGetConsent_WithMultipleAuthorizationStatuses tests consent with multiple authorizations
 func TestGetConsent_WithMultipleAuthorizationStatuses(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
 	})
@@ -679,7 +679,7 @@ func TestGetConsent_WithMultipleAuthorizationStatuses(t *testing.T) {
 
 	// Assert authorizations
 	require.Len(t, response.Authorizations, 2, "Should have 2 authorizations")
-	
+
 	// Verify both authorizations are present
 	statuses := make(map[string]bool)
 	for _, auth := range response.Authorizations {

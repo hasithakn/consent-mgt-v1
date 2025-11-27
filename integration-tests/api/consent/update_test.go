@@ -17,7 +17,7 @@ import (
 // TestUpdateConsent_Success tests successful update of consent fields
 func TestUpdateConsent_Success(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	// Create test purposes
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access":    "Data access purpose",
@@ -95,7 +95,7 @@ func TestUpdateConsent_Success(t *testing.T) {
 
 	// Verify updated purposes
 	require.Len(t, updateResp.ConsentPurpose, 2, "Should have 2 consent purposes after update")
-	
+
 	purposeMap := make(map[string]models.ConsentPurposeItem)
 	for _, cp := range updateResp.ConsentPurpose {
 		purposeMap[cp.Name] = cp
@@ -144,7 +144,7 @@ func TestUpdateConsent_Success(t *testing.T) {
 // TestUpdateConsent_AddDataAccessValidityDuration tests adding dataAccessValidityDuration to existing consent
 func TestUpdateConsent_AddDataAccessValidityDuration(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
 	})
@@ -217,7 +217,7 @@ func TestUpdateConsent_AddDataAccessValidityDuration(t *testing.T) {
 // TestUpdateConsent_ChangeDataAccessValidityDuration tests changing dataAccessValidityDuration
 func TestUpdateConsent_ChangeDataAccessValidityDuration(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
 	})
@@ -291,7 +291,7 @@ func TestUpdateConsent_ChangeDataAccessValidityDuration(t *testing.T) {
 // TestUpdateConsent_NegativeDataAccessValidityDuration tests update with negative duration
 func TestUpdateConsent_NegativeDataAccessValidityDuration(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
 	})
@@ -354,7 +354,7 @@ func TestUpdateConsent_NegativeDataAccessValidityDuration(t *testing.T) {
 // TestUpdateConsent_NotFound tests update of non-existent consent
 func TestUpdateConsent_NotFound(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
 	})
@@ -390,7 +390,7 @@ func TestUpdateConsent_NotFound(t *testing.T) {
 // TestUpdateConsent_DifferentOrgID tests that consent from different org cannot be updated
 func TestUpdateConsent_DifferentOrgID(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
 	})
@@ -451,7 +451,7 @@ func TestUpdateConsent_DifferentOrgID(t *testing.T) {
 // TestUpdateConsent_InvalidRequest tests update with invalid/missing required fields
 func TestUpdateConsent_InvalidRequest(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
 	})
@@ -520,7 +520,7 @@ func TestUpdateConsent_InvalidRequest(t *testing.T) {
 // TestUpdateConsent_WithNonExistentPurpose tests updating consent with a purpose that doesn't exist
 func TestUpdateConsent_WithNonExistentPurpose(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
 	})
@@ -582,7 +582,7 @@ func TestUpdateConsent_WithNonExistentPurpose(t *testing.T) {
 // TestUpdateConsent_UpdateAuthResourceAndCheckStatus tests updating authorization and verifying consent status changes
 func TestUpdateConsent_UpdateAuthResourceAndCheckStatus(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
 	})
@@ -689,7 +689,7 @@ func TestUpdateConsent_UpdateAuthResourceAndCheckStatus(t *testing.T) {
 // TestUpdateConsent_RemovePurposes tests updating consent to remove purposes
 func TestUpdateConsent_RemovePurposes(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access":    "Data access purpose",
 		"payment_access": "Payment access purpose",
@@ -765,7 +765,7 @@ func TestUpdateConsent_RemovePurposes(t *testing.T) {
 // TestUpdateConsent_RemoveAuthResourcesAndCheckStatus tests removing authorization resources and checking consent status
 func TestUpdateConsent_RemoveAuthResourcesAndCheckStatus(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
 	})
@@ -850,7 +850,7 @@ func TestUpdateConsent_RemoveAuthResourcesAndCheckStatus(t *testing.T) {
 // TestUpdateConsent_AddMultipleAuthResourcesWithMixedStatuses tests adding multiple auth resources with different statuses
 func TestUpdateConsent_AddMultipleAuthResourcesWithMixedStatuses(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
 	})
@@ -955,7 +955,7 @@ func TestUpdateConsent_AddMultipleAuthResourcesWithMixedStatuses(t *testing.T) {
 // TestUpdateConsent_ChangeAuthStatusFromApprovedToRejected tests status change when authorization is rejected
 func TestUpdateConsent_ChangeAuthStatusFromApprovedToRejected(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
 	})
@@ -1056,7 +1056,7 @@ func TestUpdateConsent_ChangeAuthStatusFromApprovedToRejected(t *testing.T) {
 // TestUpdateConsent_DuplicatePurposeNames tests that consent update rejects duplicate purpose names
 func TestUpdateConsent_DuplicatePurposeNames(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	// Create test purposes
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access":    "Data access purpose",
@@ -1128,7 +1128,7 @@ func TestUpdateConsent_DuplicatePurposeNames(t *testing.T) {
 	if details, ok := errorResponse["details"].(string); ok {
 		errorText += " " + details
 	}
-	
+
 	assert.Contains(t, errorText, "duplicate", "Error should mention duplicate")
 	assert.Contains(t, errorText, "payment_access", "Error should mention the duplicate purpose name")
 
@@ -1138,7 +1138,7 @@ func TestUpdateConsent_DuplicatePurposeNames(t *testing.T) {
 // TestUpdateConsent_IsSelectedDefaultsToTrue tests that isUserApproved defaults to true when not provided in update
 func TestUpdateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	// Create test purposes
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access":    "Data access purpose",
@@ -1175,7 +1175,7 @@ func TestUpdateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	// Update with valid field combinations
 	updateReq := &models.ConsentAPIUpdateRequest{
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Updated value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)}, // explicitly valid combination
+			{Name: "data_access", Value: "Updated value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},     // explicitly valid combination
 			{Name: "payment_access", Value: "Payment info", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)}, // explicitly false
 		},
 	}
@@ -1201,7 +1201,7 @@ func TestUpdateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 
 	// Verify consent purposes - first one should be true, second should be false
 	require.Len(t, updateResp.ConsentPurpose, 2, "Should have 2 consent purposes")
-	
+
 	for _, cp := range updateResp.ConsentPurpose {
 		if cp.Name == "data_access" {
 			require.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil")
@@ -1222,7 +1222,7 @@ func TestUpdateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 // TestUpdateConsent_ExpiryCheck tests that expired consents get EXPIRED status during update
 func TestUpdateConsent_ExpiryCheck(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	// Create test purposes
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"data_access": "Data access purpose",
@@ -1305,7 +1305,7 @@ func TestUpdateConsent_ExpiryCheck(t *testing.T) {
 // preserves the CREATED consent status (doesn't change to ACTIVE)
 func TestUpdateConsent_CustomAuthStatusPreservesCreatedStatus(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	// Create test purpose
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"test_purpose": "Test purpose for custom auth status",
@@ -1330,13 +1330,13 @@ func TestUpdateConsent_CustomAuthStatusPreservesCreatedStatus(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	env.Router.ServeHTTP(recorder, req)
-	
+
 	assert.Equal(t, http.StatusCreated, recorder.Code)
-	
+
 	var createResponse models.ConsentAPIResponse
 	json.Unmarshal(recorder.Body.Bytes(), &createResponse)
 	defer CleanupTestData(t, env, createResponse.ID)
-	
+
 	assert.Equal(t, "CREATED", createResponse.Status, "Initial consent status should be CREATED")
 	t.Logf("✓ Created consent with CREATED status: %s", createResponse.ID)
 
@@ -1364,17 +1364,17 @@ func TestUpdateConsent_CustomAuthStatusPreservesCreatedStatus(t *testing.T) {
 
 	updateRecorder := httptest.NewRecorder()
 	env.Router.ServeHTTP(updateRecorder, updateHttpReq)
-	
+
 	assert.Equal(t, http.StatusOK, updateRecorder.Code)
-	
+
 	var updateResponse models.ConsentAPIResponse
 	json.Unmarshal(updateRecorder.Body.Bytes(), &updateResponse)
-	
+
 	// Verify status is still CREATED (not changed to ACTIVE)
 	assert.Equal(t, "CREATED", updateResponse.Status, "Consent status should remain CREATED when custom auth status is added")
 	assert.Len(t, updateResponse.Authorizations, 1, "Should have 1 authorization")
 	assert.Equal(t, "custom_pending", updateResponse.Authorizations[0].Status, "Authorization status should be custom_pending")
-	
+
 	t.Logf("✓ Consent status remains CREATED after adding custom authorization status")
 	t.Logf("✓ Custom authorization status preserved existing consent status (bug fix verified)")
 }
@@ -1383,7 +1383,7 @@ func TestUpdateConsent_CustomAuthStatusPreservesCreatedStatus(t *testing.T) {
 // to an ACTIVE consent preserves the ACTIVE status
 func TestUpdateConsent_CustomAuthStatusPreservesActiveStatus(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	// Create test purpose
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"test_purpose": "Test purpose for custom auth status",
@@ -1415,13 +1415,13 @@ func TestUpdateConsent_CustomAuthStatusPreservesActiveStatus(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	env.Router.ServeHTTP(recorder, req)
-	
+
 	assert.Equal(t, http.StatusCreated, recorder.Code)
-	
+
 	var createResponse models.ConsentAPIResponse
 	json.Unmarshal(recorder.Body.Bytes(), &createResponse)
 	defer CleanupTestData(t, env, createResponse.ID)
-	
+
 	assert.Equal(t, "ACTIVE", createResponse.Status, "Initial consent status should be ACTIVE (has approved auth)")
 	t.Logf("✓ Created consent with ACTIVE status: %s", createResponse.ID)
 
@@ -1449,17 +1449,17 @@ func TestUpdateConsent_CustomAuthStatusPreservesActiveStatus(t *testing.T) {
 
 	updateRecorder := httptest.NewRecorder()
 	env.Router.ServeHTTP(updateRecorder, updateHttpReq)
-	
+
 	assert.Equal(t, http.StatusOK, updateRecorder.Code)
-	
+
 	var updateResponse models.ConsentAPIResponse
 	json.Unmarshal(updateRecorder.Body.Bytes(), &updateResponse)
-	
+
 	// Verify status is still ACTIVE (not changed to CREATED or other)
 	assert.Equal(t, "ACTIVE", updateResponse.Status, "Consent status should remain ACTIVE when changing to custom auth status")
 	assert.Len(t, updateResponse.Authorizations, 1, "Should have 1 authorization")
 	assert.Equal(t, "custom_processing", updateResponse.Authorizations[0].Status, "Authorization status should be custom_processing")
-	
+
 	t.Logf("✓ Consent status remains ACTIVE after changing to custom authorization status")
 	t.Logf("✓ Custom authorization status preserved existing consent status (bug fix verified)")
 }
@@ -1546,5 +1546,3 @@ func TestUpdateConsent_ExpiredWithAuthUpdatesAllStatuses(t *testing.T) {
 
 	t.Log("✓ PUT expired consent: consent status updated to EXPIRED and all auth statuses updated to SYS_EXPIRED")
 }
-
-

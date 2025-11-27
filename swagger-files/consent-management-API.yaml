@@ -1502,17 +1502,19 @@ components:
     ConsentPurposeItem:
       type: object
       description: |
-        Represents a single consent purpose with its selection state and optional value.
+        Represents a single consent purpose with its approval state, mandatory flag, and optional value.
         
         Used in consent create/update requests and responses to indicate which purposes
-        are associated with a consent and whether they are selected/approved.
+        are associated with a consent and their approval/mandatory status.
+        
+        **Validation Rule:** If `isMandatory` is true, then `isUserApproved` MUST also be true.
       required:
         - name
       properties:
         name:
           type: string
           description: The purpose identifier/name (must match an existing consent purpose)
-          example: "utility_read"
+          example: "license_read"
         value:
           description: |
             Optional purpose value - flexible type that can be:
@@ -1526,14 +1528,26 @@ components:
             - type: string
             - type: object
             - type: array
-          example: "utility:read"
-        isSelected:
+          example: "license_read"
+        isUserApproved:
           type: boolean
           description: |
-            Indicates whether this purpose is selected/approved for this consent.
+            Indicates whether the user has approved this purpose for this consent.
             
-            This field is OPTIONAL. If not provided, it defaults to true.
-            It is persisted in the database and returned in all consent responses.
+            This field is **OPTIONAL**. If not provided, it defaults to **false**.
+            
+            **Validation:** When `isMandatory` is true, this field MUST be true.
+          default: false
+          example: true
+        isMandatory:
+          type: boolean
+          description: |
+            Indicates whether this purpose is mandatory for the consent.
+            
+            This field is **OPTIONAL**. If not provided, it defaults to **true**.
+            
+            **Validation:** When this field is true, `isUserApproved` must also be true.
+            When a purpose is mandatory, it inherently requires user approval.
           default: true
           example: true
     File:
@@ -2306,11 +2320,12 @@ components:
         consentPurpose:
           type: array
           description: |
-            List of consent purposes with their selection state and **enriched details from purpose definitions**.
+            List of consent purposes with their approval state, mandatory flag, and **enriched details from purpose definitions**.
             Each purpose includes:
             - name: Purpose identifier
             - value: User-provided value for this purpose (if any)
-            - isSelected: Whether the purpose is selected (boolean)
+            - isUserApproved: Whether the user has approved this purpose (boolean, default false)
+            - isMandatory: Whether this purpose is mandatory (boolean, default true)
             - type: Purpose type from definition (string, json-schema, or attribute)
             - description: Purpose description from definition
             - attributes: Purpose attributes from definition (e.g., validationSchema, resourcePath, jsonPath)

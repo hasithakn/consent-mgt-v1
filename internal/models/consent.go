@@ -85,12 +85,13 @@ func (j *JSON) UnmarshalJSON(data []byte) error {
 
 // ConsentPurposeItem represents a single consent purpose with name, value, and selection status
 type ConsentPurposeItem struct {
-	Name        string                 `json:"name"`
-	Value       interface{}            `json:"value"`                 // Can be string, object, or array
-	IsSelected  *bool                  `json:"isSelected,omitempty"`  // Pointer to distinguish nil (defaults to true) from explicit false
-	Type        *string                `json:"type,omitempty"`        // Enriched from purpose definition (optional)
-	Description *string                `json:"description,omitempty"` // Enriched from purpose definition (optional)
-	Attributes  map[string]interface{} `json:"attributes,omitempty"`  // Enriched from purpose definition (optional)
+	Name           string                 `json:"name"`
+	Value          interface{}            `json:"value"`                    // Can be string, object, or array
+	IsUserApproved *bool                  `json:"isUserApproved,omitempty"` // Optional: defaults to false if not provided
+	IsMandatory    *bool                  `json:"isMandatory,omitempty"`    // Optional: defaults to true if not provided
+	Type           *string                `json:"type,omitempty"`           // Enriched from purpose definition (optional)
+	Description    *string                `json:"description,omitempty"`    // Enriched from purpose definition (optional)
+	Attributes     map[string]interface{} `json:"attributes,omitempty"`     // Enriched from purpose definition (optional)
 }
 
 // ConsentAPIRequest represents the API payload for creating a consent (external format)
@@ -261,14 +262,26 @@ func (c *Consent) GetUpdatedTime() time.Time {
 // ToConsentCreateRequest converts API request format to internal format
 // Note: CurrentStatus will be set by the handler based on authorization states
 func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, error) {
-	// Apply default isSelected=true to purposes where it's not provided
+	// Apply defaults and validate purposes
 	consentPurposes := make([]ConsentPurposeItem, len(req.ConsentPurpose))
 	for i, cp := range req.ConsentPurpose {
 		consentPurposes[i] = cp
-		if consentPurposes[i].IsSelected == nil {
-			// Default to true when not provided
+
+		// Apply default: isUserApproved = false if not provided
+		if consentPurposes[i].IsUserApproved == nil {
+			falseVal := false
+			consentPurposes[i].IsUserApproved = &falseVal
+		}
+
+		// Apply default: isMandatory = true if not provided
+		if consentPurposes[i].IsMandatory == nil {
 			trueVal := true
-			consentPurposes[i].IsSelected = &trueVal
+			consentPurposes[i].IsMandatory = &trueVal
+		}
+
+		// Validation: if isMandatory is true, isUserApproved must be true
+		if *consentPurposes[i].IsMandatory && !*consentPurposes[i].IsUserApproved {
+			return nil, fmt.Errorf("purpose '%s': when isMandatory is true, isUserApproved must also be true", cp.Name)
 		}
 	}
 
@@ -323,16 +336,28 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 // ToConsentUpdateRequest converts API update request format to internal format
 // Note: CurrentStatus will be set by the handler based on authorization states
 func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequest, error) {
-	// Apply default isSelected=true to purposes where it's not provided
+	// Apply defaults and validate purposes
 	var consentPurposes []ConsentPurposeItem
 	if req.ConsentPurpose != nil {
 		consentPurposes = make([]ConsentPurposeItem, len(req.ConsentPurpose))
 		for i, cp := range req.ConsentPurpose {
 			consentPurposes[i] = cp
-			if consentPurposes[i].IsSelected == nil {
-				// Default to true when not provided
+
+			// Apply default: isUserApproved = false if not provided
+			if consentPurposes[i].IsUserApproved == nil {
+				falseVal := false
+				consentPurposes[i].IsUserApproved = &falseVal
+			}
+
+			// Apply default: isMandatory = true if not provided
+			if consentPurposes[i].IsMandatory == nil {
 				trueVal := true
-				consentPurposes[i].IsSelected = &trueVal
+				consentPurposes[i].IsMandatory = &trueVal
+			}
+
+			// Validation: if isMandatory is true, isUserApproved must be true
+			if *consentPurposes[i].IsMandatory && !*consentPurposes[i].IsUserApproved {
+				return nil, fmt.Errorf("purpose '%s': when isMandatory is true, isUserApproved must also be true", cp.Name)
 			}
 		}
 
@@ -492,29 +517,29 @@ type ValidateRequest struct {
 
 // ValidateResponse represents the response for validation API
 type ValidateResponse struct {
-	IsValid            bool                            `json:"isValid"`
-	ModifiedPayload    interface{}                     `json:"modifiedPayload,omitempty"`
-	ErrorCode          int                             `json:"errorCode,omitempty"`
-	ErrorMessage       string                          `json:"errorMessage,omitempty"`
-	ErrorDescription   string                          `json:"errorDescription,omitempty"`
+	IsValid            bool                        `json:"isValid"`
+	ModifiedPayload    interface{}                 `json:"modifiedPayload,omitempty"`
+	ErrorCode          int                         `json:"errorCode,omitempty"`
+	ErrorMessage       string                      `json:"errorMessage,omitempty"`
+	ErrorDescription   string                      `json:"errorDescription,omitempty"`
 	ConsentInformation *ValidateConsentAPIResponse `json:"consentInformation,omitempty"`
 }
 
 // ValidateConsentAPIResponse represents consent information in validate response (excludes modifiedResponse)
 type ValidateConsentAPIResponse struct {
-	ID                         string                        `json:"id"`
-	Type                       string                        `json:"type"`
-	ClientID                   string                        `json:"clientId"`
-	Status                     string                        `json:"status"`
-	CreatedTime                int64                         `json:"createdTime"`
-	UpdatedTime                int64                         `json:"updatedTime"`
-	ValidityTime               *int64                        `json:"validityTime"`
-	RecurringIndicator         *bool                         `json:"recurringIndicator"`
-	Frequency                  *int                          `json:"frequency"`
-	DataAccessValidityDuration *int64                        `json:"dataAccessValidityDuration"`
-	ConsentPurpose             []ConsentPurposeItem          `json:"consentPurpose"`
-	Attributes                 map[string]string             `json:"attributes,omitempty"`
-	Authorizations             []AuthorizationAPIResponse    `json:"authorizations,omitempty"`
+	ID                         string                     `json:"id"`
+	Type                       string                     `json:"type"`
+	ClientID                   string                     `json:"clientId"`
+	Status                     string                     `json:"status"`
+	CreatedTime                int64                      `json:"createdTime"`
+	UpdatedTime                int64                      `json:"updatedTime"`
+	ValidityTime               *int64                     `json:"validityTime"`
+	RecurringIndicator         *bool                      `json:"recurringIndicator"`
+	Frequency                  *int                       `json:"frequency"`
+	DataAccessValidityDuration *int64                     `json:"dataAccessValidityDuration"`
+	ConsentPurpose             []ConsentPurposeItem       `json:"consentPurpose"`
+	Attributes                 map[string]string          `json:"attributes,omitempty"`
+	Authorizations             []AuthorizationAPIResponse `json:"authorizations,omitempty"`
 }
 
 // ToValidateConsentAPIResponse converts ConsentAPIResponse to ValidateConsentAPIResponse (excludes modifiedResponse)

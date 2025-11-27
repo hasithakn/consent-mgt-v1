@@ -29,7 +29,7 @@ func TestUpdateConsent_Success(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Initial value", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Initial value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Attributes: map[string]string{
 			"channel": "web",
@@ -60,8 +60,8 @@ func TestUpdateConsent_Success(t *testing.T) {
 		Type:         "accounts",
 		ValidityTime: &validityTime,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Updated value", IsSelected: BoolPtr(false)},
-			{Name: "payment_access", Value: "Payment data", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Updated value", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)},
+			{Name: "payment_access", Value: "Payment data", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Attributes: map[string]string{
 			"channel": "mobile",
@@ -104,14 +104,18 @@ func TestUpdateConsent_Success(t *testing.T) {
 	dataAccess, exists := purposeMap["data_access"]
 	assert.True(t, exists, "data_access purpose should exist")
 	assert.Equal(t, "Updated value", dataAccess.Value, "data_access value should be updated")
-	assert.NotNil(t, dataAccess.IsSelected, "IsSelected should not be nil")
-	assert.False(t, *dataAccess.IsSelected, "data_access should not be selected after update")
+	assert.NotNil(t, dataAccess.IsUserApproved, "IsUserApproved should not be nil")
+	assert.False(t, *dataAccess.IsUserApproved, "data_access should not be selected after update")
+	assert.NotNil(t, dataAccess.IsMandatory, "IsMandatory should not be nil")
+	assert.False(t, *dataAccess.IsMandatory, "data_access should not be mandatory after update")
 
 	paymentAccess, exists := purposeMap["payment_access"]
 	assert.True(t, exists, "payment_access purpose should exist")
 	assert.Equal(t, "Payment data", paymentAccess.Value, "payment_access value should match")
-	assert.NotNil(t, paymentAccess.IsSelected, "IsSelected should not be nil")
-	assert.True(t, *paymentAccess.IsSelected, "payment_access should be selected")
+	assert.NotNil(t, paymentAccess.IsUserApproved, "IsUserApproved should not be nil")
+	assert.True(t, *paymentAccess.IsUserApproved, "payment_access should be selected")
+	assert.NotNil(t, paymentAccess.IsMandatory, "IsMandatory should not be nil")
+	assert.True(t, *paymentAccess.IsMandatory, "payment_access should be mandatory")
 
 	// Verify updated attributes
 	assert.Equal(t, "mobile", updateResp.Attributes["channel"], "channel should be updated")
@@ -150,7 +154,7 @@ func TestUpdateConsent_AddDataAccessValidityDuration(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -181,7 +185,7 @@ func TestUpdateConsent_AddDataAccessValidityDuration(t *testing.T) {
 		Type:                       "accounts",
 		DataAccessValidityDuration: &duration,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -225,7 +229,7 @@ func TestUpdateConsent_ChangeDataAccessValidityDuration(t *testing.T) {
 		Type:                       "accounts",
 		DataAccessValidityDuration: &initialDuration,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -256,7 +260,7 @@ func TestUpdateConsent_ChangeDataAccessValidityDuration(t *testing.T) {
 		Type:                       "accounts",
 		DataAccessValidityDuration: &newDuration,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -297,7 +301,7 @@ func TestUpdateConsent_NegativeDataAccessValidityDuration(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -325,7 +329,7 @@ func TestUpdateConsent_NegativeDataAccessValidityDuration(t *testing.T) {
 		Type:                       "accounts",
 		DataAccessValidityDuration: &negativeDuration,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -361,7 +365,7 @@ func TestUpdateConsent_NotFound(t *testing.T) {
 	updateReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -396,7 +400,7 @@ func TestUpdateConsent_DifferentOrgID(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Initial", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Initial", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -422,7 +426,7 @@ func TestUpdateConsent_DifferentOrgID(t *testing.T) {
 	updateReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Updated", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Updated", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -457,7 +461,7 @@ func TestUpdateConsent_InvalidRequest(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -526,7 +530,7 @@ func TestUpdateConsent_WithNonExistentPurpose(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -552,8 +556,8 @@ func TestUpdateConsent_WithNonExistentPurpose(t *testing.T) {
 	updateReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Valid purpose", IsSelected: BoolPtr(true)},
-			{Name: "nonexistent_purpose", Value: "This doesn't exist", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Valid purpose", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+			{Name: "nonexistent_purpose", Value: "This doesn't exist", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -588,7 +592,7 @@ func TestUpdateConsent_UpdateAuthResourceAndCheckStatus(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -626,7 +630,7 @@ func TestUpdateConsent_UpdateAuthResourceAndCheckStatus(t *testing.T) {
 	updateReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -697,9 +701,9 @@ func TestUpdateConsent_RemovePurposes(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Data", IsSelected: BoolPtr(true)},
-			{Name: "payment_access", Value: "Payment", IsSelected: BoolPtr(true)},
-			{Name: "profile_access", Value: "Profile", IsSelected: BoolPtr(false)},
+			{Name: "data_access", Value: "Data", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+			{Name: "payment_access", Value: "Payment", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+			{Name: "profile_access", Value: "Profile", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)},
 		},
 	}
 
@@ -728,7 +732,7 @@ func TestUpdateConsent_RemovePurposes(t *testing.T) {
 	updateReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Data only", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Data only", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -771,7 +775,7 @@ func TestUpdateConsent_RemoveAuthResourcesAndCheckStatus(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -813,7 +817,7 @@ func TestUpdateConsent_RemoveAuthResourcesAndCheckStatus(t *testing.T) {
 	updateReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{}, // Empty array to remove authorizations
 	}
@@ -856,7 +860,7 @@ func TestUpdateConsent_AddMultipleAuthResourcesWithMixedStatuses(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -886,7 +890,7 @@ func TestUpdateConsent_AddMultipleAuthResourcesWithMixedStatuses(t *testing.T) {
 	updateReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -961,7 +965,7 @@ func TestUpdateConsent_ChangeAuthStatusFromApprovedToRejected(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -999,7 +1003,7 @@ func TestUpdateConsent_ChangeAuthStatusFromApprovedToRejected(t *testing.T) {
 	updateReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -1065,7 +1069,7 @@ func TestUpdateConsent_DuplicatePurposeNames(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Initial value", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Initial value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -1090,9 +1094,9 @@ func TestUpdateConsent_DuplicatePurposeNames(t *testing.T) {
 	// Attempt to update with duplicate purpose names
 	updateReq := &models.ConsentAPIUpdateRequest{
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Updated value", IsSelected: BoolPtr(true)},
-			{Name: "payment_access", Value: "Payment info", IsSelected: BoolPtr(true)},
-			{Name: "payment_access", Value: "Duplicate payment", IsSelected: BoolPtr(false)}, // Duplicate!
+			{Name: "data_access", Value: "Updated value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+			{Name: "payment_access", Value: "Payment info", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+			{Name: "payment_access", Value: "Duplicate payment", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)}, // Duplicate!
 		},
 	}
 
@@ -1131,7 +1135,7 @@ func TestUpdateConsent_DuplicatePurposeNames(t *testing.T) {
 	t.Log("✓ Correctly rejected duplicate purpose names in update request")
 }
 
-// TestUpdateConsent_IsSelectedDefaultsToTrue tests that isSelected defaults to true when not provided in update
+// TestUpdateConsent_IsSelectedDefaultsToTrue tests that isUserApproved defaults to true when not provided in update
 func TestUpdateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	env := SetupTestEnvironment(t)
 	
@@ -1146,7 +1150,7 @@ func TestUpdateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Initial value", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Initial value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -1168,11 +1172,11 @@ func TestUpdateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	require.NoError(t, err)
 	consentID := createResp.ID
 
-	// Update without providing isSelected
+	// Update without providing isUserApproved
 	updateReq := &models.ConsentAPIUpdateRequest{
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Updated value"}, // isSelected not provided
-			{Name: "payment_access", Value: "Payment info", IsSelected: BoolPtr(false)}, // explicitly false
+			{Name: "data_access", Value: "Updated value"}, // isUserApproved not provided
+			{Name: "payment_access", Value: "Payment info", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)}, // explicitly false
 		},
 	}
 
@@ -1200,15 +1204,15 @@ func TestUpdateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	
 	for _, cp := range updateResp.ConsentPurpose {
 		if cp.Name == "data_access" {
-			require.NotNil(t, cp.IsSelected, "IsSelected should not be nil")
-			assert.True(t, *cp.IsSelected, "IsSelected should default to true when not provided")
+			require.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil")
+			assert.True(t, *cp.IsUserApproved, "IsUserApproved should default to true when not provided")
 		} else if cp.Name == "payment_access" {
-			require.NotNil(t, cp.IsSelected, "IsSelected should not be nil")
-			assert.False(t, *cp.IsSelected, "IsSelected should be false when explicitly set")
+			require.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil")
+			assert.False(t, *cp.IsUserApproved, "IsUserApproved should be false when explicitly set")
 		}
 	}
 
-	t.Log("✓ isSelected correctly defaults to true when not provided in update request")
+	t.Log("✓ isUserApproved correctly defaults to true when not provided in update request")
 }
 
 // TestUpdateConsent_ExpiryCheck tests that expired consents get EXPIRED status during update
@@ -1227,7 +1231,7 @@ func TestUpdateConsent_ExpiryCheck(t *testing.T) {
 		Type:         "accounts",
 		ValidityTime: &expiredValidityTime,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Initial value", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Initial value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -1258,7 +1262,7 @@ func TestUpdateConsent_ExpiryCheck(t *testing.T) {
 	// Update the consent (should detect expiry and set EXPIRED status)
 	updateReq := &models.ConsentAPIUpdateRequest{
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Updated value", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Updated value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -1310,7 +1314,7 @@ func TestUpdateConsent_CustomAuthStatusPreservesCreatedStatus(t *testing.T) {
 		Type:         "accounts",
 		ValidityTime: &validityTime,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "test_purpose", Value: "Test value", IsSelected: BoolPtr(true)},
+			{Name: "test_purpose", Value: "Test value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -1337,7 +1341,7 @@ func TestUpdateConsent_CustomAuthStatusPreservesCreatedStatus(t *testing.T) {
 		Type:         "accounts",
 		ValidityTime: &validityTime,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "test_purpose", Value: "Test value", IsSelected: BoolPtr(true)},
+			{Name: "test_purpose", Value: "Test value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -1388,7 +1392,7 @@ func TestUpdateConsent_CustomAuthStatusPreservesActiveStatus(t *testing.T) {
 		Type:         "accounts",
 		ValidityTime: &validityTime,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "test_purpose", Value: "Test value", IsSelected: BoolPtr(true)},
+			{Name: "test_purpose", Value: "Test value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -1422,7 +1426,7 @@ func TestUpdateConsent_CustomAuthStatusPreservesActiveStatus(t *testing.T) {
 		Type:         "accounts",
 		ValidityTime: &validityTime,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "test_purpose", Value: "Test value", IsSelected: BoolPtr(true)},
+			{Name: "test_purpose", Value: "Test value", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{

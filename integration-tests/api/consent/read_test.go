@@ -28,8 +28,8 @@ func TestGetConsent_Success(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Account information", IsSelected: BoolPtr(true)},
-			{Name: "transaction_history", Value: "Transaction details", IsSelected: BoolPtr(false)},
+			{Name: "data_access", Value: "Account information", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+			{Name: "transaction_history", Value: "Transaction details", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)},
 		},
 		Attributes: map[string]string{
 			"channel":   "mobile",
@@ -98,15 +98,19 @@ func TestGetConsent_Success(t *testing.T) {
 	dataAccess, exists := purposeMap["data_access"]
 	assert.True(t, exists, "data_access purpose should exist")
 	assert.Equal(t, "Account information", dataAccess.Value, "data_access value should match")
-	assert.NotNil(t, dataAccess.IsSelected, "data_access IsSelected should not be nil")
-	assert.True(t, *dataAccess.IsSelected, "data_access should be selected")
+	assert.NotNil(t, dataAccess.IsUserApproved, "data_access IsUserApproved should not be nil")
+	assert.True(t, *dataAccess.IsUserApproved, "data_access should be selected")
+	assert.NotNil(t, dataAccess.IsMandatory, "IsMandatory should not be nil")
+	assert.True(t, *dataAccess.IsMandatory, "data_access should be mandatory")
 
 	// Verify transaction_history purpose
 	txHistory, exists := purposeMap["transaction_history"]
 	assert.True(t, exists, "transaction_history purpose should exist")
 	assert.Equal(t, "Transaction details", txHistory.Value, "transaction_history value should match")
-	assert.NotNil(t, txHistory.IsSelected, "transaction_history IsSelected should not be nil")
-	assert.False(t, *txHistory.IsSelected, "transaction_history should not be selected")
+	assert.NotNil(t, txHistory.IsUserApproved, "transaction_history IsUserApproved should not be nil")
+	assert.False(t, *txHistory.IsUserApproved, "transaction_history should not be selected")
+	assert.NotNil(t, txHistory.IsMandatory, "IsMandatory should not be nil")
+	assert.False(t, *txHistory.IsMandatory, "transaction_history should not be mandatory")
 
 	// Assert attributes
 	require.NotNil(t, response.Attributes, "Attributes should not be nil")
@@ -368,7 +372,7 @@ func TestGetConsent_DifferentOrgID(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -423,7 +427,7 @@ func TestGetConsent_WithValidityTime(t *testing.T) {
 		Frequency:          &frequency,
 		RecurringIndicator: &recurringIndicator,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -486,7 +490,7 @@ func TestGetConsent_WithDataAccessValidityDuration(t *testing.T) {
 		Type:                       "accounts",
 		DataAccessValidityDuration: &duration,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -543,7 +547,7 @@ func TestGetConsent_WithAuthorizationResources(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "payments",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "payment_initiation", Value: "Payment consent", IsSelected: BoolPtr(true)},
+			{Name: "payment_initiation", Value: "Payment consent", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -619,7 +623,7 @@ func TestGetConsent_WithMultipleAuthorizationStatuses(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Account data", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Account data", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{

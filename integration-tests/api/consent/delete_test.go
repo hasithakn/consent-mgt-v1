@@ -25,7 +25,7 @@ func TestDeleteConsent_Success(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test consent", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test consent", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -102,7 +102,7 @@ func TestDeleteConsent_DifferentOrgID(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test consent", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test consent", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -162,7 +162,7 @@ func TestDeleteConsent_WithAuthorizationResources(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "payments",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "payment_initiation", Value: "Payment consent", IsSelected: BoolPtr(true)},
+			{Name: "payment_initiation", Value: "Payment consent", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Authorizations: []models.AuthorizationAPIRequest{
 			{
@@ -234,7 +234,7 @@ func TestDeleteConsent_WithAttributes(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Test consent", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Test consent", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Attributes: map[string]string{
 			"account_id":   "ACC-12345",
@@ -301,9 +301,9 @@ func TestDeleteConsent_WithMultiplePurposes(t *testing.T) {
 	createReq := &models.ConsentAPIRequest{
 		Type: "accounts",
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Access data", IsSelected: BoolPtr(true)},
-			{Name: "data_sharing", Value: "Share data", IsSelected: BoolPtr(true)},
-			{Name: "data_analytics", Value: "Analyze data", IsSelected: BoolPtr(false)},
+			{Name: "data_access", Value: "Access data", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+			{Name: "data_sharing", Value: "Share data", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+			{Name: "data_analytics", Value: "Analyze data", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)},
 		},
 	}
 
@@ -365,8 +365,8 @@ func TestDeleteConsent_WithAllRelatedData(t *testing.T) {
 		Type:         "accounts",
 		ValidityTime: Int64Ptr(7776000),
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "data_access", Value: "Access data", IsSelected: BoolPtr(true)},
-			{Name: "data_sharing", Value: "Share data", IsSelected: BoolPtr(true)},
+			{Name: "data_access", Value: "Access data", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+			{Name: "data_sharing", Value: "Share data", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Attributes: map[string]string{
 			"account_id":  "ACC-12345",

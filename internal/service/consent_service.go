@@ -186,13 +186,18 @@ func (s *ConsentService) CreateConsentWithPurposes(ctx context.Context, request 
 				valueJSON = &valueStr
 			}
 
-			// Dereference IsSelected pointer (should not be nil at this point due to defaulting in ToConsentCreateRequest)
-			isSelected := false
-			if purposeItem.IsSelected != nil {
-				isSelected = *purposeItem.IsSelected
+			// Dereference IsUserApproved and IsMandatory pointers (should not be nil at this point due to defaulting in ToConsentCreateRequest)
+			isUserApproved := false
+			if purposeItem.IsUserApproved != nil {
+				isUserApproved = *purposeItem.IsUserApproved
 			}
 
-			if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consent.ConsentID, purposeName, orgID, valueJSON, isSelected); err != nil {
+			isMandatory := true
+			if purposeItem.IsMandatory != nil {
+				isMandatory = *purposeItem.IsMandatory
+			}
+
+			if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consent.ConsentID, purposeName, orgID, valueJSON, isUserApproved, isMandatory); err != nil {
 				return nil, fmt.Errorf("failed to link purpose: %w", err)
 			}
 		}
@@ -501,13 +506,18 @@ func (s *ConsentService) UpdateConsentWithPurposes(ctx context.Context, consentI
 			valueJSON = &valueStr
 		}
 
-		// Dereference IsSelected pointer (should not be nil at this point due to defaulting in ToConsentUpdateRequest)
-		isSelected := false
-		if purposeItem.IsSelected != nil {
-			isSelected = *purposeItem.IsSelected
+		// Dereference IsUserApproved and IsMandatory pointers (should not be nil at this point due to defaulting in ToConsentUpdateRequest)
+		isUserApproved := false
+		if purposeItem.IsUserApproved != nil {
+			isUserApproved = *purposeItem.IsUserApproved
 		}
 
-		if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consentID, purposeID, orgID, valueJSON, isSelected); err != nil {
+		isMandatory := true
+		if purposeItem.IsMandatory != nil {
+			isMandatory = *purposeItem.IsMandatory
+		}
+
+		if err := s.consentPurposeDAO.LinkPurposeToConsentWithTx(ctx, tx.Tx, consentID, purposeID, orgID, valueJSON, isUserApproved, isMandatory); err != nil {
 			return nil, fmt.Errorf("failed to link purpose: %w", err)
 		}
 	}

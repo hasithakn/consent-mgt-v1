@@ -18,15 +18,15 @@ import (
 // TestCreateConsent_Success tests successful consent creation with basic fields
 func TestCreateConsent_Success(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	// Create test purposes
 	purposes := CreateTestPurposes(t, env, map[string]string{
-		"test_data_access":   "Test data access purpose",
-		"test_account_info":  "Test account info purpose",
+		"test_data_access":  "Test data access purpose",
+		"test_account_info": "Test account info purpose",
 	})
 	defer CleanupTestPurposes(t, env, purposes)
 
-	// Prepare request with isSelected field
+	// Prepare request with isUserApproved field
 	// validityTime should be a future timestamp (in milliseconds or seconds from epoch)
 	// Set to 90 days from now in milliseconds
 	validityTime := time.Now().Add(90 * 24 * time.Hour).UnixMilli()
@@ -39,8 +39,8 @@ func TestCreateConsent_Success(t *testing.T) {
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "test_data_access", Value: "Read account data", IsSelected: BoolPtr(true)},
-			{Name: "test_account_info", Value: "Read account info", IsSelected: BoolPtr(false)},
+			{Name: "test_data_access", Value: "Read account data", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+			{Name: "test_account_info", Value: "Read account info", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)},
 		},
 		Attributes: map[string]string{
 			"source": "api-test",
@@ -78,11 +78,11 @@ func TestCreateConsent_Success(t *testing.T) {
 	assert.Equal(t, "accounts", response.Type, "Type should match")
 	assert.Equal(t, "TEST_CLIENT", response.ClientID, "ClientID should match")
 	assert.Equal(t, "CREATED", response.Status, "Status should be CREATED (no authorizations)")
-	
+
 	// Verify timestamps
 	assert.Greater(t, response.CreatedTime, int64(0), "CreatedTime should be positive")
 	assert.Greater(t, response.UpdatedTime, int64(0), "UpdatedTime should be positive")
-	
+
 	// Verify consent fields
 	assert.NotNil(t, response.ValidityTime, "ValidityTime should not be nil")
 	assert.Equal(t, validityTime, *response.ValidityTime, "ValidityTime should match")
@@ -91,28 +91,32 @@ func TestCreateConsent_Success(t *testing.T) {
 	assert.NotNil(t, response.Frequency, "Frequency should not be nil")
 	assert.Equal(t, frequency, *response.Frequency, "Frequency should match")
 	assert.Nil(t, response.DataAccessValidityDuration, "DataAccessValidityDuration should be nil")
-	
+
 	// Verify consent purposes
 	assert.NotNil(t, response.ConsentPurpose, "ConsentPurpose should not be nil")
 	assert.Len(t, response.ConsentPurpose, 2, "Should have 2 consent purposes")
-	
-	// Verify isSelected field and all purpose fields
+
+	// Verify isUserApproved field and all purpose fields
 	foundDataAccess := false
 	foundAccountInfo := false
 	for _, cp := range response.ConsentPurpose {
 		assert.NotEmpty(t, cp.Name, "Purpose name should not be empty")
 		assert.NotEmpty(t, cp.Value, "Purpose value should not be empty")
-		
+
 		if cp.Name == "test_data_access" {
 			foundDataAccess = true
 			assert.Equal(t, "Read account data", cp.Value, "Value should match")
-			assert.NotNil(t, cp.IsSelected, "IsSelected should not be nil")
-			assert.True(t, *cp.IsSelected, "test_data_access should be selected")
+			assert.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil")
+			assert.True(t, *cp.IsUserApproved, "test_data_access should be selected")
+			assert.NotNil(t, cp.IsMandatory, "IsMandatory should not be nil")
+			assert.True(t, *cp.IsMandatory, "test_data_access should be mandatory")
 		} else if cp.Name == "test_account_info" {
 			foundAccountInfo = true
 			assert.Equal(t, "Read account info", cp.Value, "Value should match")
-			assert.NotNil(t, cp.IsSelected, "IsSelected should not be nil")
-			assert.False(t, *cp.IsSelected, "test_account_info should not be selected")
+			assert.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil")
+			assert.False(t, *cp.IsUserApproved, "test_account_info should not be selected")
+			assert.NotNil(t, cp.IsMandatory, "IsMandatory should not be nil")
+			assert.False(t, *cp.IsMandatory, "test_account_info should not be mandatory")
 		}
 	}
 	assert.True(t, foundDataAccess, "Should find test_data_access purpose")
@@ -121,7 +125,7 @@ func TestCreateConsent_Success(t *testing.T) {
 	// Verify attributes
 	assert.NotNil(t, response.Attributes, "Attributes should not be nil")
 	assert.Equal(t, "api-test", response.Attributes["source"], "Source attribute should match")
-	
+
 	// Verify authorizations (should be empty)
 	assert.NotNil(t, response.Authorizations, "Authorizations should not be nil")
 	assert.Empty(t, response.Authorizations, "Authorizations should be empty")
@@ -134,13 +138,13 @@ func TestCreateConsent_Success(t *testing.T) {
 
 	getRecorder := httptest.NewRecorder()
 	env.Router.ServeHTTP(getRecorder, getReq)
-	
+
 	assert.Equal(t, http.StatusOK, getRecorder.Code, "Should retrieve created consent")
-	
+
 	var retrievedConsent models.ConsentAPIResponse
 	err = json.Unmarshal(getRecorder.Body.Bytes(), &retrievedConsent)
 	require.NoError(t, err)
-	
+
 	// Verify all fields match the created consent
 	assert.Equal(t, response.ID, retrievedConsent.ID, "ID should match")
 	assert.Equal(t, response.Type, retrievedConsent.Type, "Type should match")
@@ -152,23 +156,27 @@ func TestCreateConsent_Success(t *testing.T) {
 	assert.Equal(t, *response.RecurringIndicator, *retrievedConsent.RecurringIndicator, "RecurringIndicator should match")
 	assert.Equal(t, *response.Frequency, *retrievedConsent.Frequency, "Frequency should match")
 	assert.Len(t, retrievedConsent.ConsentPurpose, 2, "Retrieved consent should have 2 purposes")
-	
+
 	// Verify purposes in GET response
 	for _, cp := range retrievedConsent.ConsentPurpose {
 		if cp.Name == "test_data_access" {
 			assert.Equal(t, "Read account data", cp.Value, "Value should match in GET")
-			assert.NotNil(t, cp.IsSelected, "IsSelected should not be nil in GET")
-			assert.True(t, *cp.IsSelected, "IsSelected should be true in GET")
+			assert.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil in GET")
+			assert.True(t, *cp.IsUserApproved, "IsUserApproved should be true in GET")
+			assert.NotNil(t, cp.IsMandatory, "IsMandatory should not be nil")
+			assert.True(t, *cp.IsMandatory, "IsUserApproved should be true in GET")
 		} else if cp.Name == "test_account_info" {
 			assert.Equal(t, "Read account info", cp.Value, "Value should match in GET")
-			assert.NotNil(t, cp.IsSelected, "IsSelected should not be nil in GET")
-			assert.False(t, *cp.IsSelected, "IsSelected should be false in GET")
+			assert.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil in GET")
+			assert.False(t, *cp.IsUserApproved, "IsUserApproved should be false in GET")
+			assert.NotNil(t, cp.IsMandatory, "IsMandatory should not be nil")
+			assert.False(t, *cp.IsMandatory, "IsUserApproved should be false in GET")
 		}
 	}
 	assert.Equal(t, response.Attributes["source"], retrievedConsent.Attributes["source"], "Attributes should match")
 	assert.Empty(t, retrievedConsent.Authorizations, "Authorizations should still be empty in GET")
 
-	t.Logf("✓ Successfully created consent %s with isSelected fields", response.ID)
+	t.Logf("✓ Successfully created consent %s with isUserApproved fields", response.ID)
 
 	// Cleanup
 	CleanupTestData(t, env, response.ID)
@@ -195,7 +203,7 @@ func TestCreateConsent_WithAuthResources(t *testing.T) {
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "auth_resources_test", Value: "consent with auth", IsSelected: BoolPtr(true)},
+			{Name: "auth_resources_test", Value: "consent with auth", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 		Attributes: map[string]string{
 			"test": "value",
@@ -243,11 +251,11 @@ func TestCreateConsent_WithAuthResources(t *testing.T) {
 	assert.Equal(t, "payments", response.Type, "Type should match")
 	assert.Equal(t, "TEST_CLIENT", response.ClientID, "ClientID should match")
 	assert.Equal(t, "ACTIVE", response.Status, "Status should be ACTIVE (has approved authorization)")
-	
+
 	// Verify timestamps
 	assert.Greater(t, response.CreatedTime, int64(0), "CreatedTime should be positive")
 	assert.Greater(t, response.UpdatedTime, int64(0), "UpdatedTime should be positive")
-	
+
 	// Verify consent metadata
 	assert.NotNil(t, response.ValidityTime, "ValidityTime should not be nil")
 	assert.Equal(t, validityTime, *response.ValidityTime, "ValidityTime should match")
@@ -255,23 +263,23 @@ func TestCreateConsent_WithAuthResources(t *testing.T) {
 	assert.Equal(t, recurringIndicator, *response.RecurringIndicator, "RecurringIndicator should match")
 	assert.NotNil(t, response.Frequency, "Frequency should not be nil")
 	assert.Equal(t, frequency, *response.Frequency, "Frequency should match")
-	
+
 	// Verify consent purpose
 	assert.NotNil(t, response.ConsentPurpose, "ConsentPurpose should not be nil")
 	assert.Len(t, response.ConsentPurpose, 1, "Should have 1 consent purpose")
 	assert.Equal(t, "auth_resources_test", response.ConsentPurpose[0].Name, "Purpose name should match")
 	assert.Equal(t, "consent with auth", response.ConsentPurpose[0].Value, "Purpose value should match")
-	assert.NotNil(t, response.ConsentPurpose[0].IsSelected, "IsSelected should not be nil")
-	assert.True(t, *response.ConsentPurpose[0].IsSelected, "Purpose should be selected")
-	
+	assert.NotNil(t, response.ConsentPurpose[0].IsUserApproved, "IsUserApproved should not be nil")
+	assert.True(t, *response.ConsentPurpose[0].IsUserApproved, "Purpose should be selected")
+
 	// Verify attributes
 	assert.NotNil(t, response.Attributes, "Attributes should not be nil")
 	assert.Equal(t, "value", response.Attributes["test"], "Test attribute should match")
-	
+
 	// Verify authorizations - comprehensive check
 	assert.NotNil(t, response.Authorizations, "Authorizations should not be nil")
 	require.Len(t, response.Authorizations, 1, "Should have 1 authorization")
-	
+
 	auth := response.Authorizations[0]
 	assert.NotEmpty(t, auth.ID, "Authorization ID should not be empty")
 	assert.Equal(t, "authorization_code", auth.Type, "Authorization type should match")
@@ -287,20 +295,20 @@ func TestCreateConsent_WithAuthResources(t *testing.T) {
 	assert.Contains(t, resourcesMap, "accountIds", "Resources should contain accountIds")
 	assert.Contains(t, resourcesMap, "permissions", "Resources should contain permissions")
 	assert.Contains(t, resourcesMap, "additionalScopes", "Resources should contain additionalScopes")
-	
+
 	// Verify specific resource values
 	accountIds, ok := resourcesMap["accountIds"].([]interface{})
 	require.True(t, ok, "accountIds should be an array")
 	assert.Len(t, accountIds, 2, "Should have 2 account IDs")
 	assert.Equal(t, "ACC-001", accountIds[0], "First account ID should match")
 	assert.Equal(t, "ACC-002", accountIds[1], "Second account ID should match")
-	
+
 	permissions, ok := resourcesMap["permissions"].([]interface{})
 	require.True(t, ok, "permissions should be an array")
 	assert.Len(t, permissions, 2, "Should have 2 permissions")
 	assert.Contains(t, permissions, "read", "Should contain read permission")
 	assert.Contains(t, permissions, "write", "Should contain write permission")
-	
+
 	additionalScopes, ok := resourcesMap["additionalScopes"].(string)
 	require.True(t, ok, "additionalScopes should be a string")
 	assert.Equal(t, "utility_read taxes_read", additionalScopes, "additionalScopes should match")
@@ -313,20 +321,20 @@ func TestCreateConsent_WithAuthResources(t *testing.T) {
 
 	getRecorder := httptest.NewRecorder()
 	env.Router.ServeHTTP(getRecorder, getReq)
-	
+
 	assert.Equal(t, http.StatusOK, getRecorder.Code, "Should retrieve created consent")
-	
+
 	var retrievedConsent models.ConsentAPIResponse
 	err = json.Unmarshal(getRecorder.Body.Bytes(), &retrievedConsent)
 	require.NoError(t, err)
-	
+
 	// Verify all fields match
 	assert.Equal(t, response.ID, retrievedConsent.ID, "ID should match")
 	assert.Equal(t, response.Type, retrievedConsent.Type, "Type should match")
 	assert.Equal(t, response.ClientID, retrievedConsent.ClientID, "ClientID should match")
 	assert.Equal(t, response.Status, retrievedConsent.Status, "Status should match")
 	assert.Equal(t, response.CreatedTime, retrievedConsent.CreatedTime, "CreatedTime should match")
-	
+
 	// Verify authorizations in GET response
 	require.Len(t, retrievedConsent.Authorizations, 1, "Retrieved consent should have 1 authorization")
 	retrievedAuth := retrievedConsent.Authorizations[0]
@@ -336,7 +344,7 @@ func TestCreateConsent_WithAuthResources(t *testing.T) {
 	assert.NotNil(t, retrievedAuth.UserID, "UserID should not be nil in GET")
 	assert.Equal(t, "user-789", *retrievedAuth.UserID, "UserID should match in GET")
 	assert.NotNil(t, retrievedAuth.Resources, "Resources should be present in GET response")
-	
+
 	// Verify resources in GET response
 	retrievedResourcesMap, ok := retrievedAuth.Resources.(map[string]interface{})
 	require.True(t, ok, "Resources should be a map in GET response")
@@ -362,13 +370,13 @@ func TestCreateConsent_InvalidRequest(t *testing.T) {
 	}{
 		{
 			name:           "Missing consent type",
-			requestBody:    `{"status": "created", "consentPurpose": [{"name": "test", "value": "test", "isSelected": true}]}`,
+			requestBody:    `{"status": "created", "consentPurpose": [{"name": "test", "value": "test", "isUserApproved": true}]}`,
 			expectedStatus: http.StatusBadRequest,
 			errorContains:  "type",
 		},
 		{
 			name:           "Missing status",
-			requestBody:    `{"type": "accounts", "consentPurpose": [{"name": "test", "value": "test", "isSelected": true}]}`,
+			requestBody:    `{"type": "accounts", "consentPurpose": [{"name": "test", "value": "test", "isUserApproved": true}]}`,
 			expectedStatus: http.StatusBadRequest,
 			errorContains:  "",
 		},
@@ -410,7 +418,7 @@ func TestCreateConsent_InvalidRequest(t *testing.T) {
 			env.Router.ServeHTTP(recorder, req)
 
 			assert.Equal(t, tt.expectedStatus, recorder.Code, "Test: %s", tt.name)
-			
+
 			if tt.errorContains != "" {
 				body := strings.ToLower(recorder.Body.String())
 				assert.Contains(t, body, strings.ToLower(tt.errorContains), "Test: %s", tt.name)
@@ -419,13 +427,13 @@ func TestCreateConsent_InvalidRequest(t *testing.T) {
 	}
 }
 
-// TestCreateConsent_MissingIsSelected tests that isSelected field defaults properly
+// TestCreateConsent_MissingIsSelected tests that isUserApproved field defaults properly
 func TestCreateConsent_MissingIsSelected(t *testing.T) {
 	env := SetupTestEnvironment(t)
 
 	// Create test purpose
 	purposes := CreateTestPurposes(t, env, map[string]string{
-		"test_missing_selected": "Test purpose without isSelected",
+		"test_missing_selected": "Test purpose without isUserApproved",
 	})
 	defer CleanupTestPurposes(t, env, purposes)
 
@@ -439,7 +447,7 @@ func TestCreateConsent_MissingIsSelected(t *testing.T) {
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "test_missing_selected", Value: "Test without isSelected"}, // isSelected not provided
+			{Name: "test_missing_selected", Value: "Test without isUserApproved"}, // isUserApproved not provided
 		},
 	}
 
@@ -466,11 +474,11 @@ func TestCreateConsent_MissingIsSelected(t *testing.T) {
 	assert.Equal(t, "accounts", response.Type, "Type should match")
 	assert.Equal(t, "TEST_CLIENT", response.ClientID, "ClientID should match")
 	assert.Equal(t, "CREATED", response.Status, "Status should be CREATED")
-	
+
 	// Verify timestamps
 	assert.Greater(t, response.CreatedTime, int64(0), "CreatedTime should be positive")
 	assert.Greater(t, response.UpdatedTime, int64(0), "UpdatedTime should be positive")
-	
+
 	// Verify consent metadata
 	assert.NotNil(t, response.ValidityTime, "ValidityTime should not be nil")
 	assert.Equal(t, validityTime, *response.ValidityTime, "ValidityTime should match")
@@ -479,14 +487,14 @@ func TestCreateConsent_MissingIsSelected(t *testing.T) {
 	assert.NotNil(t, response.Frequency, "Frequency should not be nil")
 	assert.Equal(t, frequency, *response.Frequency, "Frequency should match")
 
-	// Verify isSelected defaults to true when not provided
+	// Verify isUserApproved defaults to true when not provided
 	assert.NotNil(t, response.ConsentPurpose, "ConsentPurpose should not be nil")
 	assert.Len(t, response.ConsentPurpose, 1, "Should have 1 consent purpose")
 	assert.Equal(t, "test_missing_selected", response.ConsentPurpose[0].Name, "Purpose name should match")
-	assert.Equal(t, "Test without isSelected", response.ConsentPurpose[0].Value, "Purpose value should match")
-	assert.NotNil(t, response.ConsentPurpose[0].IsSelected, "IsSelected should not be nil")
-	assert.True(t, *response.ConsentPurpose[0].IsSelected, "IsSelected should default to true when not provided")
-	t.Logf("✓ IsSelected correctly defaults to true when not provided: %v", *response.ConsentPurpose[0].IsSelected)
+	assert.Equal(t, "Test without isUserApproved", response.ConsentPurpose[0].Value, "Purpose value should match")
+	assert.NotNil(t, response.ConsentPurpose[0].IsUserApproved, "IsUserApproved should not be nil")
+	assert.True(t, *response.ConsentPurpose[0].IsUserApproved, "IsUserApproved should default to true when not provided")
+	t.Logf("✓ IsUserApproved correctly defaults to true when not provided: %v", *response.ConsentPurpose[0].IsUserApproved)
 
 	CleanupTestData(t, env, response.ID)
 }
@@ -515,8 +523,8 @@ func TestCreateConsent_WithDataAccessValidityDuration(t *testing.T) {
 		Frequency:                  &frequency,
 		DataAccessValidityDuration: &dataAccessValidityDuration,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "validity_test_data", Value: "Test with dataAccessValidityDuration", IsSelected: BoolPtr(true)},
-			{Name: "validity_test_purpose", Value: "testing", IsSelected: BoolPtr(true)},
+			{Name: "validity_test_data", Value: "Test with dataAccessValidityDuration", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+			{Name: "validity_test_purpose", Value: "testing", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -543,15 +551,15 @@ func TestCreateConsent_WithDataAccessValidityDuration(t *testing.T) {
 	assert.Equal(t, "accounts", response.Type, "Type should match")
 	assert.Equal(t, "TEST_CLIENT", response.ClientID, "ClientID should match")
 	assert.Equal(t, "CREATED", response.Status, "Status should be CREATED")
-	
+
 	// Verify timestamps
 	assert.Greater(t, response.CreatedTime, int64(0), "CreatedTime should be positive")
 	assert.Greater(t, response.UpdatedTime, int64(0), "UpdatedTime should be positive")
-	
+
 	// Verify dataAccessValidityDuration - the main focus of this test
 	assert.NotNil(t, response.DataAccessValidityDuration, "DataAccessValidityDuration should be present")
 	assert.Equal(t, dataAccessValidityDuration, *response.DataAccessValidityDuration, "DataAccessValidityDuration should match")
-	
+
 	// Verify other consent fields
 	assert.NotNil(t, response.ValidityTime, "ValidityTime should not be nil")
 	assert.Equal(t, validityTime, *response.ValidityTime, "ValidityTime should match")
@@ -559,15 +567,17 @@ func TestCreateConsent_WithDataAccessValidityDuration(t *testing.T) {
 	assert.Equal(t, recurringIndicator, *response.RecurringIndicator, "RecurringIndicator should match")
 	assert.NotNil(t, response.Frequency, "Frequency should not be nil")
 	assert.Equal(t, frequency, *response.Frequency, "Frequency should match")
-	
+
 	// Verify consent purposes
 	assert.NotNil(t, response.ConsentPurpose, "ConsentPurpose should not be nil")
 	assert.Len(t, response.ConsentPurpose, 2, "Should have 2 consent purposes")
 	for _, cp := range response.ConsentPurpose {
 		assert.NotEmpty(t, cp.Name, "Purpose name should not be empty")
 		assert.NotEmpty(t, cp.Value, "Purpose value should not be empty")
-		assert.NotNil(t, cp.IsSelected, "IsSelected should not be nil")
-		assert.True(t, *cp.IsSelected, "All purposes should be selected")
+		assert.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil")
+		assert.True(t, *cp.IsUserApproved, "All purposes should be selected")
+		assert.NotNil(t, cp.IsMandatory, "IsMandatory should not be nil")
+		assert.True(t, *cp.IsMandatory, "All purposes should be mandatory")
 	}
 
 	t.Logf("✓ Created consent %s with dataAccessValidityDuration=%d", response.ID, *response.DataAccessValidityDuration)
@@ -595,7 +605,7 @@ func TestCreateConsent_WithoutDataAccessValidityDuration(t *testing.T) {
 		RecurringIndicator: &recurringIndicator,
 		Frequency:          &frequency,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "no_validity_test", Value: "Test without dataAccessValidityDuration", IsSelected: BoolPtr(true)},
+			{Name: "no_validity_test", Value: "Test without dataAccessValidityDuration", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -622,14 +632,14 @@ func TestCreateConsent_WithoutDataAccessValidityDuration(t *testing.T) {
 	assert.Equal(t, "accounts", response.Type, "Type should match")
 	assert.Equal(t, "TEST_CLIENT", response.ClientID, "ClientID should match")
 	assert.Equal(t, "CREATED", response.Status, "Status should be CREATED")
-	
+
 	// Verify timestamps
 	assert.Greater(t, response.CreatedTime, int64(0), "CreatedTime should be positive")
 	assert.Greater(t, response.UpdatedTime, int64(0), "UpdatedTime should be positive")
-	
+
 	// Verify dataAccessValidityDuration is null - the main focus of this test
 	assert.Nil(t, response.DataAccessValidityDuration, "DataAccessValidityDuration should be null")
-	
+
 	// Verify other consent fields
 	assert.NotNil(t, response.ValidityTime, "ValidityTime should not be nil")
 	assert.Equal(t, validityTime, *response.ValidityTime, "ValidityTime should match")
@@ -637,13 +647,13 @@ func TestCreateConsent_WithoutDataAccessValidityDuration(t *testing.T) {
 	assert.Equal(t, recurringIndicator, *response.RecurringIndicator, "RecurringIndicator should match")
 	assert.NotNil(t, response.Frequency, "Frequency should not be nil")
 	assert.Equal(t, frequency, *response.Frequency, "Frequency should match")
-	
+
 	// Verify consent purpose
 	assert.NotNil(t, response.ConsentPurpose, "ConsentPurpose should not be nil")
 	assert.Len(t, response.ConsentPurpose, 1, "Should have 1 consent purpose")
 	assert.Equal(t, "no_validity_test", response.ConsentPurpose[0].Name, "Purpose name should match")
-	assert.NotNil(t, response.ConsentPurpose[0].IsSelected, "IsSelected should not be nil")
-	assert.True(t, *response.ConsentPurpose[0].IsSelected, "Purpose should be selected")
+	assert.NotNil(t, response.ConsentPurpose[0].IsUserApproved, "IsUserApproved should not be nil")
+	assert.True(t, *response.ConsentPurpose[0].IsUserApproved, "Purpose should be selected")
 
 	t.Logf("✓ Created consent %s without dataAccessValidityDuration (null)", response.ID)
 
@@ -672,7 +682,7 @@ func TestCreateConsent_WithNegativeDataAccessValidityDuration(t *testing.T) {
 		Frequency:                  &frequency,
 		DataAccessValidityDuration: &negativeDataAccessValidityDuration,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "neg_validity_test", Value: "Test with negative dataAccessValidityDuration", IsSelected: BoolPtr(true)},
+			{Name: "neg_validity_test", Value: "Test with negative dataAccessValidityDuration", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
 		},
 	}
 
@@ -708,11 +718,11 @@ func TestCreateConsent_WithNegativeDataAccessValidityDuration(t *testing.T) {
 // TestCreateConsent_DuplicatePurposeNames tests that consent creation rejects duplicate purpose names
 func TestCreateConsent_DuplicatePurposeNames(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	// Create test purposes
 	purposes := CreateTestPurposes(t, env, map[string]string{
-		"test_data_access":   "Test data access purpose",
-		"test_account_info":  "Test account info purpose",
+		"test_data_access":  "Test data access purpose",
+		"test_account_info": "Test account info purpose",
 	})
 	defer CleanupTestPurposes(t, env, purposes)
 
@@ -723,9 +733,9 @@ func TestCreateConsent_DuplicatePurposeNames(t *testing.T) {
 		Type:         "accounts",
 		ValidityTime: &validityTime,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "test_data_access", Value: "Read account data", IsSelected: BoolPtr(true)},
-			{Name: "test_data_access", Value: "Duplicate purpose", IsSelected: BoolPtr(true)}, // Duplicate!
-			{Name: "test_account_info", Value: "Read account info", IsSelected: BoolPtr(false)},
+			{Name: "test_data_access", Value: "Read account data", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+			{Name: "test_data_access", Value: "Duplicate purpose", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)}, // Duplicate!
+			{Name: "test_account_info", Value: "Read account info", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)},
 		},
 	}
 
@@ -761,10 +771,10 @@ func TestCreateConsent_DuplicatePurposeNames(t *testing.T) {
 	t.Log("✓ Correctly rejected duplicate purpose names in create request")
 }
 
-// TestCreateConsent_IsSelectedDefaultsToTrue tests that isSelected defaults to true when not provided
+// TestCreateConsent_IsSelectedDefaultsToTrue tests that isUserApproved defaults to true when not provided
 func TestCreateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	env := SetupTestEnvironment(t)
-	
+
 	// Create test purposes
 	purposes := CreateTestPurposes(t, env, map[string]string{
 		"test_data_access":  "Test data access purpose",
@@ -772,15 +782,15 @@ func TestCreateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 	})
 	defer CleanupTestPurposes(t, env, purposes)
 
-	// Prepare request WITHOUT isSelected field
+	// Prepare request WITHOUT isUserApproved field
 	validityTime := int64(7776000) // ~90 days in seconds
 
 	createReq := &models.ConsentAPIRequest{
 		Type:         "accounts",
 		ValidityTime: &validityTime,
 		ConsentPurpose: []models.ConsentPurposeItem{
-			{Name: "test_data_access", Value: "Read account data"}, // isSelected not provided
-			{Name: "test_account_info", Value: "Read account info", IsSelected: BoolPtr(false)}, // explicitly false
+			{Name: "test_data_access", Value: "Read account data"},                                                               // isUserApproved not provided
+			{Name: "test_account_info", Value: "Read account info", IsUserApproved: BoolPtr(false), IsMandatory: BoolPtr(false)}, // explicitly false
 		},
 	}
 
@@ -807,16 +817,16 @@ func TestCreateConsent_IsSelectedDefaultsToTrue(t *testing.T) {
 
 	// Verify consent purposes - first one should default to true, second should be false
 	require.Len(t, response.ConsentPurpose, 2, "Should have 2 consent purposes")
-	
+
 	for _, cp := range response.ConsentPurpose {
 		if cp.Name == "test_data_access" {
-			require.NotNil(t, cp.IsSelected, "IsSelected should not be nil")
-			assert.True(t, *cp.IsSelected, "IsSelected should default to true when not provided")
+			require.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil")
+			assert.True(t, *cp.IsUserApproved, "IsUserApproved should default to true when not provided")
 		} else if cp.Name == "test_account_info" {
-			require.NotNil(t, cp.IsSelected, "IsSelected should not be nil")
-			assert.False(t, *cp.IsSelected, "IsSelected should be false when explicitly set")
+			require.NotNil(t, cp.IsUserApproved, "IsUserApproved should not be nil")
+			assert.False(t, *cp.IsUserApproved, "IsUserApproved should be false when explicitly set")
 		}
 	}
 
-	t.Log("✓ isSelected correctly defaults to true when not provided in create request")
+	t.Log("✓ isUserApproved correctly defaults to true when not provided in create request")
 }

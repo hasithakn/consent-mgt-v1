@@ -21,9 +21,10 @@ func BuildConsentResponse(
 		consentPurpose = make([]models.ConsentPurposeItem, len(purposeMappings))
 		for i, mapping := range purposeMappings {
 			consentPurpose[i] = models.ConsentPurposeItem{
-				Name:       mapping.Name,
-				Value:      mapping.Value,
-				IsSelected: &mapping.IsSelected,
+				Name:           mapping.Name,
+				Value:          mapping.Value,
+				IsUserApproved: &mapping.IsUserApproved,
+				IsMandatory:    &mapping.IsMandatory,
 			}
 		}
 	}

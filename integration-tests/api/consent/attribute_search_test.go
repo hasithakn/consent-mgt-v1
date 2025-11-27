@@ -253,9 +253,10 @@ func createConsentWithAttributes(t *testing.T, env *TestEnvironment, purposes ma
 	var consentPurposes []models.ConsentPurposeItem
 	for name := range purposes {
 		consentPurposes = append(consentPurposes, models.ConsentPurposeItem{
-			Name:       name,
-			Value:      "Test value for " + name,
-			IsSelected: BoolPtr(true),
+			Name:           name,
+			Value:          "Test value for " + name,
+			IsUserApproved: BoolPtr(true),
+			IsMandatory:    BoolPtr(true),
 		})
 	}
 

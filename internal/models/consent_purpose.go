@@ -62,12 +62,13 @@ type ConsentPurpose struct {
 
 // ConsentPurposeMapping represents the CONSENT_PURPOSE_MAPPING table
 type ConsentPurposeMapping struct {
-	ConsentID  string      `db:"CONSENT_ID" json:"consentId"`
-	OrgID      string      `db:"ORG_ID" json:"orgId"`
-	PurposeID  string      `db:"PURPOSE_ID" json:"purposeId"`
-	Value      interface{} `db:"VALUE" json:"value,omitempty"`
-	IsSelected bool        `db:"IS_SELECTED" json:"isSelected"`
-	Name       string      `db:"-" json:"name"` // Purpose name for convenience (not in mapping table)
+	ConsentID      string      `db:"CONSENT_ID" json:"consentId"`
+	OrgID          string      `db:"ORG_ID" json:"orgId"`
+	PurposeID      string      `db:"PURPOSE_ID" json:"purposeId"`
+	Value          interface{} `db:"VALUE" json:"value,omitempty"`
+	IsUserApproved bool        `db:"IS_USER_APPROVED" json:"isUserApproved"`
+	IsMandatory    bool        `db:"IS_MANDATORY" json:"isMandatory"`
+	Name           string      `db:"-" json:"name"` // Purpose name for convenience (not in mapping table)
 }
 
 // ConsentPurposeCreateRequest represents the request to create a consent purpose

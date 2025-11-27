@@ -767,3 +767,129 @@ func TestGetConsent_ExpiredWithAuthUpdatesAllStatuses(t *testing.T) {
 
 	t.Log("✓ GET expired consent: consent status updated to EXPIRED and all auth statuses updated to SYS_EXPIRED")
 }
+
+// TestRejectedConsentDoesNotBecomeExpired tests that REJECTED consents
+// don't transition to EXPIRED when GET is called, even if validityTime passed.
+func TestRejectedConsentDoesNotBecomeExpired(t *testing.T) {
+	env := SetupTestEnvironment(t)
+
+	// Create test purposes first
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"purpose-rejected-test": "Purpose for rejected test",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create a consent with REJECTED status and past validity time
+	pastTime := time.Now().Add(-24 * time.Hour).Unix()
+	createReq := &models.ConsentAPIRequest{
+		Type:         "EXPLICIT",
+		ValidityTime: &pastTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "purpose-rejected-test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{UserID: "user-001", Type: "authorization_code", Status: "rejected"},
+		},
+	}
+
+	reqBody, _ := json.Marshal(createReq)
+	req, _ := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+	resp := httptest.NewRecorder()
+	env.Router.ServeHTTP(resp, req)
+
+	require.Equal(t, 201, resp.Code, "Failed to create consent: %s", resp.Body.String())
+
+	var createResp models.ConsentAPIResponse
+	err := json.Unmarshal(resp.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	require.Equal(t, "REJECTED", createResp.Status)
+	t.Logf("✓ Created consent %s with REJECTED status and expired validityTime", createResp.ID)
+
+	// GET the consent - status should remain REJECTED
+	req, _ = http.NewRequest("GET", "/api/v1/consents/"+createResp.ID, nil)
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+	resp = httptest.NewRecorder()
+	env.Router.ServeHTTP(resp, req)
+
+	require.Equal(t, 200, resp.Code, "Failed to GET consent")
+
+	var getResp models.ConsentAPIResponse
+	err = json.Unmarshal(resp.Body.Bytes(), &getResp)
+	require.NoError(t, err)
+
+	assert.Equal(t, "REJECTED", getResp.Status, "REJECTED consent should remain REJECTED on GET")
+	t.Logf("✓ BUG FIX VERIFIED: REJECTED consent with expired validityTime remains REJECTED on GET")
+}
+
+// TestActiveConsentStillBecomesExpired verifies that ACTIVE consents
+// still properly transition to EXPIRED when validityTime has passed.
+// This ensures the bug fix didn't break the expected expiry behavior.
+func TestActiveConsentStillBecomesExpired(t *testing.T) {
+	env := SetupTestEnvironment(t)
+
+	// Create test purposes first
+	purposes := CreateTestPurposes(t, env, map[string]string{
+		"purpose-active-expires-test": "Purpose for active expires test",
+	})
+	defer CleanupTestPurposes(t, env, purposes)
+
+	// Create a consent with ACTIVE status (via approved auths) and past validity time
+	pastTime := time.Now().Add(-1 * time.Hour).Unix()
+	createReq := &models.ConsentAPIRequest{
+		Type:         "EXPLICIT",
+		ValidityTime: &pastTime,
+		ConsentPurpose: []models.ConsentPurposeItem{
+			{Name: "purpose-active-expires-test", IsUserApproved: BoolPtr(true), IsMandatory: BoolPtr(true)},
+		},
+		Authorizations: []models.AuthorizationAPIRequest{
+			{UserID: "user-001", Type: "authorization_code", Status: "approved"},
+		},
+	}
+
+	reqBody, _ := json.Marshal(createReq)
+	req, _ := http.NewRequest("POST", "/api/v1/consents", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+	resp := httptest.NewRecorder()
+	env.Router.ServeHTTP(resp, req)
+
+	require.Equal(t, 201, resp.Code, "Failed to create consent: %s", resp.Body.String())
+
+	var createResp models.ConsentAPIResponse
+	err := json.Unmarshal(resp.Body.Bytes(), &createResp)
+	require.NoError(t, err)
+	defer CleanupTestData(t, env, createResp.ID)
+
+	require.Equal(t, "ACTIVE", createResp.Status)
+	t.Logf("✓ Created consent %s with ACTIVE status and expired validityTime", createResp.ID)
+
+	// GET the consent - status should change to EXPIRED
+	req, _ = http.NewRequest("GET", "/api/v1/consents/"+createResp.ID, nil)
+	req.Header.Set("org-id", "TEST_ORG")
+	req.Header.Set("client-id", "TEST_CLIENT")
+	resp = httptest.NewRecorder()
+	env.Router.ServeHTTP(resp, req)
+
+	require.Equal(t, 200, resp.Code, "Failed to GET consent")
+
+	var getResp models.ConsentAPIResponse
+	err = json.Unmarshal(resp.Body.Bytes(), &getResp)
+	require.NoError(t, err)
+
+	assert.Equal(t, "EXPIRED", getResp.Status, "ACTIVE consent should change to EXPIRED on GET")
+
+	// Auth status should be SYS_EXPIRED
+	for _, auth := range getResp.Authorizations {
+		assert.Equal(t, string(models.AuthStateSysExpired), auth.Status, "Auth status should be SYS_EXPIRED")
+	}
+
+	t.Logf("✓ EXPECTED BEHAVIOR VERIFIED: ACTIVE consent with expired validityTime changed to EXPIRED on GET")
+	t.Logf("✓ Authorization status changed to SYS_EXPIRED")
+}

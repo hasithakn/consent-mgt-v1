@@ -167,7 +167,8 @@ func (h *ConsentHandler) GetConsent(c *gin.Context) {
 	// Check if consent is expired based on validity time and update status if needed
 	if consent.ValidityTime != nil && utils.IsExpired(*consent.ValidityTime) {
 		cfg := config.Get()
-		if cfg != nil && !cfg.Consent.IsExpiredStatus(consent.CurrentStatus) {
+		// Only ACTIVE consents can transition to EXPIRED
+		if cfg != nil && cfg.Consent.IsActiveStatus(consent.CurrentStatus) {
 			// Update to expired status
 			updatedConsent, err := h.consentService.UpdateConsentStatus(
 				c.Request.Context(),
@@ -276,10 +277,11 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 
 	// If existing consent has validity time and it's expired, override status to EXPIRED
 	// and update all auth resource statuses to SYS_EXPIRED
+	// Only ACTIVE consents can transition to EXPIRED
 	if existingConsent != nil && existingConsent.ValidityTime != nil {
 		if utils.IsExpired(*existingConsent.ValidityTime) {
 			cfg := config.Get()
-			if cfg != nil {
+			if cfg != nil && cfg.Consent.IsActiveStatus(existingConsent.CurrentStatus) {
 				updateRequest.CurrentStatus = cfg.Consent.StatusMappings.ExpiredStatus
 				// Update all auth resources status to SYS_EXPIRED if they are provided in the request
 				if updateRequest.AuthResources != nil {
@@ -434,44 +436,60 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 	}
 
 	// Check if consent has expired based on validityTime
+	// Only ACTIVE consents can transition to EXPIRED
 	if consent.ValidityTime != nil && utils.IsExpired(*consent.ValidityTime) {
-		// Consent has expired - update the status to expired in DB
-		expiredStatus := cfg.Consent.StatusMappings.ExpiredStatus
+		// If consent is active and expired, update the status to expired in DB
+		if cfg.Consent.IsActiveStatus(consent.CurrentStatus) {
+			expiredStatus := cfg.Consent.StatusMappings.ExpiredStatus
 
-		// Use the dedicated UpdateConsentStatus method which safely updates only the status
-		// without needing to provide the full consent payload
-		actionBy := consent.ClientID
-		reason := "Consent expired based on validity time"
-		updatedConsent, err := h.consentService.UpdateConsentStatus(
-			c.Request.Context(),
-			req.ConsentID,
-			orgID,
-			expiredStatus,
-			actionBy,
-			reason,
-		)
-		if err != nil {
-			// Log the error but continue with the expired status response
+			// Use the dedicated UpdateConsentStatus method which safely updates only the status
+			// without needing to provide the full consent payload
+			actionBy := consent.ClientID
+			reason := "Consent expired based on validity time"
+			updatedConsent, err := h.consentService.UpdateConsentStatus(
+				c.Request.Context(),
+				req.ConsentID,
+				orgID,
+				expiredStatus,
+				actionBy,
+				reason,
+			)
+			if err != nil {
+				// Log the error but continue with the expired status response
+				response := models.ValidateResponse{
+					IsValid:            false,
+					ModifiedPayload:    nil,
+					ErrorCode:          401,
+					ErrorMessage:       "consent_expired",
+					ErrorDescription:   fmt.Sprintf("Consent has expired. Failed to update status: %s", err.Error()),
+					ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, consent, orgID).ToValidateConsentAPIResponse(),
+				}
+				c.JSON(200, response)
+				return
+			}
+
+			// Return expired response with updated consent data
 			response := models.ValidateResponse{
 				IsValid:            false,
 				ModifiedPayload:    nil,
 				ErrorCode:          401,
 				ErrorMessage:       "consent_expired",
-				ErrorDescription:   fmt.Sprintf("Consent has expired. Failed to update status: %s", err.Error()),
-				ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, consent, orgID).ToValidateConsentAPIResponse(),
+				ErrorDescription:   fmt.Sprintf("Consent has expired. Status updated to: %s", expiredStatus),
+				ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, updatedConsent, orgID).ToValidateConsentAPIResponse(),
 			}
 			c.JSON(200, response)
 			return
 		}
-
-		// Return expired response with updated consent data
+		
+		// If consent is already in a terminal state (REVOKED, REJECTED, etc.) but expired,
+		// just return invalid without updating status
 		response := models.ValidateResponse{
 			IsValid:            false,
 			ModifiedPayload:    nil,
 			ErrorCode:          401,
 			ErrorMessage:       "consent_expired",
-			ErrorDescription:   fmt.Sprintf("Consent has expired. Status updated to: %s", expiredStatus),
-			ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, updatedConsent, orgID).ToValidateConsentAPIResponse(),
+			ErrorDescription:   fmt.Sprintf("Consent has expired and is in status: %s", consent.CurrentStatus),
+			ConsentInformation: handlerutils.BuildEnrichedConsentAPIResponse(c, h.consentPurposeService, consent, orgID).ToValidateConsentAPIResponse(),
 		}
 		c.JSON(200, response)
 		return

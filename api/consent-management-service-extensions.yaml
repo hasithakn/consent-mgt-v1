@@ -558,110 +558,105 @@ components:
       description: Defines an error object with details.
     UpdateRequest:
       type: object
+      description: Request for pre-process-consent-update (same structure as pre-process-consent-creation)
       properties:
         consentInitiationData:
-          type: object
-          description: The initiation payload used by third parties which includes detailed information on data access request.
-          properties:
-            type:
-              description: The type of consent (e.g., 'accounts', 'payments').
-              type: string
-              example: "accounts"
-            status:
-              description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
-              type: string
-              example: "AwaitingAuthorisation"
-            validityTime:
-              description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
-              type: integer
-              format: int64
-              example: 0
-            recurringIndicator:
-              description: A boolean flag indicating if the consent is for a recurring payment or access.
-              type: boolean
-              example: false
-            frequency:
-              description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
-              type: integer
-              format: int32
-              example: 0
-            dataAccessValidityDuration:
-              description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
-              type: integer
-              format: int64
-              example: 86400
-            requestPayload:
-              description: The original consent initiation request payload from the TPP.
-              type: object
-            attributes:
-              description: A key-value map of additional, non-standard attributes associated with the consent.
-              type: object
-              properties:
-                key:
-                  type: string
-            authorizations:
-              description: An array of authorization resources linked to this consent, detailing which users have acted upon it.
-              type: array
-              items:
-                $ref: "#/components/schemas/ConsentAuthorizationCreatePayload"
-            fileContent:
-              description: File content
-              type: string
+          description: |
+            The consent update payload matching POST /consents request body.
+            Contains the complete consent data including type, purposes, authorizations, etc.
+          allOf:
+            - $ref: '#/components/schemas/ConsentCreatePayload'
         requestHeaders:
           $ref: '#/components/schemas/RequestHeaders'
     Request:
       type: object
       properties:
         consentInitiationData:
-          type: object
-          description: The initiation payload used by third parties which includes detailed information on data access request.
-          properties:
-            type:
-              description: The type of consent (e.g., 'accounts', 'payments').
-              type: string
-              example: "accounts"
-            status:
-              description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
-              type: string
-              example: "AwaitingAuthorisation"
-            validityTime:
-              description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
-              type: integer
-              format: int64
-              example: 0
-            recurringIndicator:
-              description: A boolean flag indicating if the consent is for a recurring payment or access.
-              type: boolean
-              example: false
-            frequency:
-              description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
-              type: integer
-              format: int32
-              example: 0
-            dataAccessValidityDuration:
-              description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
-              type: integer
-              format: int64
-              example: 86400
-            requestPayload:
-              description: The original consent initiation request payload from the TPP.
-              type: object
-            attributes:
-              description: A key-value map of additional, non-standard attributes associated with the consent.
-              type: object
-              properties:
-                key:
-                  type: string
-            authorizations:
-              description: An array of authorization resources linked to this consent, detailing which users have acted upon it.
-              type: array
-              items:
-                $ref: "#/components/schemas/ConsentAuthorizationCreatePayload"
+          description: |
+            The consent creation payload matching POST /consents request body.
+            Contains the complete consent initiation data including type, purposes, authorizations, etc.
+          allOf:
+            - $ref: '#/components/schemas/ConsentCreatePayload'
         requestHeaders:
           $ref: '#/components/schemas/RequestHeaders'
+    ConsentCreatePayload:
+      type: object
+      description: |
+        The request body for initiating a new consent (matches POST /consents schema).
+        Status is derived from authorization states.
+      required:
+        - type
+        - consentPurpose
+      properties:
+        type:
+          description: The type of consent (e.g., 'accounts', 'payments').
+          type: string
+          example: "accounts"
+        validityTime:
+          description: The duration for which the consent is valid, in seconds.
+          type: integer
+          format: int64
+          example: 0
+        recurringIndicator:
+          description: A boolean flag indicating if the consent is for recurring access.
+          type: boolean
+          example: false
+        dataAccessValidityDuration:
+          description: The duration for which data access is valid, in seconds.
+          type: integer
+          format: int64
+          example: 86400
+        frequency:
+          description: For recurring consents, this indicates the frequency.
+          type: integer
+          format: int32
+          example: 0
+        consentPurpose:
+          description: Array of consent purposes for this consent (REQUIRED, minimum 1 item).
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ConsentPurposeItem"
+        attributes:
+          description: A key-value map of additional attributes.
+          type: object
+          additionalProperties:
+            type: string
+        authorizations:
+          description: Array of authorization resources linked to this consent.
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsentAuthorizationCreatePayload"
+    ConsentPurposeItem:
+      type: object
+      description: Represents a single consent purpose with its approval state and optional value.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The purpose identifier/name
+          example: "license_read"
+        value:
+          description: Optional purpose value (string, object, or array)
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          example: "license_read"
+        isUserApproved:
+          type: boolean
+          description: Whether the user has approved this purpose (defaults to false)
+          default: false
+          example: true
+        isMandatory:
+          type: boolean
+          description: Whether this purpose is mandatory (defaults to true)
+          default: true
+          example: true
     ConsentAuthorizationCreatePayload:
       type: object
-      description: Represents a detaild authorization object.
+      description: Represents a detailed authorization object.
       properties:
         userId:
           description: The unique ID of the user who performed this authorization.
@@ -672,12 +667,17 @@ components:
           type: string
           example: "authorisation"
         status:
-          description: The current status of this specific authorization (e.g., 'created', 'authorised', 'rejected').
+          description: The authorization state (defaults to 'approved' if not provided).
           type: string
-          example: "created"
-        resource:
-          description: Additional resource data related to the authorization.
-          type: object
+          example: "approved"
+        resources:
+          description: Flexible resources field containing authorization-specific data.
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          example:
+            accountIds: ["123456", "789012"]
     RequestForEnrichConsentCreationResponse:
       type: object
       properties:
@@ -915,6 +915,7 @@ components:
         - $ref: '#/components/schemas/FailedResponse'
     SuccessResponseConsentRevocationData:
       type: object
+      description: Response data for pre-process-consent-revoke (echoes back the request data)
       properties:
         actionBy:
           description: Identifier of the user or system performing the delete/revoke action.
@@ -924,10 +925,6 @@ components:
           description: The reason for revoking the consent.
           type: string
           example: "Admin revoke"
-        revokedConsentStatus:
-          description: The status to set for the consent upon revocation.
-          type: string
-          example: "revoked"
     SuccessResponseForResponseAlternationData:
       type: object
       properties:
@@ -939,15 +936,14 @@ components:
           description: Generated custom response body
     SuccessResponseWithDetailedConsentData:
       type: object
+      description: Response data for pre-process-consent-creation (matches request's consentInitiationData)
       properties:
         consentResource:
-          $ref: '#/components/schemas/DetailedConsentResourceData'
-        resolvedConsentPurposes:
-          type: array
-          description: Array of resolved consent purpose IDs that are associated with this consent
-          items:
-            type: string
-          example: ["PURPOSE-001", "PURPOSE-002"]
+          description: |
+            The consent resource matching the request's consentInitiationData structure.
+            Contains the same fields as ConsentCreatePayload.
+          allOf:
+            - $ref: '#/components/schemas/ConsentCreatePayload'
     SuccessResponsePreProcessFileUploadData:
       type: object
       properties:
@@ -959,58 +955,58 @@ components:
           description: "Id of the user doing the file upload. Used for auditing purposes."
     DetailedConsentResourceData:
       type: object
+      description: Detailed consent resource data without ID (used in pre-process responses)
       properties:
         type:
           description: The type of consent (e.g., 'accounts', 'payments').
           type: string
           example: "accounts"
         status:
-          description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
+          description: The current status of the consent (e.g., 'created', 'active', 'rejected', 'revoked', 'expired').
           type: string
-          example: "AwaitingAuthorisation"
+          example: "active"
         validityTime:
-          description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
+          description: The duration for which the consent is valid, in seconds.
           type: integer
           format: int64
           example: 0
         recurringIndicator:
-          description: A boolean flag indicating if the consent is for a recurring payment or access.
+          description: A boolean flag indicating if the consent is for recurring access.
           type: boolean
           example: false
         frequency:
-          description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
+          description: For recurring consents, this indicates the frequency.
           type: integer
           format: int32
           example: 0
         dataAccessValidityDuration:
-          description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
+          description: The duration for which data access is valid, in seconds.
           type: integer
           format: int64
           example: 86400
-        requestPayload:
-          description: The original consent initiation request payload from the TPP.
-          type: object
+        consentPurpose:
+          description: Array of consent purposes with their approval states and values.
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsentPurposeItem"
         attributes:
-          description: A key-value map of additional, non-standard attributes associated with the consent.
+          description: A key-value map of additional attributes.
           type: object
-          properties:
-            key:
-              type: string
+          additionalProperties:
+            type: string
         authorizations:
-          description: An array of authorization resources linked to this consent, detailing which users have acted upon it.
+          description: Array of authorization resources linked to this consent.
           type: array
           items:
             $ref: "#/components/schemas/ConsentAuthorizationCreatePayload"
     StoredBasicConsentResourceData:
       type: object
+      description: Basic stored consent resource data (used in pre-process-consent-retrieval)
       properties:
         id:
           description: Consent Id
           type: string
           example: "consent_id"
-        requestPayload:
-          description: The original consent initiation request payload from the TPP.
-          type: object
         createdTime:
           type: integer
           format: int32
@@ -1024,36 +1020,40 @@ components:
           type: string
           example: "accounts"
         status:
-          description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
+          description: The current status of the consent (e.g., 'created', 'active', 'rejected', 'revoked', 'expired').
           type: string
-          example: "AwaitingAuthorisation"
+          example: "active"
         frequency:
-          description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
+          description: For recurring consents, this indicates the frequency.
           type: integer
           format: int32
           example: 0
         validityTime:
-          description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
+          description: The duration for which the consent is valid, in seconds.
           type: integer
           format: int64
           example: 0
         recurringIndicator:
-          description: A boolean flag indicating if the consent is for a recurring payment or access.
+          description: A boolean flag indicating if the consent is for recurring access.
           type: boolean
           example: false
         dataAccessValidityDuration:
-          description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
+          description: The duration for which data access is valid, in seconds.
           type: integer
           format: int64
           example: 86400
+        consentPurpose:
+          description: Array of consent purposes with their approval states and values.
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsentPurposeItem"
         attributes:
-          description: A key-value map of additional, non-standard attributes associated with the consent.
+          description: A key-value map of additional attributes.
           type: object
-          properties:
-            key:
-              type: string
+          additionalProperties:
+            type: string
         authorizations:
-          description: An array of authorization resources linked to this consent, detailing which users have acted upon it.
+          description: Array of authorization resources linked to this consent.
           type: array
           items:
             $ref: "#/components/schemas/ConsentAuthorizationCreateResponse"
@@ -1062,14 +1062,12 @@ components:
           type: string
     StoredBasicConsentResourceDataForRevoke:
       type: object
+      description: Basic consent resource data for revoke operations
       properties:
         id:
           description: Consent Id
           type: string
           example: "consent_id"
-        requestPayload:
-          description: The original consent initiation request payload from the TPP.
-          type: object
         createdTime:
           type: integer
           format: int32
@@ -1083,30 +1081,35 @@ components:
           type: string
           example: "accounts"
         status:
-          description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
+          description: The current status of the consent (e.g., 'created', 'active', 'rejected', 'revoked', 'expired').
           type: string
-          example: "AwaitingAuthorisation"
+          example: "active"
         frequency:
-          description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
+          description: For recurring consents, this indicates the frequency.
           type: integer
           format: int32
           example: 0
         validityTime:
-          description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
+          description: The duration for which the consent is valid, in seconds.
           type: integer
           format: int64
           example: 0
         recurringIndicator:
-          description: A boolean flag indicating if the consent is for a recurring payment or access.
+          description: A boolean flag indicating if the consent is for recurring access.
           type: boolean
           example: false
         dataAccessValidityDuration:
-          description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
+          description: The duration for which data access is valid, in seconds.
           type: integer
           format: int64
           example: 86400
+        consentPurpose:
+          description: Array of consent purposes with their approval states and values.
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsentPurposeItem"
         attributes:
-          description: A key-value map of additional, non-standard attributes associated with the consent.
+          description: A key-value map of additional attributes.
           type: object
           properties:
             key:
@@ -1121,6 +1124,10 @@ components:
           type: string
     RevokeRequestBody:
       type: object
+      description: Revoke request payload sent by client
+      required:
+        - actionBy
+        - revocationReason
       properties:
         actionBy:
           description: Identifier of the user or system performing the delete/revoke action.
@@ -1130,20 +1137,14 @@ components:
           description: The reason for revoking the consent.
           type: string
           example: "Admin revoke"
-        revokedConsentStatus:
-          description: The status to set for the consent upon revocation.
-          type: string
-          example: "revoked"
     StoredDetailedConsentResourceData:
       type: object
+      description: Complete stored consent resource data (used in enrich-consent-creation-response)
       properties:
         id:
           description: Consent Id
           type: string
           example: "consent_id"
-        requestPayload:
-          description: The original consent initiation request payload from the TPP.
-          type: object
         createdTime:
           type: integer
           format: int32
@@ -1157,49 +1158,51 @@ components:
           type: string
           example: "accounts"
         status:
-          description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
+          description: The current status of the consent (e.g., 'created', 'active', 'rejected', 'revoked', 'expired').
           type: string
-          example: "AwaitingAuthorisation"
+          example: "active"
         frequency:
-          description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
+          description: For recurring consents, this indicates the frequency.
           type: integer
           format: int32
           example: 0
         validityTime:
-          description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
+          description: The duration for which the consent is valid, in seconds.
           type: integer
           format: int64
           example: 0
         recurringIndicator:
-          description: A boolean flag indicating if the consent is for a recurring payment or access.
+          description: A boolean flag indicating if the consent is for recurring access.
           type: boolean
           example: false
         dataAccessValidityDuration:
-          description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
+          description: The duration for which data access is valid, in seconds.
           type: integer
           format: int64
           example: 86400
+        consentPurpose:
+          description: Array of consent purposes with their approval states and values.
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsentPurposeItem"
         attributes:
-          description: A key-value map of additional, non-standard attributes associated with the consent.
+          description: A key-value map of additional attributes.
           type: object
-          properties:
-            key:
-              type: string
+          additionalProperties:
+            type: string
         authorizations:
-          description: An array of authorization resources linked to this consent, detailing which users have acted upon it.
+          description: Array of authorization resources linked to this consent.
           type: array
           items:
             $ref: "#/components/schemas/ConsentAuthorizationCreateResponse"
     StoredDetailedConsentResourceDataForUpdate:
       type: object
+      description: Complete stored consent resource data for update operations
       properties:
         id:
           description: Consent Id
           type: string
           example: "consent_id"
-        requestPayload:
-          description: The original consent initiation request payload from the TPP.
-          type: object
         createdTime:
           type: integer
           format: int32
@@ -1213,36 +1216,40 @@ components:
           type: string
           example: "accounts"
         status:
-          description: The current status of the consent in its lifecycle (e.g., 'AwaitingAuthorisation', 'authorised', 'revoked', 'expired').
+          description: The current status of the consent (e.g., 'created', 'active', 'rejected', 'revoked', 'expired').
           type: string
-          example: "AwaitingAuthorisation"
+          example: "active"
         frequency:
-          description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
+          description: For recurring consents, this indicates the frequency.
           type: integer
           format: int32
           example: 0
         validityTime:
-          description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
+          description: The duration for which the consent is valid, in seconds.
           type: integer
           format: int64
           example: 0
         recurringIndicator:
-          description: A boolean flag indicating if the consent is for a recurring payment or access.
+          description: A boolean flag indicating if the consent is for recurring access.
           type: boolean
           example: false
         dataAccessValidityDuration:
-          description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
+          description: The duration for which data access is valid, in seconds.
           type: integer
           format: int64
           example: 86400
+        consentPurpose:
+          description: Array of consent purposes with their approval states and values.
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsentPurposeItem"
         attributes:
-          description: A key-value map of additional, non-standard attributes associated with the consent.
+          description: A key-value map of additional attributes.
           type: object
-          properties:
-            key:
-              type: string
+          additionalProperties:
+            type: string
         authorizations:
-          description: An array of authorization resources linked to this consent, detailing which users have acted upon it.
+          description: Array of authorization resources linked to this consent.
           type: array
           items:
             $ref: "#/components/schemas/ConsentAuthorizationCreateResponse"
@@ -1251,7 +1258,7 @@ components:
           type: string
     ConsentAuthorizationCreateResponse:
       type: object
-      description: Represents a detaild authorization object.
+      description: Represents a detailed authorization object in responses.
       properties:
         id:
           description: Auth Id
@@ -1266,15 +1273,20 @@ components:
           type: string
           example: "authorisation"
         status:
-          description: The current status of this specific authorization (e.g., 'created', 'authorised', 'rejected').
+          description: The current status of this specific authorization (e.g., 'created', 'approved', 'rejected').
           type: string
-          example: "created"
+          example: "approved"
         updatedTime:
           type: integer
           format: int32
-        resource:
-          description: Additional resource data related to the authorization.
-          type: object
+        resources:
+          description: Flexible resources field containing authorization-specific data.
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          example:
+            accountIds: ["123456", "789012"]
     RequestHeaders:
       type: object
       description: Request headers sent by the TPP. Filtered set of headers are sent to the external service.

@@ -263,16 +263,55 @@ paths:
                 status: ERROR
                 errorMessage: server_error
                 errorDescription: Failed to process the response
-  /pre-process-consent-file-upload:
+  /validate-consent-access:
     post:
       tags:
         - Consent
-      summary: Handle pre validations related to file upload requests.
+      summary: Handle custom consent data validations before data access
+      description: |
+        Validates consent-specific business rules and custom logic before allowing data access.
+        This endpoint is invoked during the consent validation flow to perform additional
+        validation checks beyond standard consent status and expiry validation.
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PreProcessFileUploadRequestBody'
+              $ref: '#/components/schemas/ValidateConsentAccessRequestBody'
+            example:
+              requestId: Ec1wMjmiG8
+              data:
+                consentId: "CONSENT-123e4567-e89b-12d3-a456-426614174000"
+                consentResource:
+                  id: "CONSENT-123e4567-e89b-12d3-a456-426614174000"
+                  type: "accounts"
+                  status: "active"
+                  clientId: "client-app-123"
+                  createdTime: 1699564800
+                  updatedTime: 1699651200
+                  validityTime: 1707340800
+                  recurringIndicator: true
+                  frequency: 10
+                  consentPurpose:
+                    - name: "license_read"
+                      value: "license_read"
+                      isUserApproved: true
+                      isMandatory: true
+                  attributes:
+                    channel: "mobile"
+                  authorizations:
+                    - id: "AUTH-123"
+                      userId: "user-456"
+                      type: "authorization"
+                      status: "approved"
+                      resources:
+                        accountIds: ["123456", "789012"]
+                validateRequestPayload:
+                  consentId: "CNT_123456"
+                  userId: "user123"
+                  clientId: "banking-app-001"
+                  resourceParams:
+                    resource: "/accounts/ACC-789/transactions"
+                    httpMethod: "GET"
         required: true
       responses:
         "200":
@@ -280,169 +319,22 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Response200ForPreProcessFileUpload'
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                responseId: Ec1wMjmiG8
-                status: ERROR
-                data:
-                  errorMessage: invalid_request
-                  errorDescription: Data is missing
-        "500":
-          description: Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                responseId: Ec1wMjmiG8
-                status: ERROR
-                errorMessage: server_error
-                errorDescription: Failed to process the response
-  /enrich-consent-file-response:
-    post:
-      tags:
-        - Consent
-      summary: Modify the response sent in the file upload request after successfully storig the file.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EnrichFileUploadResponseRequestBody'
-        required: true
-      responses:
-        "200":
-          description: Ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Response200ForResponseAlternation'
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                responseId: Ec1wMjmiG8
-                status: ERROR
-                errorMessage: invalid_request
-                errorDescription: Data is missing
-        "500":
-          description: Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                responseId: Ec1wMjmiG8
-                status: ERROR
-                errorMessage: server_error
-                errorDescription: Failed to process the response
-  /validate-consent-file-retrieval:
-    post:
-      tags:
-        - Consent
-      summary: Handle validations related to file retrieval and return a response
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PreProcessConsentRequestBody'
-        required: true
-      responses:
-        "200":
-          description: Ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Response200'
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                responseId: Ec1wMjmiG8
-                status: ERROR
-                errorMessage: invalid_request
-                errorDescription: Data is missing
-        "500":
-          description: Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                responseId: Ec1wMjmiG8
-                status: ERROR
-                errorMessage: server_error
-                errorDescription: Failed to process the response
-  /pre-process-consent-file-update:
-    post:
-      tags:
-        - Consent
-      summary: Handle pre validations related to file update requests.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PreProcessFileUploadRequestBody'
-        required: true
-      responses:
-        "200":
-          description: Ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Response200ForPreProcessFileUpload'
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                responseId: Ec1wMjmiG8
-                status: ERROR
-                data:
-                  errorMessage: invalid_request
-                  errorDescription: Data is missing
-        "500":
-          description: Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                responseId: Ec1wMjmiG8
-                status: ERROR
-                errorMessage: server_error
-                errorDescription: Failed to process the response
-  /enrich-consent-file-update-response:
-    post:
-      tags:
-        - Consent
-      summary: Modify the response sent in the file update request after successfully replacing the file.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EnrichFileUploadResponseRequestBody'
-        required: true
-      responses:
-        "200":
-          description: Ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Response200ForResponseAlternation'
+                $ref: '#/components/schemas/Response200ForValidateConsentAccess'
+              examples:
+                success:
+                  summary: Validation passed
+                  value:
+                    responseId: Ec1wMjmiG8
+                    status: SUCCESS
+                error:
+                  summary: Validation failed
+                  value:
+                    responseId: Ec1wMjmiG8
+                    status: ERROR
+                    errorCode: 403
+                    data:
+                      errorMessage: insufficient_permissions
+                      errorDescription: User does not have permission to access the requested resource
         "400":
           description: Bad Request
           content:
@@ -692,30 +584,6 @@ components:
           $ref: '#/components/schemas/StoredDetailedConsentResourceDataForUpdate'
         requestHeaders:
           $ref: '#/components/schemas/RequestHeaders'
-    RequestForPreProcessFileUpload:
-      type: object
-      properties:
-        consentResource:
-          $ref: '#/components/schemas/StoredDetailedConsentResourceData'
-        fileContent:
-          type: string
-          description: content of the uploaded file
-        requestHeaders:
-          $ref: '#/components/schemas/RequestHeaders'
-    RequestForEnrichFileUploadResponse:
-      type: object
-      properties:
-        consentId:
-          type: string
-          description: To identify consent.
-        fileUploadCreatedTime:
-          type: string
-          description: Timestamp which the file was stored in the database.
-        requestHeaders:
-          $ref: '#/components/schemas/RequestHeaders'
-        fileContent:
-          description: File content
-          type: string
     PreProcessConsentRetrievalData:
       type: object
       properties:
@@ -774,17 +642,6 @@ components:
             - SUCCESS
         data:
           $ref: '#/components/schemas/SuccessResponseWithDetailedConsentData'
-    SuccessResponsePreProcessFileUpload:
-      type: object
-      properties:
-        responseId:
-          type: string
-        status:
-          type: string
-          enum:
-            - SUCCESS
-        data:
-          $ref: '#/components/schemas/SuccessResponsePreProcessFileUploadData'
     FailedResponse:
       required:
         - data
@@ -853,24 +710,6 @@ components:
           example: Ec1wMjmiG8
         data:
           $ref: '#/components/schemas/RequestForEnrichConsentCreationResponse'
-    EnrichFileUploadResponseRequestBody:
-      type: object
-      properties:
-        requestId:
-          type: string
-          description: A unique correlation identifier
-          example: Ec1wMjmiG8
-        data:
-          $ref: '#/components/schemas/RequestForEnrichFileUploadResponse'
-    PreProcessFileUploadRequestBody:
-      type: object
-      properties:
-        requestId:
-          type: string
-          description: A unique correlation identifier
-          example: Ec1wMjmiG8
-        data:
-          $ref: '#/components/schemas/RequestForPreProcessFileUpload'
     PreProcessConsentRevokeRequestBody:
       type: object
       properties:
@@ -889,6 +728,66 @@ components:
           example: Ec1wMjmiG8
         data:
           $ref: '#/components/schemas/PreProcessConsentRetrievalData'
+    ValidateConsentAccessRequestBody:
+      type: object
+      description: Request body for validate-consent-access endpoint
+      properties:
+        requestId:
+          type: string
+          description: A unique correlation identifier
+          example: Ec1wMjmiG8
+        data:
+          $ref: '#/components/schemas/ValidateConsentAccessData'
+    ValidateConsentAccessData:
+      type: object
+      description: Data for consent access validation
+      required:
+        - consentId
+        - consentResource
+        - validateRequestPayload
+      properties:
+        consentId:
+          type: string
+          description: The unique identifier of the consent being validated
+          example: "CONSENT-123e4567-e89b-12d3-a456-426614174000"
+        consentResource:
+          description: Complete consent details (matches GET /consents/{consentId} response structure)
+          allOf:
+            - $ref: '#/components/schemas/StoredDetailedConsentResourceData'
+        validateRequestPayload:
+          type: object
+          description: The original validate request payload from the client
+          properties:
+            consentId:
+              type: string
+              example: "CNT_123456"
+            userId:
+              type: string
+              example: "user123"
+            clientId:
+              type: string
+              example: "banking-app-001"
+            headers:
+              type: object
+              additionalProperties:
+                type: string
+            payload:
+              type: object
+            electedResource:
+              type: string
+            resourceParams:
+              type: object
+              properties:
+                resource:
+                  type: string
+                httpMethod:
+                  type: string
+                context:
+                  type: string
+    Response200ForValidateConsentAccess:
+      oneOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - $ref: '#/components/schemas/FailedResponse'
     Response200ForPreProcessConsentUpdate:
       oneOf:
         - $ref: '#/components/schemas/SuccessResponsePreProcessConsentCreation'
@@ -896,10 +795,6 @@ components:
     Response200ForPreProcessConsentCreation:
       oneOf:
         - $ref: '#/components/schemas/SuccessResponsePreProcessConsentCreation'
-        - $ref: '#/components/schemas/FailedResponse'
-    Response200ForPreProcessFileUpload:
-      oneOf:
-        - $ref: '#/components/schemas/SuccessResponsePreProcessFileUpload'
         - $ref: '#/components/schemas/FailedResponse'
     Response200ForResponseAlternation:
       oneOf:
@@ -944,15 +839,6 @@ components:
             Contains the same fields as ConsentCreatePayload.
           allOf:
             - $ref: '#/components/schemas/ConsentCreatePayload'
-    SuccessResponsePreProcessFileUploadData:
-      type: object
-      properties:
-        consentStatus:
-          type: string
-          description: "New consent status after the file upload is successful."
-        userId:
-          type: string
-          description: "Id of the user doing the file upload. Used for auditing purposes."
     DetailedConsentResourceData:
       type: object
       description: Detailed consent resource data without ID (used in pre-process responses)
@@ -1057,9 +943,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ConsentAuthorizationCreateResponse"
-        fileContent:
-          description: File content
-          type: string
     StoredBasicConsentResourceDataForRevoke:
       type: object
       description: Basic consent resource data for revoke operations
@@ -1119,9 +1002,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ConsentAuthorizationCreateResponse"
-        fileContent:
-          description: File content
-          type: string
     RevokeRequestBody:
       type: object
       description: Revoke request payload sent by client
@@ -1253,9 +1133,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ConsentAuthorizationCreateResponse"
-        fileContent:
-          description: File content
-          type: string
     ConsentAuthorizationCreateResponse:
       type: object
       description: Represents a detailed authorization object in responses.

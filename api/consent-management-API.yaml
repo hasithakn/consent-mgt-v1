@@ -29,7 +29,7 @@ servers:
         description: Port number for the Consent Management server.
 tags:
   - name: Consent
-    description: Provides RESTful endpoints to handle the full lifecycle of consent resources, their associated authorizations, and attached files. Supports operations such as initiation, retrieval, update, and revocation.
+    description: Provides RESTful endpoints to handle the full lifecycle of consent resources and their associated authorizations. Supports operations such as initiation, retrieval, update, and revocation.
   - name: Consent Purpose
     description: Manage consent purposes (reference data for categorizing consents). Purposes can be created, retrieved, updated, deleted, and validated.
 paths:
@@ -135,11 +135,6 @@ paths:
           schema:
             type: integer
             format: int32
-        - name: withConsentFile
-          in: query
-          description: "Optional flag to retrieve the consent file along with the consent details."
-          schema:
-            type: boolean
         - name: limit
           in: query
           description: The maximum number of results to return in a single page. Used for pagination.
@@ -261,11 +256,6 @@ paths:
           description: "The client ID of the Third-Party Provider (TPP) application that owns the consent."
           schema:
             type: string
-        - name: withConsentFile
-          in: query
-          description: "Optional flag to retrieve the consent file along with the consent details."
-          schema:
-            type: boolean
         - in: path
           name: consentId
           required: true
@@ -404,183 +394,6 @@ paths:
                 $ref: "#/components/schemas/ConsentErrorCommon"
         "500":
           description: Internal Server Error. An unexpected error occurred on the server while trying to create the consent.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConsentErrorCommon"
-      security:
-        - basicAuth: []
-  /consents/{consentId}/file:
-    post:
-      summary: Upload a consent-related file
-      description: |
-        Uploads and associates a file with an existing consent.
-
-        In order to handle custom requirements, The endpoint invokes the following **extension points**:
-        
-        - **/pre-process-consent-file-upload**: Handle pre validations related to file upload requests.
-        - **/enrich-consent-file-response**: Modify the response sent in the file upload request after successfully storig the file.
-      operationId: consents-file-POST
-      tags:
-        - Consent
-      parameters:
-        - in: header
-          name: org-id
-          required: true
-          description: "Organisation ID."
-          schema:
-            type: string
-        - in: header
-          name: TPP-client-id
-          required: true
-          description: "TPP Application client Id."
-          schema:
-            type: string
-        - in: path
-          name: consentId
-          required: true
-          description: The unique identifier of the consent to associate the file with.
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                resourceFile:
-                  type: object
-                  format: binary
-                  description: This represents the corresponding resource file that needs to be added.
-      responses:
-        "201":
-          description: Created. The file was successfully uploaded and associated with the consent.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConsentFileUploadResponse"
-        "400":
-          description: Bad Request. Required parameters are unavailable.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConsentErrorCommon"
-        "500":
-          description: Internal Server Error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConsentErrorCommon"
-      security:
-        - basicAuth: []
-    get:
-      summary: Download a consent-related file
-      description: |
-        Retrieves a file that has been associated with a specific consent.
-        
-        The response body expected to contain the consent file. In order to handle custom validations, The endpoint invokes following **extension point**:
-        - **/validate-consent-file-retrieval**: Handle validations related to file retrieval and return a response
-      operationId: consents-file-GET
-      tags:
-        - Consent
-      parameters:
-        - in: header
-          name: org-id
-          required: true
-          description: "Organisation ID."
-          schema:
-            type: string
-        - in: header
-          name: TPP-client-id
-          required: true
-          description: "TPP Application client Id."
-          schema:
-            type: string
-        - in: path
-          name: consentId
-          required: true
-          description: The unique identifier of the consent associated with the file.
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK. The file content is returned in the response body.
-          content:
-            "*/*":
-              schema:
-                $ref: "#/components/schemas/File"
-        "400":
-          description: Bad Request. Required parameters are unavailable or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConsentErrorCommon"
-        "500":
-          description: Internal Server Error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConsentErrorCommon"
-      security:
-        - basicAuth: []
-    put:
-      summary: Update a consent-related file
-      description: |
-        Updates a file that has been associated with a specific consent.
-
-        In order to handle custom requirements, The endpoint invokes the following **extension points**:
-        
-        - **/pre-process-consent-file-update**: Handle pre validations related to file update requests.
-        - **/enrich-consent-file-update-response**: Modify the response sent in the file update request after successfully storig the updated file.
-      operationId: consent-file-PUT
-      tags:
-        - Consent
-      parameters:
-        - in: header
-          name: org-id
-          required: true
-          description: "Organisation ID."
-          schema:
-            type: string
-        - in: header
-          name: TPP-client-id
-          required: true
-          description: "TPP Application client Id."
-          schema:
-            type: string
-        - in: path
-          name: consentId
-          required: true
-          description: The unique identifier of the consent to associate the file with.
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                resourceFile:
-                  type: object
-                  format: binary
-                  description: This represents the corresponding resource file that needs to be added.
-      responses:
-        "201":
-          description: Created. The file was successfully uploaded and associated with the consent.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConsentFileUpdateResponse"
-        "400":
-          description: Bad Request. Required parameters are unavailable.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConsentErrorCommon"
-        "500":
-          description: Internal Server Error.
           content:
             application/json:
               schema:
@@ -775,6 +588,61 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConsentErrorCommon" 
+      security:
+        - basicAuth: []
+  /consents/validate:
+    post:
+      summary: Validate a consent for a specific action
+      description: |
+        Validates whether a consent is valid and active for a specific user action or API request.
+        
+        This endpoint checks:
+        - If the consent exists and belongs to the specified user
+        - If the consent status is active (AUTHORIZED, ACTIVE, etc.)
+        - If the consent has not expired based on validityTime
+        - Optionally validates resource parameters against consent scope
+        
+        If the consent has expired, the endpoint automatically updates the consent status to EXPIRED.
+        
+        **Response includes enriched consent information:**
+        - Complete consent details with all fields
+        - Consent purposes enriched with type, description, and attributes from purpose definitions
+        - Excludes the `modifiedResponse` field (present only in GET/POST/PUT responses)
+        
+        **Note:** All responses return HTTP 200. Check the `isValid` field and `httpCode` in the response body to determine the actual validation result.
+      operationId: consents-validate-POST
+      tags:
+        - Consent
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: "The unique identifier for the organization."
+          schema:
+            type: string
+        - in: header
+          name: client-id
+          required: true
+          description: "The client ID of the application making the validation request."
+          schema:
+            type: string
+      requestBody:
+        description: The validation request containing consent details and the action being validated.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValidateRequest"
+      responses:
+        "200":
+          description: |
+            Validation completed. Check the `isValid` field in the response body.
+            - If `isValid: true`, the consent is valid for the requested action
+            - If `isValid: false`, check `errorCode`, `errorMessage`, and `httpCode` for details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateResponse"
       security:
         - basicAuth: []
   /consent-purposes:
@@ -1011,22 +879,31 @@ paths:
           schema:
             type: string
             example: "ORG-123"
+        - name: name
+          in: query
+          description: Filter purposes by name (partial match, case-insensitive search)
+          required: false
+          schema:
+            type: string
+            example: "account"
         - name: limit
           in: query
-          description: Maximum number of purposes to return (default 100, max 100)
+          description: The maximum number of results to return in a single page. Used for pagination.
           required: false
           schema:
             type: integer
+            format: int32
             minimum: 1
             maximum: 100
             default: 100
             example: 10
         - name: offset
           in: query
-          description: Number of purposes to skip for pagination (default 0)
+          description: The number of results to skip. Used for pagination.
           required: false
           schema:
             type: integer
+            format: int32
             minimum: 0
             default: 0
             example: 0
@@ -1038,7 +915,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConsentPurposeListResponse"
               example:
-                purposes:
+                data:
                   - id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                     name: "Marketing"
                     description: "Purpose for marketing and promotional communications"
@@ -1054,7 +931,11 @@ paths:
                     description: "Allows reading transaction history"
                     type: "string"
                     value: "account:read:transactions"
-                total: 3
+                metadata:
+                  total: 3
+                  offset: 0
+                  count: 3
+                  limit: 100
         "500":
           description: Internal Server Error
           content:
@@ -1442,61 +1323,6 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
       security:
         - basicAuth: []
-  /consents/validate:
-    post:
-      summary: Validate a consent for a specific action
-      description: |
-        Validates whether a consent is valid and active for a specific user action or API request.
-        
-        This endpoint checks:
-        - If the consent exists and belongs to the specified user
-        - If the consent status is active (AUTHORIZED, ACTIVE, etc.)
-        - If the consent has not expired based on validityTime
-        - Optionally validates resource parameters against consent scope
-        
-        If the consent has expired, the endpoint automatically updates the consent status to EXPIRED.
-        
-        **Response includes enriched consent information:**
-        - Complete consent details with all fields
-        - Consent purposes enriched with type, description, and attributes from purpose definitions
-        - Excludes the `modifiedResponse` field (present only in GET/POST/PUT responses)
-        
-        **Note:** All responses return HTTP 200. Check the `isValid` field and `httpCode` in the response body to determine the actual validation result.
-      operationId: consents-validate-POST
-      tags:
-        - Consent
-      parameters:
-        - in: header
-          name: org-id
-          required: true
-          description: "The unique identifier for the organization."
-          schema:
-            type: string
-        - in: header
-          name: client-id
-          required: true
-          description: "The client ID of the application making the validation request."
-          schema:
-            type: string
-      requestBody:
-        description: The validation request containing consent details and the action being validated.
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ValidateRequest"
-      responses:
-        "200":
-          description: |
-            Validation completed. Check the `isValid` field in the response body.
-            - If `isValid: true`, the consent is valid for the requested action
-            - If `isValid: false`, check `errorCode`, `errorMessage`, and `httpCode` for details
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ValidateResponse"
-      security:
-        - basicAuth: []
 components:
   schemas:
     ConsentPurposeItem:
@@ -1550,11 +1376,6 @@ components:
             When a purpose is mandatory, it inherently requires user approval.
           default: true
           example: true
-    File:
-      type: object
-      description: Represents a file to be uploaded or downloaded.
-      additionalProperties: false
-      properties: {}
     AuthorizationResourceRequestBody:
       type: object
       description: |
@@ -1966,24 +1787,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ConsentAuthorizationCreateResponse"
-        fileContent:
-          description: File content
-          type: string
         modifiedResponse:
           description: Optional field used to provide an alternative payload that overrides the original `consentPurpose` during consent processing.
           type: object
-    ConsentFileUploadResponse:
-      type: object
-      description: The response body returned after successfully uploading a file for a consent.
-      properties:
-        modifiedResponse:
-          description: Optional field used to provide an alternative payload that overrides the response paylaod.
-    ConsentFileUpdateResponse:
-      type: object
-      description: The response body returned after successfully updating a file for the consent.
-      properties:
-        modifiedResponse:
-          description: Optional field used to provide an alternative payload that overrides the response paylaod.
     ConsentRevokedResponse:
       type: object
       description: The response body returned after successfully revoking a consent.
@@ -2122,9 +1928,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ConsentAuthorizationCreateResponse"
-        fileContent:
-          description: File content
-          type: string
     ConsentSearchMetadata:
       type: object
       description: Pagination metadata returned with search results.
@@ -2210,7 +2013,7 @@ components:
         electedResource:
           description: The resource the user is trying to access.
           type: string
-          example: "account-transactions"
+          example: "/accounts/1234"
         resourceParams:
           description: Parameters describing the specific action being validated.
           type: object
@@ -2221,7 +2024,7 @@ components:
             resource:
               description: The API resource path being accessed.
               type: string
-              example: "/accounts/ACC-789/transactions"
+              example: "/aisp/accounts/{AccountId}?queryParam=queryParamValue"
             httpMethod:
               description: The HTTP method of the request.
               type: string
@@ -2229,7 +2032,7 @@ components:
             context:
               description: Additional context about the request.
               type: string
-              example: "transaction-history"
+              example: "/open-banking/v3.1/aisp"
     ValidateResponse:
       type: object
       description: Response payload from consent validation.
@@ -2553,19 +2356,18 @@ components:
         - type
     ConsentPurposeListResponse:
       type: object
+      description: The response from a successful consent purpose list/search query.
       properties:
-        purposes:
+        data:
           type: array
-          description: Array of consent purposes
+          description: Array of consent purposes matching the search criteria
           items:
             $ref: "#/components/schemas/ConsentPurposeResponse"
-        total:
-          type: integer
-          description: Total number of purposes available (for pagination)
-          example: 25
+        metadata:
+          $ref: "#/components/schemas/ConsentSearchMetadata"
       required:
-        - purposes
-        - total
+        - data
+        - metadata
     ErrorResponse:
       type: object
       properties:

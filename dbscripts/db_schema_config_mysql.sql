@@ -46,4 +46,3 @@ CREATE TABLE IF NOT EXISTS CONFIG_ATTRIBUTE (
     ON DELETE CASCADE
     ON UPDATE CASCADE
 ) ENGINE=INNODB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Configuration resource attributes (key-value pairs)';

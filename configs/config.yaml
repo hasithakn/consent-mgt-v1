@@ -27,11 +27,6 @@ extension:
     preProcessConsentUpdate: /pre-process-consent-update
     # enrichConsentUpdateResponse: /enrich-consent-update-response
     # preProcessConsentRevoke: /pre-process-consent-revoke
-    # preProcessConsentFileUpload: /pre-process-consent-file-upload
-    # enrichConsentFileResponse: /enrich-consent-file-response
-    # validateConsentFileRetrieval: /validate-consent-file-retrieval
-    # preProcessConsentFileUpdate: /pre-process-consent-file-update
-    # enrichConsentFileUpdateResponse: /enrich-consent-file-update-response
     # mapAcceleratorErrorResponse: /map-accelerator-error-response
 
 logging:

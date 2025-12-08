@@ -446,6 +446,11 @@ func (s *ConsentPurposeService) UpdatePurpose(ctx context.Context, purposeID, or
 		return nil, err
 	}
 
+	// Validate purpose type early (before any database calls)
+	if err := models.ValidatePurposeType(req.Type); err != nil {
+		return nil, fmt.Errorf("invalid purpose type: %w", err)
+	}
+
 	// Check if purpose exists
 	existingPurpose, err := s.purposeDAO.GetByID(ctx, purposeID, orgID)
 	if err != nil {
@@ -475,11 +480,6 @@ func (s *ConsentPurposeService) UpdatePurpose(ctx context.Context, purposeID, or
 		if exists {
 			return nil, fmt.Errorf("purpose name '%s' already exists for this organization", req.Name)
 		}
-	}
-
-	// Validate purpose type
-	if err := models.ValidatePurposeType(req.Type); err != nil {
-		return nil, fmt.Errorf("invalid purpose type: %w", err)
 	}
 
 	// Validate attributes based on type

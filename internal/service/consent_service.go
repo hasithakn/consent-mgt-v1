@@ -257,7 +257,7 @@ func (s *ConsentService) UpdateConsentStatus(ctx context.Context, consentID, org
 	// Validate that the new status is one of the allowed statuses from config
 	cfg := config.Get()
 	if !cfg.Consent.IsStatusAllowed(newStatus) {
-		return nil, fmt.Errorf("invalid status '%s': must be one of %v", newStatus, cfg.Consent.AllowedStatuses)
+		return nil, fmt.Errorf("invalid status '%s': must be one of %v", newStatus, cfg.Consent.GetAllowedStatuses())
 	}
 
 	// Start transaction

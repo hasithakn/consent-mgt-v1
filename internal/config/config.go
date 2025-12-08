@@ -9,59 +9,60 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Server    ServerConfig    `mapstructure:"server"`
-	Database  DatabaseConfig  `mapstructure:"database"`
-	Extension ExtensionConfig `mapstructure:"extension"`
-	Logging   LoggingConfig   `mapstructure:"logging"`
-	Consent   ConsentConfig   `mapstructure:"consent"`
-	Security  SecurityConfig  `mapstructure:"security"`
-	CORS      CORSConfig      `mapstructure:"cors"`
+	Server           ServerConfig           `mapstructure:"server"`
+	Database         DatabasesConfig        `mapstructure:"database"`
+	ServiceExtension ServiceExtensionConfig `mapstructure:"service_extension"`
+	Logging          LoggingConfig          `mapstructure:"logging"`
+	Consent          ConsentConfig          `mapstructure:"consent"`
+	Security         SecurityConfig         `mapstructure:"security"`
+	CORS             CORSConfig             `mapstructure:"cors"`
 }
 
 // ServerConfig holds HTTP server configuration
 type ServerConfig struct {
+	Hostname     string        `mapstructure:"hostname"`
 	Port         int           `mapstructure:"port"`
-	Host         string        `mapstructure:"host"`
 	ReadTimeout  time.Duration `mapstructure:"readTimeout"`
 	WriteTimeout time.Duration `mapstructure:"writeTimeout"`
 	IdleTimeout  time.Duration `mapstructure:"idleTimeout"`
 }
 
-// DatabaseConfig holds database configuration
+// DatabasesConfig holds all database configurations
+type DatabasesConfig struct {
+	Consent DatabaseConfig `mapstructure:"consent"`
+}
+
+// DatabaseConfig holds individual database configuration
 type DatabaseConfig struct {
-	Host            string        `mapstructure:"host"`
+	Type            string        `mapstructure:"type"`
+	Hostname        string        `mapstructure:"hostname"`
 	Port            int           `mapstructure:"port"`
 	User            string        `mapstructure:"user"`
 	Password        string        `mapstructure:"password"`
 	Database        string        `mapstructure:"database"`
-	MaxOpenConns    int           `mapstructure:"maxOpenConns"`
-	MaxIdleConns    int           `mapstructure:"maxIdleConns"`
-	ConnMaxLifetime time.Duration `mapstructure:"connMaxLifetime"`
+	MaxOpenConns    int           `mapstructure:"max_open_conns"`
+	MaxIdleConns    int           `mapstructure:"max_idle_conns"`
+	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
 }
 
-// ExtensionConfig holds extension service configuration
-type ExtensionConfig struct {
+// ServiceExtensionConfig holds extension service configuration
+type ServiceExtensionConfig struct {
 	Enabled       bool               `mapstructure:"enabled"`
-	BaseURL       string             `mapstructure:"baseUrl"`
+	BaseURL       string             `mapstructure:"base_url"`
 	Timeout       time.Duration      `mapstructure:"timeout"`
-	RetryAttempts int                `mapstructure:"retryAttempts"`
+	RetryAttempts int                `mapstructure:"retry_attempts"`
 	Endpoints     ExtensionEndpoints `mapstructure:"endpoints"`
 }
 
 // ExtensionEndpoints holds all extension service endpoint paths
 type ExtensionEndpoints struct {
-	PreProcessConsentCreation       string `mapstructure:"preProcessConsentCreation"`
-	EnrichConsentCreationResponse   string `mapstructure:"enrichConsentCreationResponse"`
-	PreProcessConsentRetrieval      string `mapstructure:"preProcessConsentRetrieval"`
-	PreProcessConsentUpdate         string `mapstructure:"preProcessConsentUpdate"`
-	EnrichConsentUpdateResponse     string `mapstructure:"enrichConsentUpdateResponse"`
-	PreProcessConsentRevoke         string `mapstructure:"preProcessConsentRevoke"`
-	PreProcessConsentFileUpload     string `mapstructure:"preProcessConsentFileUpload"`
-	EnrichConsentFileResponse       string `mapstructure:"enrichConsentFileResponse"`
-	ValidateConsentFileRetrieval    string `mapstructure:"validateConsentFileRetrieval"`
-	PreProcessConsentFileUpdate     string `mapstructure:"preProcessConsentFileUpdate"`
-	EnrichConsentFileUpdateResponse string `mapstructure:"enrichConsentFileUpdateResponse"`
-	MapAcceleratorErrorResponse     string `mapstructure:"mapAcceleratorErrorResponse"`
+	PreProcessConsentCreation     string `mapstructure:"pre_process_consent_creation"`
+	EnrichConsentCreationResponse string `mapstructure:"enrich_consent_creation_response"`
+	PreProcessConsentRetrieval    string `mapstructure:"pre_process_consent_retrieval"`
+	PreProcessConsentUpdate       string `mapstructure:"pre_process_consent_update"`
+	EnrichConsentUpdateResponse   string `mapstructure:"enrich_consent_update_response"`
+	PreProcessConsentRevoke       string `mapstructure:"pre_process_consent_revoke"`
+	MapAcceleratorErrorResponse   string `mapstructure:"map_accelerator_error_response"`
 }
 
 // LoggingConfig holds logging configuration
@@ -73,22 +74,21 @@ type LoggingConfig struct {
 
 // ConsentConfig holds consent-related configuration
 type ConsentConfig struct {
-	AllowedStatuses []string              `mapstructure:"allowedStatuses"`
-	StatusMappings  ConsentStatusMappings `mapstructure:"statusMappings"`
+	StatusMappings ConsentStatusMappings `mapstructure:"status_mappings"`
 }
 
 // ConsentStatusMappings holds the mapping of specific consent lifecycle states
 type ConsentStatusMappings struct {
-	ActiveStatus   string `mapstructure:"activeStatus"`
-	ExpiredStatus  string `mapstructure:"expiredStatus"`
-	RevokedStatus  string `mapstructure:"revokedStatus"`
-	CreatedStatus  string `mapstructure:"createdStatus"`
-	RejectedStatus string `mapstructure:"rejectedStatus"`
+	ActiveStatus   string `mapstructure:"active_status"`
+	ExpiredStatus  string `mapstructure:"expired_status"`
+	RevokedStatus  string `mapstructure:"revoked_status"`
+	CreatedStatus  string `mapstructure:"created_status"`
+	RejectedStatus string `mapstructure:"rejected_status"`
 }
 
 // SecurityConfig holds security configuration
 type SecurityConfig struct {
-	BasicAuth BasicAuthConfig `mapstructure:"basicAuth"`
+	BasicAuth BasicAuthConfig `mapstructure:"basic_auth"`
 }
 
 // BasicAuthConfig holds basic authentication configuration
@@ -106,11 +106,11 @@ type BasicAuthUser struct {
 // CORSConfig holds CORS configuration
 type CORSConfig struct {
 	Enabled          bool     `mapstructure:"enabled"`
-	AllowedOrigins   []string `mapstructure:"allowedOrigins"`
-	AllowedMethods   []string `mapstructure:"allowedMethods"`
-	AllowedHeaders   []string `mapstructure:"allowedHeaders"`
-	AllowCredentials bool     `mapstructure:"allowCredentials"`
-	MaxAge           int      `mapstructure:"maxAge"`
+	AllowedOrigins   []string `mapstructure:"allowed_origins"`
+	AllowedMethods   []string `mapstructure:"allowed_methods"`
+	AllowedHeaders   []string `mapstructure:"allowed_headers"`
+	AllowCredentials bool     `mapstructure:"allow_credentials"`
+	MaxAge           int      `mapstructure:"max_age"`
 }
 
 var globalConfig *Config
@@ -161,23 +161,19 @@ func validateConfig(config *Config) error {
 		return fmt.Errorf("invalid server port: %d", config.Server.Port)
 	}
 
-	if config.Database.Host == "" {
-		return fmt.Errorf("database host is required")
+	if config.Database.Consent.Hostname == "" {
+		return fmt.Errorf("database hostname is required")
 	}
 
-	if config.Database.Database == "" {
+	if config.Database.Consent.Database == "" {
 		return fmt.Errorf("database name is required")
 	}
 
-	if config.Extension.Enabled && config.Extension.BaseURL == "" {
-		return fmt.Errorf("extension base URL is required when extension is enabled")
+	if config.ServiceExtension.Enabled && config.ServiceExtension.BaseURL == "" {
+		return fmt.Errorf("service extension base URL is required when extension is enabled")
 	}
 
-	// Validate consent configuration
-	if len(config.Consent.AllowedStatuses) == 0 {
-		return fmt.Errorf("at least one allowed consent status is required")
-	}
-
+	// Validate consent status mappings
 	if config.Consent.StatusMappings.ActiveStatus == "" {
 		return fmt.Errorf("active status mapping is required")
 	}
@@ -190,24 +186,12 @@ func validateConfig(config *Config) error {
 		return fmt.Errorf("revoked status mapping is required")
 	}
 
-	// Verify that mapped statuses exist in allowed statuses
-	mappedStatuses := []string{
-		config.Consent.StatusMappings.ActiveStatus,
-		config.Consent.StatusMappings.ExpiredStatus,
-		config.Consent.StatusMappings.RevokedStatus,
-		config.Consent.StatusMappings.CreatedStatus,
-		config.Consent.StatusMappings.RejectedStatus,
+	if config.Consent.StatusMappings.CreatedStatus == "" {
+		return fmt.Errorf("created status mapping is required")
 	}
 
-	allowedStatusMap := make(map[string]bool)
-	for _, status := range config.Consent.AllowedStatuses {
-		allowedStatusMap[status] = true
-	}
-
-	for _, mappedStatus := range mappedStatuses {
-		if mappedStatus != "" && !allowedStatusMap[mappedStatus] {
-			return fmt.Errorf("mapped status '%s' not found in allowedStatuses", mappedStatus)
-		}
+	if config.Consent.StatusMappings.RejectedStatus == "" {
+		return fmt.Errorf("rejected status mapping is required")
 	}
 
 	return nil
@@ -228,7 +212,7 @@ func (d *DatabaseConfig) GetDSN() string {
 	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&multiStatements=true",
 		d.User,
 		d.Password,
-		d.Host,
+		d.Hostname,
 		d.Port,
 		d.Database,
 	)
@@ -236,11 +220,11 @@ func (d *DatabaseConfig) GetDSN() string {
 
 // GetServerAddress returns the server address in host:port format
 func (s *ServerConfig) GetServerAddress() string {
-	return fmt.Sprintf("%s:%d", s.Host, s.Port)
+	return fmt.Sprintf("%s:%d", s.Hostname, s.Port)
 }
 
-// GetExtensionURL returns the full URL for an extension endpoint
-func (e *ExtensionConfig) GetExtensionURL(endpoint string) string {
+// GetExtensionURL returns the full URL for a service extension endpoint
+func (e *ServiceExtensionConfig) GetExtensionURL(endpoint string) string {
 	return e.BaseURL + endpoint
 }
 
@@ -259,14 +243,14 @@ func (s *SecurityConfig) ValidateUser(username, password string) bool {
 	return false
 }
 
-// IsStatusAllowed checks if a given status is in the allowed statuses list
+// IsStatusAllowed checks if a given status is a valid consent status
 func (c *ConsentConfig) IsStatusAllowed(status string) bool {
-	for _, allowedStatus := range c.AllowedStatuses {
-		if allowedStatus == status {
-			return true
-		}
-	}
-	return false
+	// Check if the status matches any of the configured status mappings
+	return status == c.StatusMappings.ActiveStatus ||
+		status == c.StatusMappings.ExpiredStatus ||
+		status == c.StatusMappings.RevokedStatus ||
+		status == c.StatusMappings.CreatedStatus ||
+		status == c.StatusMappings.RejectedStatus
 }
 
 // IsActiveStatus checks if the given status represents an active consent
@@ -299,9 +283,13 @@ func (c *ConsentConfig) IsTerminalStatus(status string) bool {
 	return c.IsExpiredStatus(status) || c.IsRevokedStatus(status)
 }
 
-// GetAllowedStatuses returns a copy of the allowed statuses list
+// GetAllowedStatuses returns a list of all configured consent statuses
 func (c *ConsentConfig) GetAllowedStatuses() []string {
-	statuses := make([]string, len(c.AllowedStatuses))
-	copy(statuses, c.AllowedStatuses)
-	return statuses
+	return []string{
+		c.StatusMappings.CreatedStatus,
+		c.StatusMappings.ActiveStatus,
+		c.StatusMappings.RejectedStatus,
+		c.StatusMappings.RevokedStatus,
+		c.StatusMappings.ExpiredStatus,
+	}
 }

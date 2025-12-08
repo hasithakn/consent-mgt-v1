@@ -58,7 +58,7 @@ func (h *ConsentHandler) CreateConsent(c *gin.Context) {
 
 	// Call pre-create consent extension if configured and enabled
 	cfg := config.Get()
-	if cfg != nil && cfg.Extension.Enabled && h.extensionClient != nil {
+	if cfg != nil && cfg.ServiceExtension.Enabled && h.extensionClient != nil {
 		// Extract request headers to pass to extension
 		headers := make(map[string]string)
 		for key, values := range c.Request.Header {
@@ -215,7 +215,7 @@ func (h *ConsentHandler) UpdateConsent(c *gin.Context) {
 
 	// Call pre-update consent extension if configured and enabled
 	cfg := config.Get()
-	if cfg != nil && cfg.Extension.Enabled && h.extensionClient != nil {
+	if cfg != nil && cfg.ServiceExtension.Enabled && h.extensionClient != nil {
 		// Extract request headers to pass to extension
 		headers := make(map[string]string)
 		for key, values := range c.Request.Header {
@@ -480,7 +480,7 @@ func (h *ConsentHandler) Validate(c *gin.Context) {
 			c.JSON(200, response)
 			return
 		}
-		
+
 		// If consent is already in a terminal state (REVOKED, REJECTED, etc.) but expired,
 		// just return invalid without updating status
 		response := models.ValidateResponse{

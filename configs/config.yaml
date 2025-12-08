@@ -1,33 +1,35 @@
 server:
+  hostname: localhost
   port: 3000
-  host: localhost
   readTimeout: 30s
   writeTimeout: 30s
   idleTimeout: 120s
 
 database:
-  host: localhost
-  port: 3306
-  user: root
-  password: password
-  database: AAconsent-mgt-v3
-  maxOpenConns: 25
-  maxIdleConns: 5
-  connMaxLifetime: 5m
+  consent:
+    type: mysql
+    hostname: localhost
+    port: 3306
+    database: AAconsent-mgt-v3
+    max_open_conns: 25
+    max_idle_conns: 5
+    conn_max_lifetime: 5m
+    user: root
+    password: password
 
-extension:
+service_extension:
   enabled: false
-  baseUrl: http://localhost:3001/api/services
+  base_url: http://localhost:3001/api/services
   timeout: 30s
-  retryAttempts: 3
+  retry_attempts: 3
   endpoints:
-    preProcessConsentCreation: /pre-process-consent-creation
-    # enrichConsentCreationResponse: /enrich-consent-creation-response
-    # preProcessConsentRetrieval: /pre-process-consent-retrieval
-    preProcessConsentUpdate: /pre-process-consent-update
-    # enrichConsentUpdateResponse: /enrich-consent-update-response
-    # preProcessConsentRevoke: /pre-process-consent-revoke
-    # mapAcceleratorErrorResponse: /map-accelerator-error-response
+    pre_process_consent_creation: /pre-process-consent-creation
+    # enrich_consent_creation_response: /enrich-consent-creation-response
+    # pre_process_consent_retrieval: /pre-process-consent-retrieval
+    pre_process_consent_update: /pre-process-consent-update
+    # enrich_consent_update_response: /enrich-consent-update-response
+    # pre_process_consent_revoke: /pre-process-consent-revoke
+    # map_accelerator_error_response: /map-accelerator-error-response
 
 logging:
   level: info
@@ -36,47 +38,26 @@ logging:
 
 # Consent status configuration
 consent:
-  # List of allowed consent statuses
-  allowedStatuses:
-    - CREATED
-    - ACTIVE
-    - REJECTED
-    - REVOKED
-    - EXPIRED
-  # Status mappings for specific consent lifecycle states
-  statusMappings:
+  status_mappings:
     # Status representing an active/authorized consent
-    activeStatus: ACTIVE
+    active_status: ACTIVE
     # Status representing an expired consent
-    expiredStatus: EXPIRED
+    expired_status: EXPIRED
     # Status representing a revoked consent
-    revokedStatus: REVOKED
+    revoked_status: REVOKED
     # Status representing a created consent
-    createdStatus: CREATED
+    created_status: CREATED
     # Status representing a rejected consent
-    rejectedStatus: REJECTED
+    rejected_status: REJECTED
   
 security:
-  basicAuth:
+  basic_auth:
     enabled: true
     # Default credentials for development (should be changed in production)
     users:
       - username: admin
         password: admin123
-      - username: testuser
-        password: test123
 
 cors:
-  enabled: true
-  allowedOrigins:
-    - "*"
-  allowedMethods:
-    - GET
-    - POST
-    - PUT
-    - DELETE
-    - OPTIONS
-  allowedHeaders:
-    - "*"
-  allowCredentials: true
-  maxAge: 3600
+  allowed_origins:
+    - "https://localhost:3000"

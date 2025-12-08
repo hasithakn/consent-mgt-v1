@@ -33,7 +33,7 @@ func setupConsentPurposeAPITestEnvironment(t *testing.T) *TestConsentPurposeAPIE
 	logger.SetLevel(logrus.ErrorLevel) // Reduce noise in tests
 
 	// Initialize database
-	db, err := database.Initialize(&cfg.Database, logger)
+	db, err := database.Initialize(&cfg.Database.Consent, logger)
 	require.NoError(t, err, "Failed to initialize database")
 
 	// Initialize DAOs

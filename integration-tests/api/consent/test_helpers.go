@@ -18,17 +18,17 @@ import (
 
 // TestEnvironment sets up test environment for Consent API integration tests
 type TestEnvironment struct {
-	Router                 *gin.Engine
-	ConsentService         *service.ConsentService
-	AuthResourceService    *service.AuthResourceService
-	ConsentPurposeService  *service.ConsentPurposeService
-	ConsentDAO             *dao.ConsentDAO
-	StatusAuditDAO         *dao.StatusAuditDAO
-	AttributeDAO           *dao.ConsentAttributeDAO
-	FileDAO                *dao.ConsentFileDAO
-	AuthResourceDAO        *dao.AuthResourceDAO
-	ConsentPurposeDAO      *dao.ConsentPurposeDAO
-	ConsentPurposeAttrDAO  *dao.ConsentPurposeAttributeDAO
+	Router                *gin.Engine
+	ConsentService        *service.ConsentService
+	AuthResourceService   *service.AuthResourceService
+	ConsentPurposeService *service.ConsentPurposeService
+	ConsentDAO            *dao.ConsentDAO
+	StatusAuditDAO        *dao.StatusAuditDAO
+	AttributeDAO          *dao.ConsentAttributeDAO
+	FileDAO               *dao.ConsentFileDAO
+	AuthResourceDAO       *dao.AuthResourceDAO
+	ConsentPurposeDAO     *dao.ConsentPurposeDAO
+	ConsentPurposeAttrDAO *dao.ConsentPurposeAttributeDAO
 }
 
 // SetupTestEnvironment initializes the test environment with all necessary dependencies
@@ -42,7 +42,7 @@ func SetupTestEnvironment(t *testing.T) *TestEnvironment {
 	logger.SetLevel(logrus.DebugLevel)
 
 	// Initialize database
-	db, err := database.Initialize(&cfg.Database, logger)
+	db, err := database.Initialize(&cfg.Database.Consent, logger)
 	require.NoError(t, err, "Failed to initialize database")
 
 	// Create DAOs
@@ -92,7 +92,7 @@ func CleanupTestData(t *testing.T, env *TestEnvironment, consentIDs ...string) {
 // CreateTestPurpose creates a test consent purpose and returns it
 func CreateTestPurpose(t *testing.T, env *TestEnvironment, name, description string) *models.ConsentPurpose {
 	ctx := context.Background()
-	
+
 	purpose := &models.ConsentPurpose{
 		ID:          "PURPOSE-test-" + name,
 		Name:        name,
@@ -100,10 +100,10 @@ func CreateTestPurpose(t *testing.T, env *TestEnvironment, name, description str
 		Type:        "string", // Default type for test purposes
 		OrgID:       "TEST_ORG",
 	}
-	
+
 	err := env.ConsentPurposeDAO.Create(ctx, purpose)
 	require.NoError(t, err, "Failed to create test purpose: %s", name)
-	
+
 	return purpose
 }
 

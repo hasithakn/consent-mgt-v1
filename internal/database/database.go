@@ -25,7 +25,7 @@ func Initialize(cfg *config.DatabaseConfig, logger *logrus.Logger) (*DB, error) 
 	dsn := cfg.GetDSN()
 
 	logger.WithFields(logrus.Fields{
-		"host":     cfg.Host,
+		"hostname": cfg.Hostname,
 		"port":     cfg.Port,
 		"database": cfg.Database,
 	}).Info("Connecting to database...")

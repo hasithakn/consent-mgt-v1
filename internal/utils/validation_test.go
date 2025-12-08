@@ -10,15 +10,6 @@ import (
 func mockConfig() *config.Config {
 	return &config.Config{
 		Consent: config.ConsentConfig{
-			AllowedStatuses: []string{
-				"CREATED",
-				"CREATED",
-				"ACTIVE",
-				"ACTIVE",
-				"REJECTED",
-				"REVOKED",
-				"EXPIRED",
-			},
 			StatusMappings: config.ConsentStatusMappings{
 				ActiveStatus:   "ACTIVE",
 				ExpiredStatus:  "EXPIRED",

@@ -49,7 +49,7 @@ func main() {
 	}).Info("Configuration loaded successfully")
 
 	// Initialize database
-	db, err := database.Initialize(&cfg.Database, logger)
+	db, err := database.Initialize(&cfg.Database.Consent, logger)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize database")
 	}
@@ -103,14 +103,14 @@ func main() {
 	logger.Info("Services initialized successfully")
 
 	// Initialize extension client
-	extensionClient := extensionclient.NewExtensionClient(&cfg.Extension, logger)
+	extensionClient := extensionclient.NewExtensionClient(&cfg.ServiceExtension, logger)
 	logger.WithField("enabled", extensionClient.IsExtensionEnabled()).Info("Extension client initialized")
 
 	// Setup router
 	ginRouter := router.SetupRouter(consentService, authResourceService, purposeService, extensionClient)
 
 	// Configure HTTP server
-	serverAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	serverAddr := fmt.Sprintf("%s:%d", cfg.Server.Hostname, cfg.Server.Port)
 	server := &http.Server{
 		Addr:           serverAddr,
 		Handler:        ginRouter,
@@ -123,9 +123,9 @@ func main() {
 	// Start server in a goroutine
 	go func() {
 		logger.WithFields(logrus.Fields{
-			"host": cfg.Server.Host,
-			"port": cfg.Server.Port,
-			"addr": serverAddr,
+			"hostname": cfg.Server.Hostname,
+			"port":     cfg.Server.Port,
+			"addr":     serverAddr,
 		}).Info("Starting HTTP server...")
 
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

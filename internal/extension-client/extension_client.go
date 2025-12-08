@@ -18,7 +18,7 @@ import (
 // ExtensionClient handles communication with the external extension service
 type ExtensionClient struct {
 	httpClient *http.Client
-	config     *config.ExtensionConfig
+	config     *config.ServiceExtensionConfig
 	logger     *logrus.Logger
 }
 
@@ -53,7 +53,7 @@ type ValidationResponse struct {
 }
 
 // NewExtensionClient creates a new extension client instance
-func NewExtensionClient(cfg *config.ExtensionConfig, logger *logrus.Logger) *ExtensionClient {
+func NewExtensionClient(cfg *config.ServiceExtensionConfig, logger *logrus.Logger) *ExtensionClient {
 	timeout := 30 * time.Second
 	if cfg.Timeout > 0 {
 		timeout = cfg.Timeout

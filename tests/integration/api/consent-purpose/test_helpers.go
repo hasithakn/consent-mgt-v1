@@ -25,7 +25,7 @@ type TestConsentPurposeAPIEnvironment struct {
 // setupConsentPurposeAPITestEnvironment initializes test environment for API tests
 func setupConsentPurposeAPITestEnvironment(t *testing.T) *TestConsentPurposeAPIEnvironment {
 	// Load configuration from new location
-	cfg, err := config.Load("../../../cmd/server/repository/conf/deployment.yaml")
+	cfg, err := config.Load("../../../../consent-server/cmd/server/repository/conf/deployment.yaml")
 	require.NoError(t, err, "Failed to load config")
 
 	// Initialize logger

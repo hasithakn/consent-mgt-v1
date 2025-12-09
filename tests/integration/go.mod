@@ -3,7 +3,7 @@ module github.com/wso2/consent-management-api/tests
 go 1.25.3
 
 // Import the main module
-replace github.com/wso2/consent-management-api => ../
+replace github.com/wso2/consent-management-api => ../../consent-server
 
 require (
 	github.com/gin-gonic/gin v1.11.0

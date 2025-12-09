@@ -64,8 +64,8 @@ fi
 # Configuration
 BINARY_NAME="consent-server"
 OUTPUT_DIR="bin"
-SOURCE_DIR="cmd/server"
-CONFIG_SOURCE="cmd/server/repository/conf/deployment.yaml"
+SOURCE_DIR="consent-server/cmd/server"
+CONFIG_SOURCE="consent-server/cmd/server/repository/conf/deployment.yaml"
 TARGET_DIR="target"
 DIST_DIR="$TARGET_DIR/dist"
 
@@ -129,9 +129,11 @@ function build_binary() {
     
     # Build the binary with version and build date
     echo "Compiling binary for $GO_OS/$GO_ARCH..."
+    cd consent-server
     GOOS=$GO_OS GOARCH=$GO_ARCH CGO_ENABLED=0 go build \
         -ldflags "-X 'main.version=$VERSION' -X 'main.buildDate=$(date -u '+%Y-%m-%d %H:%M:%S UTC')'" \
-        -o "$OUTPUT_DIR/$output_binary" "$SOURCE_DIR/main.go"
+        -o "../$OUTPUT_DIR/$output_binary" "./cmd/server/main.go"
+    cd ..
     
     # Copy configuration
     echo "Copying configuration..."
@@ -143,10 +145,10 @@ function build_binary() {
     chmod +x "$OUTPUT_DIR/start.sh"
     
     # Copy database scripts
-    if [ -d "dbscripts" ]; then
+    if [ -d "consent-server/dbscripts" ]; then
         echo "Copying database scripts..."
         mkdir -p "$OUTPUT_DIR/dbscripts"
-        cp dbscripts/*.sql "$OUTPUT_DIR/dbscripts/" 2>/dev/null || true
+        cp consent-server/dbscripts/*.sql "$OUTPUT_DIR/dbscripts/" 2>/dev/null || true
     fi
     
     # Copy API specifications
@@ -246,14 +248,16 @@ function run_server() {
 function test_unit() {
     echo "================================================================"
     echo "Running unit tests..."
+    cd consent-server || exit 1
     go test ./internal/... -v -cover
+    cd "$SCRIPT_DIR" || exit 1
     echo "================================================================"
 }
 
 function test_integration() {
     echo "================================================================"
     echo "Running integration tests..."
-    cd integration-tests || exit 1
+    cd tests/integration || exit 1
     # Run tests excluding the broken auth_resource_api_test.go
     # The auth resource tests need to be updated to match the current models
     go test ./api/consent/... ./api/consent-purpose/... -v

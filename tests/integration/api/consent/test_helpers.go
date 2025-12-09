@@ -34,7 +34,7 @@ type TestEnvironment struct {
 // SetupTestEnvironment initializes the test environment with all necessary dependencies
 func SetupTestEnvironment(t *testing.T) *TestEnvironment {
 	// Load configuration from new location
-	cfg, err := config.Load("../../../cmd/server/repository/conf/deployment.yaml")
+	cfg, err := config.Load("../../../../consent-server/cmd/server/repository/conf/deployment.yaml")
 	require.NoError(t, err, "Failed to load config")
 
 	// Initialize logger

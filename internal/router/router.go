@@ -3,7 +3,7 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/wso2/consent-management-api/internal/extension-client"
+	client "github.com/wso2/consent-management-api/internal/extension-client"
 	"github.com/wso2/consent-management-api/internal/handlers"
 	"github.com/wso2/consent-management-api/internal/service"
 	"github.com/wso2/consent-management-api/internal/utils"
@@ -64,16 +64,16 @@ func SetupRouter(
 		consents := v1.Group("/consents")
 		{
 			consents.POST("", consentHandler.CreateConsent)
-			
+
 			// Attribute search endpoint (must be before /:consentId)
 			consents.GET("/attributes", consentHandler.SearchConsentsByAttribute)
-			
+
 			// Validation endpoint (must be before /:consentId)
 			consents.POST("/validate", consentHandler.Validate)
-			
+
 			// Specific paths before parameterized paths
 			consents.PUT("/:consentId/revoke", consentHandler.RevokeConsent)
-			
+
 			// General consent operations
 			consents.GET("/:consentId", consentHandler.GetConsent)
 			consents.PUT("/:consentId", consentHandler.UpdateConsent)

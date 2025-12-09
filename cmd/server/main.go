@@ -19,18 +19,30 @@ import (
 	"github.com/wso2/consent-management-api/internal/service"
 )
 
+// Version information (set by build script)
+var (
+	version   = "dev"
+	buildDate = "unknown"
+)
+
 func main() {
 	// Initialize logger
 	logger := logrus.New()
 	logger.SetFormatter(&logrus.JSONFormatter{})
 	logger.SetLevel(logrus.InfoLevel)
 
-	logger.Info("Starting Consent Management API Server...")
+	logger.WithFields(logrus.Fields{
+		"version":    version,
+		"build_date": buildDate,
+	}).Info("Starting Consent Management API Server...")
 
 	// Load configuration
+	// Priority: CONFIG_PATH env var > repository/conf/deployment.yaml > cmd/server/repository/conf/deployment.yaml
 	configPath := os.Getenv("CONFIG_PATH")
 	if configPath == "" {
-		configPath = "configs/config.yaml"
+		// Auto-discovery: will search in repository/conf/deployment.yaml first (production)
+		// then cmd/server/repository/conf/deployment.yaml (development)
+		configPath = ""
 	}
 
 	cfg, err := config.Load(configPath)

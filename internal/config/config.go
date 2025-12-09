@@ -123,11 +123,14 @@ func Load(configPath string) (*Config, error) {
 	if configPath != "" {
 		v.SetConfigFile(configPath)
 	} else {
-		v.SetConfigName("config")
+		// Default configuration lookup order:
+		// 1. ./repository/conf/deployment.yaml (production - relative to binary)
+		// 2. ./cmd/server/repository/conf/deployment.yaml (development)
+		v.SetConfigName("deployment")
 		v.SetConfigType("yaml")
-		v.AddConfigPath("./configs")
-		v.AddConfigPath("../configs")
-		v.AddConfigPath("../../configs")
+		v.AddConfigPath("./repository/conf")            // Production: <binary_dir>/repository/conf/
+		v.AddConfigPath("./cmd/server/repository/conf") // Development
+		v.AddConfigPath("../repository/conf")           // If running from subdirectory
 		v.AddConfigPath(".")
 	}
 

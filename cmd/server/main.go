@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
 	"github.com/wso2/consent-management-api/internal/config"
@@ -26,6 +27,11 @@ var (
 )
 
 func main() {
+	// Set Gin to release mode by default (can be overridden by GIN_MODE env var)
+	if os.Getenv("GIN_MODE") == "" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	// Initialize logger
 	logger := logrus.New()
 	logger.SetFormatter(&logrus.JSONFormatter{})

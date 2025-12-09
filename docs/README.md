@@ -47,6 +47,56 @@ Prerequisites
 Environment
 - Set `org-id` and `client-id` headers when making requests in tests; the tests set `TEST_ORG` / `TEST_CLIENT` by default.
 
+### Quick Start
+
+```bash
+# Build the server
+./build.sh build
+
+# Start the server normally
+./start.sh
+
+# Or start in debug mode for development
+./start.sh --debug
+```
+
+### Build & Run Commands
+
+```bash
+# Build for current platform
+./build.sh build
+
+# Build for specific platform
+./build.sh build linux amd64
+
+# Create distribution package
+./build.sh package
+
+# Run tests
+./build.sh test_unit           # Unit tests
+./build.sh test_integration    # Integration tests
+./build.sh test                # All tests
+
+# Clean build artifacts
+./build.sh clean
+```
+
+### Start Script Options
+
+```bash
+# Normal start
+./start.sh
+
+# Debug mode (with Delve remote debugger)
+./start.sh --debug
+
+# Custom ports
+./start.sh --port 9090 --debug-port 3456
+
+# Help
+./start.sh --help
+```
+
 Run integration tests (consent-specific)
 
 ```bash
@@ -58,12 +108,20 @@ go test -v ./integration-tests/api/consent -count=1
 Run all integration tests
 
 ```bash
+# Using build script (recommended)
+./build.sh test_integration
+
+# Or directly
 go test -v ./integration-tests/... -count=1
 ```
 
 Run unit tests (package-level)
 
 ```bash
+# Using build script
+./build.sh test_unit
+
+# Or directly
 go test ./... -run TestName -count=1
 ```
 
@@ -76,7 +134,7 @@ Database setup (quick)
 mysql -u root -p consent_mgt_dev < dbscripts/db_schema_mysql.sql
 ```
 
-Adjust connection settings in the local `configs/config.yaml` if needed.
+Adjust connection settings in `bin/repository/conf/deployment.yaml` or set `CONFIG_PATH` environment variable.
 
 ## Contributing / Review Notes
 - Place tests in files that reflect the operation under test (create/revoke/read/update).

@@ -132,7 +132,7 @@ function build_binary() {
     cd consent-server
     GOOS=$GO_OS GOARCH=$GO_ARCH CGO_ENABLED=0 go build \
         -ldflags "-X 'main.version=$VERSION' -X 'main.buildDate=$(date -u '+%Y-%m-%d %H:%M:%S UTC')'" \
-        -o "../$OUTPUT_DIR/$output_binary" "./cmd/server/main.go"
+        -o "../$OUTPUT_DIR/$output_binary" "./cmd/server"
     cd ..
     
     # Copy configuration

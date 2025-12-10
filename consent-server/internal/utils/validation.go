@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/wso2/consent-management-api/internal/config"
+	"github.com/wso2/consent-management-api/internal/system/config"
 )
 
 // ValidateConsentID validates consent ID format

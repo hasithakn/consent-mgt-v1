@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/wso2/consent-management-api/internal/config"
+	"github.com/wso2/consent-management-api/internal/system/config"
 	"github.com/wso2/consent-management-api/internal/dao"
 	"github.com/wso2/consent-management-api/internal/database"
 	"github.com/wso2/consent-management-api/internal/models"

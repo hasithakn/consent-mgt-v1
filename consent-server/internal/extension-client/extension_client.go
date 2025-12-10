@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/wso2/consent-management-api/internal/config"
+	"github.com/wso2/consent-management-api/internal/system/config"
 	"github.com/wso2/consent-management-api/internal/models"
 
 	"github.com/sirupsen/logrus"

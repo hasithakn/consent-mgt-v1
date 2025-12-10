@@ -22,8 +22,8 @@ package provider
 import (
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	"github.com/wso2/consent-management-api/internal/system/database/model"
+	"github.com/wso2/consent-management-api/internal/system/log"
 )
 
 // DBClientInterface defines the interface for database operations.
@@ -40,23 +40,20 @@ type DBClientInterface interface {
 type DBClient struct {
 	db     model.DBInterface
 	dbType string
-	logger *logrus.Logger
 }
 
 // NewDBClient creates a new instance of DBClient with the provided database connection.
-func NewDBClient(db model.DBInterface, dbType string, logger *logrus.Logger) DBClientInterface {
+func NewDBClient(db model.DBInterface, dbType string) DBClientInterface {
 	return &DBClient{
 		db:     db,
 		dbType: dbType,
-		logger: logger,
 	}
 }
 
 // Query executes a sql query that returns rows, typically a SELECT, and returns the result as a slice of maps.
 func (client *DBClient) Query(query model.DBQuery, args ...interface{}) ([]map[string]interface{}, error) {
-	client.logger.WithFields(logrus.Fields{
-		"query_id": query.GetID(),
-	}).Debug("Executing query")
+	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "DBClient"))
+	logger.Debug("Executing query", log.String("query_id", query.GetID()))
 
 	sqlQuery := query.GetQuery(client.dbType)
 	rows, err := client.db.Query(sqlQuery, args...)
@@ -65,7 +62,8 @@ func (client *DBClient) Query(query model.DBQuery, args ...interface{}) ([]map[s
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			client.logger.WithError(closeErr).Error("Error closing rows")
+			logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "DBClient"))
+			logger.Error("Error closing rows", log.Error(closeErr))
 		}
 	}()
 
@@ -103,9 +101,8 @@ func (client *DBClient) Query(query model.DBQuery, args ...interface{}) ([]map[s
 
 // Execute executes a sql query without returning data in any rows, and returns number of rows affected.
 func (client *DBClient) Execute(query model.DBQuery, args ...interface{}) (int64, error) {
-	client.logger.WithFields(logrus.Fields{
-		"query_id": query.GetID(),
-	}).Debug("Executing query")
+	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "DBClient"))
+	logger.Debug("Executing query", log.String("query_id", query.GetID()))
 
 	sqlQuery := query.GetQuery(client.dbType)
 	res, err := client.db.Exec(sqlQuery, args...)

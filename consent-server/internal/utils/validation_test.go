@@ -3,7 +3,7 @@ package utils
 import (
 	"testing"
 
-	"github.com/wso2/consent-management-api/internal/config"
+	"github.com/wso2/consent-management-api/internal/system/config"
 )
 
 // mockConfig creates a test configuration

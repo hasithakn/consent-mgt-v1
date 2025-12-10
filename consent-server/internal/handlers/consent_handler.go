@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/wso2/consent-management-api/internal/config"
+	"github.com/wso2/consent-management-api/internal/system/config"
 	extensionclient "github.com/wso2/consent-management-api/internal/extension-client"
 	handlerutils "github.com/wso2/consent-management-api/internal/handlers/utils"
 	"github.com/wso2/consent-management-api/internal/models"

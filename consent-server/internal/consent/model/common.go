@@ -3,7 +3,7 @@ package model
 import (
 	"strings"
 
-	"github.com/wso2/consent-management-api/internal/config"
+	"github.com/wso2/consent-management-api/internal/system/config"
 )
 
 // AuthorizationState represents known authorization states produced by authorizations

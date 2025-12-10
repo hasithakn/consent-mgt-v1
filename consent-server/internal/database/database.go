@@ -8,27 +8,26 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
-	"github.com/wso2/consent-management-api/internal/config"
+	"github.com/wso2/consent-management-api/internal/system/config"
+	"github.com/wso2/consent-management-api/internal/system/log"
 )
 
 // DB holds the database connection
 type DB struct {
 	*sqlx.DB
-	logger *logrus.Logger
 }
 
 var dbInstance *DB
 
 // Initialize creates and initializes the database connection
-func Initialize(cfg *config.DatabaseConfig, logger *logrus.Logger) (*DB, error) {
+func Initialize(cfg *config.DatabaseConfig) (*DB, error) {
+	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "Database"))
 	dsn := cfg.GetDSN()
 
-	logger.WithFields(logrus.Fields{
-		"hostname": cfg.Hostname,
-		"port":     cfg.Port,
-		"database": cfg.Database,
-	}).Info("Connecting to database...")
+	logger.Info("Connecting to database...",
+		log.String("hostname", cfg.Hostname),
+		log.Int("port", cfg.Port),
+		log.String("database", cfg.Database))
 
 	// Open database connection
 	db, err := sqlx.Open("mysql", dsn)
@@ -52,8 +51,7 @@ func Initialize(cfg *config.DatabaseConfig, logger *logrus.Logger) (*DB, error) 
 	logger.Info("Successfully connected to database")
 
 	dbInstance = &DB{
-		DB:     db,
-		logger: logger,
+		DB: db,
 	}
 
 	return dbInstance, nil
@@ -67,7 +65,8 @@ func Get() *DB {
 // Close closes the database connection
 func (db *DB) Close() error {
 	if db.DB != nil {
-		db.logger.Info("Closing database connection...")
+		logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "Database"))
+		logger.Info("Closing database connection...")
 		return db.DB.Close()
 	}
 	return nil
@@ -89,7 +88,6 @@ func (db *DB) HealthCheck(ctx context.Context) error {
 // Transaction represents a database transaction
 type Transaction struct {
 	*sqlx.Tx
-	logger *logrus.Logger
 }
 
 // BeginTx starts a new transaction
@@ -101,11 +99,11 @@ func (db *DB) BeginTx(ctx context.Context) (*Transaction, error) {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
-	db.logger.Debug("Transaction started")
+	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "Database"))
+	logger.Debug("Transaction started")
 
 	return &Transaction{
-		Tx:     tx,
-		logger: db.logger,
+		Tx: tx,
 	}, nil
 }
 
@@ -115,7 +113,8 @@ func (tx *Transaction) Commit() error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	tx.logger.Debug("Transaction committed")
+	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "Database"))
+	logger.Debug("Transaction committed")
 	return nil
 }
 
@@ -129,7 +128,8 @@ func (tx *Transaction) Rollback() error {
 		return fmt.Errorf("failed to rollback transaction: %w", err)
 	}
 
-	tx.logger.Debug("Transaction rolled back")
+	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "Database"))
+	logger.Debug("Transaction rolled back")
 	return nil
 }
 
@@ -152,7 +152,8 @@ func (db *DB) WithTransaction(ctx context.Context, fn func(*Transaction) error) 
 
 	if err := fn(tx); err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
-			db.logger.WithError(rbErr).Error("Failed to rollback transaction")
+			logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "Database"))
+			logger.Error("Failed to rollback transaction", log.Error(rbErr))
 		}
 		return err
 	}
@@ -168,13 +169,13 @@ func (db *DB) Stats() sql.DBStats {
 // LogStats logs current database connection pool statistics
 func (db *DB) LogStats() {
 	stats := db.Stats()
-	db.logger.WithFields(logrus.Fields{
-		"open_connections":    stats.OpenConnections,
-		"in_use":              stats.InUse,
-		"idle":                stats.Idle,
-		"wait_count":          stats.WaitCount,
-		"wait_duration":       stats.WaitDuration,
-		"max_idle_closed":     stats.MaxIdleClosed,
-		"max_lifetime_closed": stats.MaxLifetimeClosed,
-	}).Debug("Database connection pool stats")
+	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "Database"))
+	logger.Debug("Database connection pool stats",
+		log.Int("open_connections", stats.OpenConnections),
+		log.Int("in_use", stats.InUse),
+		log.Int("idle", stats.Idle),
+		log.Any("wait_count", stats.WaitCount),
+		log.Any("wait_duration", stats.WaitDuration),
+		log.Any("max_idle_closed", stats.MaxIdleClosed),
+		log.Any("max_lifetime_closed", stats.MaxLifetimeClosed))
 }

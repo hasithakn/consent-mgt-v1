@@ -9,18 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
-	"github.com/wso2/consent-management-api/internal/authresource"
-	"github.com/wso2/consent-management-api/internal/config"
-	"github.com/wso2/consent-management-api/internal/consent"
-	"github.com/wso2/consent-management-api/internal/consentpurpose"
-	"github.com/wso2/consent-management-api/internal/dao"
 	"github.com/wso2/consent-management-api/internal/database"
-	extensionclient "github.com/wso2/consent-management-api/internal/extension-client"
-	"github.com/wso2/consent-management-api/internal/router"
-	"github.com/wso2/consent-management-api/internal/service"
+	"github.com/wso2/consent-management-api/internal/system/config"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
+	"github.com/wso2/consent-management-api/internal/system/log"
 	"github.com/wso2/consent-management-api/internal/system/middleware"
 )
 
@@ -32,43 +24,28 @@ var (
 
 func main() {
 	// Initialize logger
-	logger := logrus.New()
-	logger.SetFormatter(&logrus.JSONFormatter{})
-	logger.SetLevel(logrus.InfoLevel)
+	logger := log.GetLogger()
 
-	logger.WithFields(logrus.Fields{
-		"version":    version,
-		"build_date": buildDate,
-	}).Info("Starting Consent Management API Server...")
+	logger.Info("Starting Consent Management API Server...",
+		log.String("version", version),
+		log.String("build_date", buildDate))
 
 	// Load configuration
 	// Priority: CONFIG_PATH env var > repository/conf/deployment.yaml > cmd/server/repository/conf/deployment.yaml
 	configPath := os.Getenv("CONFIG_PATH")
-	if configPath == "" {
-		// Auto-discovery: will search in repository/conf/deployment.yaml first (production)
-		// then cmd/server/repository/conf/deployment.yaml (development)
-		configPath = ""
-	}
 
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		logger.WithError(err).Fatal("Failed to load configuration")
+		logger.Fatal("Failed to load configuration", log.Error(err))
 	}
 
-	// Set log level from config
-	if level, err := logrus.ParseLevel(cfg.Logging.Level); err == nil {
-		logger.SetLevel(level)
-	}
-
-	logger.WithFields(logrus.Fields{
-		"config_path": configPath,
-		"log_level":   logger.GetLevel().String(),
-	}).Info("Configuration loaded successfully")
+	logger.Info("Configuration loaded successfully",
+		log.String("config_path", configPath))
 
 	// Initialize database
-	db, err := database.Initialize(&cfg.Database.Consent, logger)
+	db, err := database.Initialize(&cfg.Database.Consent)
 	if err != nil {
-		logger.WithError(err).Fatal("Failed to initialize database")
+		logger.Fatal("Failed to initialize database", log.Error(err))
 	}
 
 	// Verify database connection
@@ -76,83 +53,26 @@ func main() {
 	defer cancel()
 
 	if err := db.HealthCheck(ctx); err != nil {
-		logger.WithError(err).Fatal("Database health check failed")
+		logger.Fatal("Database health check failed", log.Error(err))
 	}
 
 	logger.Info("Database connection established successfully")
 
-	// Create DBClient provider for new system architecture
-	dbClient := provider.NewDBClient(db, "mysql", logger)
+	// Initialize DBProvider singleton
+	provider.InitDBProvider(db)
+	dbProvider := provider.GetDBProvider()
 
-	// Initialize DAOs (old architecture - to be migrated)
-	consentDAO := dao.NewConsentDAO(db)
-	statusAuditDAO := dao.NewStatusAuditDAO(db)
-	attributeDAO := dao.NewConsentAttributeDAO(db)
-	authResourceDAO := dao.NewAuthResourceDAO(db)
-	purposeDAO := dao.NewConsentPurposeDAO(db.DB)
-	purposeAttributeDAO := dao.NewConsentPurposeAttributeDAO(db.DB)
+	// Get database client from provider
+	dbClient, err := dbProvider.GetConsentDBClient()
+	if err != nil {
+		logger.Fatal("Failed to get database client", log.Error(err))
+	}
 
-	logger.Info("DAOs initialized successfully")
-
-	// Initialize services (old architecture - to be migrated)
-	consentService := service.NewConsentService(
-		consentDAO,
-		statusAuditDAO,
-		attributeDAO,
-		authResourceDAO,
-		purposeDAO,
-		db,
-		logger,
-	)
-
-	authResourceServiceOld := service.NewAuthResourceService(
-		authResourceDAO,
-		consentDAO,
-		db,
-		logger,
-	)
-
-	purposeService := service.NewConsentPurposeService(
-		purposeDAO,
-		purposeAttributeDAO,
-		consentDAO,
-		db.DB,
-		logger,
-	)
-
-	logger.Info("Services initialized successfully")
-
-	// Initialize extension client
-	extensionClient := extensionclient.NewExtensionClient(&cfg.ServiceExtension, logger)
-	logger.WithField("enabled", extensionClient.IsExtensionEnabled()).Info("Extension client initialized")
-
-	// Create http.ServeMux for new architecture
+	// Create HTTP mux
 	mux := http.NewServeMux()
 
-	// Health check endpoint
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"healthy"}`))
-	})
-
-	// Initialize new AuthResource package (new architecture)
-	_ = authresource.Initialize(mux, dbClient)
-	logger.Info("AuthResource module initialized (new architecture)")
-
-	// Initialize new ConsentPurpose package (new architecture)
-	_ = consentpurpose.Initialize(mux, dbClient)
-	logger.Info("ConsentPurpose module initialized (new architecture)")
-
-	// Initialize new Consent package (new architecture)
-	_ = consent.Initialize(mux, dbClient)
-	logger.Info("Consent module initialized (new architecture)")
-
-	// Setup Gin router for old endpoints (to be migrated)
-	ginRouter := router.SetupRouter(consentService, authResourceServiceOld, purposeService, extensionClient)
-
-	// Mount Gin router under /api/v1 (old architecture)
-	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", ginRouter))
+	// Register all services
+	registerServices(mux, dbClient)
 
 	// Wrap with correlation ID middleware
 	httpHandler := middleware.WrapWithCorrelationID(mux)
@@ -170,18 +90,17 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		logger.WithFields(logrus.Fields{
-			"hostname": cfg.Server.Hostname,
-			"port":     cfg.Server.Port,
-			"addr":     serverAddr,
-		}).Info("Starting HTTP server...")
+		logger.Info("Starting HTTP server...",
+			log.String("hostname", cfg.Server.Hostname),
+			log.Int("port", cfg.Server.Port),
+			log.String("addr", serverAddr))
 
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.WithError(err).Fatal("Failed to start server")
+			logger.Fatal("Failed to start server", log.Error(err))
 		}
 	}()
 
-	logger.WithField("address", serverAddr).Info("✓ Server is running")
+	logger.Info("✓ Server is running", log.String("address", serverAddr))
 	logger.Info("Press Ctrl+C to stop the server")
 
 	// Wait for interrupt signal to gracefully shutdown the server
@@ -196,7 +115,24 @@ func main() {
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		logger.WithError(err).Fatal("Server forced to shutdown")
+		logger.Fatal("Server forced to shutdown", log.Error(err))
+	}
+
+	// Unregister services
+	unregisterServices()
+	logger.Info("Services unregistered")
+
+	// Close database connections
+	dbCloser := provider.GetDBProviderCloser()
+	if err := dbCloser.Close(); err != nil {
+		logger.Error("Error closing database connections", log.Error(err))
+	} else {
+		logger.Debug("Database connections closed successfully")
+	}
+
+	// Close the database connection itself
+	if err := db.Close(); err != nil {
+		logger.Error("Error closing database", log.Error(err))
 	}
 
 	logger.Info("Server exited gracefully")

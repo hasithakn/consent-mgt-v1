@@ -9,6 +9,11 @@ func GenerateID() string {
 	return uuid.New().String()
 }
 
+// GenerateUUID generates a plain UUID string (without prefix)
+func GenerateUUID() string {
+	return uuid.New().String()
+}
+
 // GenerateConsentID generates a unique consent ID
 func GenerateConsentID() string {
 	return "CONSENT-" + uuid.New().String()

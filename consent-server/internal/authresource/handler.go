@@ -1,0 +1,430 @@
+package authresource
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+
+	"github.com/wso2/consent-management-api/internal/authresource/model"
+	"github.com/wso2/consent-management-api/internal/system/constants"
+	"github.com/wso2/consent-management-api/internal/system/error/apierror"
+	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
+	sysutils "github.com/wso2/consent-management-api/internal/system/utils"
+)
+
+// authResourceHandler handles HTTP requests for auth resources
+type authResourceHandler struct {
+	service AuthResourceServiceInterface
+}
+
+// newAuthResourceHandler creates a new auth resource handler
+func newAuthResourceHandler(service AuthResourceServiceInterface) *authResourceHandler {
+	return &authResourceHandler{
+		service: service,
+	}
+}
+
+// handleCreate handles POST /consents/{consentId}/auth-resources
+func (h *authResourceHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Extract path parameters
+	consentID := r.PathValue("consentId")
+	if consentID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"consent ID is required",
+		))
+		return
+	}
+
+	// Extract organization ID from header
+	orgID := r.Header.Get(constants.HeaderOrgID)
+	if orgID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"organization ID header is required",
+		))
+		return
+	}
+
+	// Parse request body
+	var request model.CreateRequest
+	if err := sysutils.DecodeJSONBody(r, &request); err != nil {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			fmt.Sprintf("invalid request body: %v", err),
+		))
+		return
+	}
+
+	// Call service
+	response, serviceErr := h.service.CreateAuthResource(ctx, consentID, orgID, &request)
+	if serviceErr != nil {
+		h.sendError(w, serviceErr)
+		return
+	}
+
+	// Send response
+	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleGet handles GET /consents/{consentId}/auth-resources/{authId}
+func (h *authResourceHandler) handleGet(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Extract path parameters
+	consentID := r.PathValue("consentId")
+	authID := r.PathValue("authId")
+	if consentID == "" || authID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"consent ID and auth ID are required",
+		))
+		return
+	}
+
+	// Extract organization ID from header
+	orgID := r.Header.Get(constants.HeaderOrgID)
+	if orgID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"organization ID header is required",
+		))
+		return
+	}
+
+	// Call service
+	response, serviceErr := h.service.GetAuthResource(ctx, authID, orgID)
+	if serviceErr != nil {
+		h.sendError(w, serviceErr)
+		return
+	}
+
+	// Send response
+	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleListByConsent handles GET /consents/{consentId}/auth-resources
+func (h *authResourceHandler) handleListByConsent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Extract path parameters
+	consentID := r.PathValue("consentId")
+	if consentID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"consent ID is required",
+		))
+		return
+	}
+
+	// Extract organization ID from header
+	orgID := r.Header.Get(constants.HeaderOrgID)
+	if orgID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"organization ID header is required",
+		))
+		return
+	}
+
+	// Call service
+	response, serviceErr := h.service.GetAuthResourcesByConsentID(ctx, consentID, orgID)
+	if serviceErr != nil {
+		h.sendError(w, serviceErr)
+		return
+	}
+
+	// Send response
+	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleListByUser handles GET /auth-resources?userId=xxx
+func (h *authResourceHandler) handleListByUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Extract query parameters
+	userID := r.URL.Query().Get("userId")
+	if userID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"userId query parameter is required",
+		))
+		return
+	}
+
+	// Extract organization ID from header
+	orgID := r.Header.Get(constants.HeaderOrgID)
+	if orgID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"organization ID header is required",
+		))
+		return
+	}
+
+	// Call service
+	response, serviceErr := h.service.GetAuthResourcesByUserID(ctx, userID, orgID)
+	if serviceErr != nil {
+		h.sendError(w, serviceErr)
+		return
+	}
+
+	// Send response
+	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleUpdate handles PUT /consents/{consentId}/auth-resources/{authId}
+func (h *authResourceHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Extract path parameters
+	consentID := r.PathValue("consentId")
+	authID := r.PathValue("authId")
+	if consentID == "" || authID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"consent ID and auth ID are required",
+		))
+		return
+	}
+
+	// Extract organization ID from header
+	orgID := r.Header.Get(constants.HeaderOrgID)
+	if orgID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"organization ID header is required",
+		))
+		return
+	}
+
+	// Parse request body
+	var request model.UpdateRequest
+	if err := sysutils.DecodeJSONBody(r, &request); err != nil {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			fmt.Sprintf("invalid request body: %v", err),
+		))
+		return
+	}
+
+	// Call service
+	response, serviceErr := h.service.UpdateAuthResource(ctx, authID, orgID, &request)
+	if serviceErr != nil {
+		h.sendError(w, serviceErr)
+		return
+	}
+
+	// Send response
+	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleUpdateStatus handles PATCH /consents/{consentId}/auth-resources/{authId}/status
+func (h *authResourceHandler) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Extract path parameters
+	consentID := r.PathValue("consentId")
+	authID := r.PathValue("authId")
+	if consentID == "" || authID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"consent ID and auth ID are required",
+		))
+		return
+	}
+
+	// Extract organization ID from header
+	orgID := r.Header.Get(constants.HeaderOrgID)
+	if orgID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"organization ID header is required",
+		))
+		return
+	}
+
+	// Parse request body
+	var statusRequest struct {
+		Status string `json:"status"`
+	}
+	if err := sysutils.DecodeJSONBody(r, &statusRequest); err != nil {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			fmt.Sprintf("invalid request body: %v", err),
+		))
+		return
+	}
+
+	// Call service
+	response, serviceErr := h.service.UpdateAuthResourceStatus(ctx, authID, orgID, statusRequest.Status)
+	if serviceErr != nil {
+		h.sendError(w, serviceErr)
+		return
+	}
+
+	// Send response
+	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleDelete handles DELETE /consents/{consentId}/auth-resources/{authId}
+func (h *authResourceHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Extract path parameters
+	consentID := r.PathValue("consentId")
+	authID := r.PathValue("authId")
+	if consentID == "" || authID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"consent ID and auth ID are required",
+		))
+		return
+	}
+
+	// Extract organization ID from header
+	orgID := r.Header.Get(constants.HeaderOrgID)
+	if orgID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"organization ID header is required",
+		))
+		return
+	}
+
+	// Call service
+	serviceErr := h.service.DeleteAuthResource(ctx, authID, orgID)
+	if serviceErr != nil {
+		h.sendError(w, serviceErr)
+		return
+	}
+
+	// Send no content response
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleDeleteByConsent handles DELETE /consents/{consentId}/auth-resources
+func (h *authResourceHandler) handleDeleteByConsent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Extract path parameters
+	consentID := r.PathValue("consentId")
+	if consentID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"consent ID is required",
+		))
+		return
+	}
+
+	// Extract organization ID from header
+	orgID := r.Header.Get(constants.HeaderOrgID)
+	if orgID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"organization ID header is required",
+		))
+		return
+	}
+
+	// Call service
+	serviceErr := h.service.DeleteAuthResourcesByConsentID(ctx, consentID, orgID)
+	if serviceErr != nil {
+		h.sendError(w, serviceErr)
+		return
+	}
+
+	// Send no content response
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleUpdateAllStatusByConsent handles PATCH /consents/{consentId}/auth-resources/status
+func (h *authResourceHandler) handleUpdateAllStatusByConsent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Extract path parameters
+	consentID := r.PathValue("consentId")
+	if consentID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"consent ID is required",
+		))
+		return
+	}
+
+	// Extract organization ID from header
+	orgID := r.Header.Get(constants.HeaderOrgID)
+	if orgID == "" {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			"organization ID header is required",
+		))
+		return
+	}
+
+	// Parse request body
+	var statusRequest struct {
+		Status string `json:"status"`
+	}
+	if err := sysutils.DecodeJSONBody(r, &statusRequest); err != nil {
+		h.sendError(w, serviceerror.CustomServiceError(
+			serviceerror.InvalidRequestError,
+			fmt.Sprintf("invalid request body: %v", err),
+		))
+		return
+	}
+
+	// Call service
+	serviceErr := h.service.UpdateAllStatusByConsentID(ctx, consentID, orgID, statusRequest.Status)
+	if serviceErr != nil {
+		h.sendError(w, serviceErr)
+		return
+	}
+
+	// Send no content response
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// sendError maps service errors to HTTP responses
+func (h *authResourceHandler) sendError(w http.ResponseWriter, serviceErr *serviceerror.ServiceError) {
+	var statusCode int
+
+	switch serviceErr.Type {
+	case serviceerror.ClientErrorType:
+		// Check error code for more specific status
+		if serviceErr.Code == serviceerror.ResourceNotFoundError.Code {
+			statusCode = http.StatusNotFound
+		} else if serviceErr.Code == serviceerror.ConflictError.Code {
+			statusCode = http.StatusConflict
+		} else {
+			statusCode = http.StatusBadRequest
+		}
+	case serviceerror.ServerErrorType:
+		statusCode = http.StatusInternalServerError
+	default:
+		statusCode = http.StatusInternalServerError
+	}
+
+	errorResponse := apierror.ErrorResponse{
+		Code:        serviceErr.Error,
+		Description: serviceErr.ErrorDescription,
+	}
+
+	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(errorResponse)
+}

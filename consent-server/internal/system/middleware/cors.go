@@ -1,6 +1,9 @@
 package middleware
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -9,6 +12,10 @@ type CORSOptions struct {
 	AllowedMethods   string
 	AllowedHeaders   string
 	AllowCredentials bool
+	// For http.ServeMux
+	AllowOrigin  string
+	AllowMethods []string
+	AllowHeaders []string
 }
 
 func CORSMiddleware(opts CORSOptions) gin.HandlerFunc {
@@ -28,6 +35,34 @@ func CORSMiddleware(opts CORSOptions) gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+// WithCORS wraps an http.HandlerFunc with CORS headers for http.ServeMux
+func WithCORS(pattern string, handler http.HandlerFunc, opts CORSOptions) (string, http.HandlerFunc) {
+	wrapped := func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		origin := r.Header.Get("Origin")
+		if origin == "" || opts.AllowOrigin == "*" {
+			w.Header().Set("Access-Control-Allow-Origin", opts.AllowOrigin)
+		} else {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		}
+		w.Header().Set("Access-Control-Allow-Methods", strings.Join(opts.AllowMethods, ", "))
+		w.Header().Set("Access-Control-Allow-Headers", strings.Join(opts.AllowHeaders, ", "))
+		if opts.AllowCredentials {
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+
+		// Handle preflight OPTIONS request
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		// Call the actual handler
+		handler(w, r)
+	}
+	return pattern, wrapped
 }
 
 func isOriginAllowed(origin string, allowedOrigins []string) bool {

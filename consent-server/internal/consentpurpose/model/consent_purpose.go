@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/wso2/consent-management-api/internal/purpose_type_handlers"
+	"github.com/wso2/consent-management-api/internal/consentpurpose/validators"
 )
 
 // JSONValue represents a JSON value that can be stored in the database
@@ -116,10 +116,10 @@ func (cp *ConsentPurpose) ToConsentPurposeResponse() *ConsentPurposeResponse {
 
 // ValidatePurposeType validates that the purpose type is registered in the handler registry
 func ValidatePurposeType(typeVal string) error {
-	_, err := purpose_type_handlers.GetHandler(typeVal)
+	_, err := validators.GetHandler(typeVal)
 	if err != nil {
 		// Get all registered types for helpful error message
-		registeredTypes := purpose_type_handlers.GetAllHandlerTypes()
+		registeredTypes := validators.GetAllHandlerTypes()
 		return fmt.Errorf("invalid purpose type '%s': must be one of %v", typeVal, registeredTypes)
 	}
 	return nil

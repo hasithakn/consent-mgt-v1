@@ -8,7 +8,7 @@ import (
 
 	"github.com/wso2/consent-management-api/internal/authresource/model"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
-	"github.com/wso2/consent-management-api/internal/utils"
+	"github.com/wso2/consent-management-api/internal/system/utils"
 )
 
 // AuthResourceServiceInterface defines the contract for auth resource business operations

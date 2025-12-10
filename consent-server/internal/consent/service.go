@@ -6,7 +6,7 @@ import (
 
 	"github.com/wso2/consent-management-api/internal/consent/model"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
-	"github.com/wso2/consent-management-api/internal/utils"
+	"github.com/wso2/consent-management-api/internal/system/utils"
 )
 
 // ConsentService defines the exported service interface

@@ -33,8 +33,6 @@ service_extension:
 
 logging:
   level: info
-  format: json
-  output: stdout
 
 # Consent status configuration
 consent:

@@ -7,7 +7,7 @@ import (
 	"github.com/wso2/consent-management-api/internal/consentpurpose/model"
 	"github.com/wso2/consent-management-api/internal/consentpurpose/validators"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
-	"github.com/wso2/consent-management-api/internal/utils"
+	"github.com/wso2/consent-management-api/internal/system/utils"
 )
 
 // ConsentPurposeService defines the exported service interface

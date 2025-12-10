@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/wso2/consent-management-api/internal/database"
+	"github.com/wso2/consent-management-api/internal/system/database"
 	"github.com/wso2/consent-management-api/internal/system/log"
 )
 

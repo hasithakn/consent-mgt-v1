@@ -42,6 +42,16 @@ func main() {
 	logger.Info("Configuration loaded successfully",
 		log.String("config_path", configPath))
 
+	// Update log level from configuration
+	if cfg.Logging.Level != "" {
+		if err := log.SetLogLevel(cfg.Logging.Level); err != nil {
+			logger.Error("Failed to set log level from configuration", log.Error(err))
+		} else {
+			logger.Debug("Log level updated from configuration",
+				log.String("level", cfg.Logging.Level))
+		}
+	}
+
 	// Initialize database
 	db, err := database.Initialize(&cfg.Database.Consent)
 	if err != nil {

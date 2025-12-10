@@ -32,18 +32,15 @@ func registerRoutes(mux *http.ServeMux, handler *consentHandler) {
 	// POST /consents - Create consent
 	mux.HandleFunc(middleware.WithCORS("POST /consents", handler.createConsent, corsOpts))
 
-	// GET /consents/{id} - Get consent by ID
-	mux.HandleFunc(middleware.WithCORS("GET /consents/{id}", handler.getConsent, corsOpts))
+	// GET /consents/{consentId} - Get consent by ID
+	mux.HandleFunc(middleware.WithCORS("GET /consents/{consentId}", handler.getConsent, corsOpts))
 
-	// GET /consents - List consents
+	// GET /consents - List/search consents
 	mux.HandleFunc(middleware.WithCORS("GET /consents", handler.listConsents, corsOpts))
 
-	// PUT /consents/{id} - Update consent
-	mux.HandleFunc(middleware.WithCORS("PUT /consents/{id}", handler.updateConsent, corsOpts))
+	// PUT /consents/{consentId} - Update consent
+	mux.HandleFunc(middleware.WithCORS("PUT /consents/{consentId}", handler.updateConsent, corsOpts))
 
-	// PATCH /consents/{id}/status - Update consent status
-	mux.HandleFunc(middleware.WithCORS("PATCH /consents/{id}/status", handler.updateConsentStatus, corsOpts))
-
-	// DELETE /consents/{id} - Delete consent
-	mux.HandleFunc(middleware.WithCORS("DELETE /consents/{id}", handler.deleteConsent, corsOpts))
+	// POST /consents/{consentId}/revoke - Revoke consent
+	mux.HandleFunc(middleware.WithCORS("POST /consents/{consentId}/revoke", handler.revokeConsent, corsOpts))
 }

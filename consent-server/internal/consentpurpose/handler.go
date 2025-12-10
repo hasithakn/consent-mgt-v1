@@ -57,10 +57,10 @@ func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(response)
 }
 
-// getPurpose handles GET /purposes/{id}
+// getPurpose handles GET /consent-purposes/{purposeId}
 func (h *consentPurposeHandler) getPurpose(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	purposeID := r.PathValue("id")
+	purposeID := r.PathValue("purposeId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
@@ -139,10 +139,10 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(response)
 }
 
-// updatePurpose handles PUT /purposes/{id}
+// updatePurpose handles PUT /consent-purposes/{purposeId}
 func (h *consentPurposeHandler) updatePurpose(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	purposeID := r.PathValue("id")
+	purposeID := r.PathValue("purposeId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
@@ -174,10 +174,10 @@ func (h *consentPurposeHandler) updatePurpose(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(response)
 }
 
-// deletePurpose handles DELETE /purposes/{id}
+// deletePurpose handles DELETE /consent-purposes/{purposeId}
 func (h *consentPurposeHandler) deletePurpose(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	purposeID := r.PathValue("id")
+	purposeID := r.PathValue("purposeId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {

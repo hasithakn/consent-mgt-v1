@@ -30,66 +30,31 @@ func registerRoutes(mux *http.ServeMux, handler *authResourceHandler) {
 		AllowCredentials: true,
 	}
 
-	// Create auth resource (POST /consents/{consentId}/auth-resources)
+	// Create authorization (POST /consents/{consentId}/authorizations)
 	mux.HandleFunc(middleware.WithCORS(
-		"POST /consents/{consentId}/auth-resources",
+		"POST /consents/{consentId}/authorizations",
 		handler.handleCreate,
 		corsOpts,
 	))
 
-	// List auth resources by consent (GET /consents/{consentId}/auth-resources)
+	// List authorizations by consent (GET /consents/{consentId}/authorizations)
 	mux.HandleFunc(middleware.WithCORS(
-		"GET /consents/{consentId}/auth-resources",
+		"GET /consents/{consentId}/authorizations",
 		handler.handleListByConsent,
 		corsOpts,
 	))
 
-	// Delete all auth resources by consent (DELETE /consents/{consentId}/auth-resources)
+	// Get single authorization (GET /consents/{consentId}/authorizations/{authorizationId})
 	mux.HandleFunc(middleware.WithCORS(
-		"DELETE /consents/{consentId}/auth-resources",
-		handler.handleDeleteByConsent,
-		corsOpts,
-	))
-
-	// Update all statuses by consent (PATCH /consents/{consentId}/auth-resources/status)
-	mux.HandleFunc(middleware.WithCORS(
-		"PATCH /consents/{consentId}/auth-resources/status",
-		handler.handleUpdateAllStatusByConsent,
-		corsOpts,
-	))
-
-	// Get single auth resource (GET /consents/{consentId}/auth-resources/{authId})
-	mux.HandleFunc(middleware.WithCORS(
-		"GET /consents/{consentId}/auth-resources/{authId}",
+		"GET /consents/{consentId}/authorizations/{authorizationId}",
 		handler.handleGet,
 		corsOpts,
 	))
 
-	// Update auth resource (PUT /consents/{consentId}/auth-resources/{authId})
+	// Update authorization (PUT /consents/{consentId}/authorizations/{authorizationId})
 	mux.HandleFunc(middleware.WithCORS(
-		"PUT /consents/{consentId}/auth-resources/{authId}",
+		"PUT /consents/{consentId}/authorizations/{authorizationId}",
 		handler.handleUpdate,
-		corsOpts,
-	))
-
-	// Delete auth resource (DELETE /consents/{consentId}/auth-resources/{authId})
-	mux.HandleFunc(middleware.WithCORS(
-		"DELETE /consents/{consentId}/auth-resources/{authId}",
-		handler.handleDelete,
-		corsOpts,
-	))
-
-	// Update auth resource status (PATCH /consents/{consentId}/auth-resources/{authId}/status)
-	mux.HandleFunc(middleware.WithCORS(
-		"PATCH /consents/{consentId}/auth-resources/{authId}/status",
-		handler.handleUpdateStatus,
-		corsOpts,
-	))
-
-	// List auth resources by user (GET /auth-resources?userId=xxx)
-	mux.HandleFunc(middleware.WithCORS(
-		"GET /auth-resources",
-		handler.handleListByUser,
 		corsOpts,
 	))
 }

@@ -24,7 +24,7 @@ func newAuthResourceHandler(service AuthResourceServiceInterface) *authResourceH
 	}
 }
 
-// handleCreate handles POST /consents/{consentId}/auth-resources
+// handleCreate handles POST /consents/{consentId}/authorizations
 func (h *authResourceHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -71,13 +71,13 @@ func (h *authResourceHandler) handleCreate(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(response)
 }
 
-// handleGet handles GET /consents/{consentId}/auth-resources/{authId}
+// handleGet handles GET /consents/{consentId}/authorizations/{authorizationId}
 func (h *authResourceHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Extract path parameters
 	consentID := r.PathValue("consentId")
-	authID := r.PathValue("authId")
+	authID := r.PathValue("authorizationId")
 	if consentID == "" || authID == "" {
 		h.sendError(w, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
@@ -109,7 +109,7 @@ func (h *authResourceHandler) handleGet(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(response)
 }
 
-// handleListByConsent handles GET /consents/{consentId}/auth-resources
+// handleListByConsent handles GET /consents/{consentId}/authorizations
 func (h *authResourceHandler) handleListByConsent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -183,13 +183,13 @@ func (h *authResourceHandler) handleListByUser(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(response)
 }
 
-// handleUpdate handles PUT /consents/{consentId}/auth-resources/{authId}
+// handleUpdate handles PUT /consents/{consentId}/authorizations/{authorizationId}
 func (h *authResourceHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Extract path parameters
 	consentID := r.PathValue("consentId")
-	authID := r.PathValue("authId")
+	authID := r.PathValue("authorizationId")
 	if consentID == "" || authID == "" {
 		h.sendError(w, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,

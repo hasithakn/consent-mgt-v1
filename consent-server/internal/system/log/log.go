@@ -56,6 +56,31 @@ func GetLogger() *Logger {
 	return logger
 }
 
+// SetLogLevel updates the log level dynamically.
+// This should be called after configuration is loaded.
+func SetLogLevel(logLevel string) error {
+	if logger == nil {
+		return errors.New("logger not initialized")
+	}
+
+	level, err := parseLogLevel(logLevel)
+	if err != nil {
+		return errors.New("error parsing log level: " + err.Error())
+	}
+
+	handlerOptions := &slog.HandlerOptions{
+		Level: level,
+	}
+
+	logHandler := slog.NewJSONHandler(os.Stdout, handlerOptions)
+	if logHandler == nil {
+		return errors.New("failed to create log handler")
+	}
+
+	logger.internal = slog.New(logHandler)
+	return nil
+}
+
 // initLogger initializes the slog logger.
 func initLogger() error {
 	// Read log level from the environment variable.

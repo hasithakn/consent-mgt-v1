@@ -54,10 +54,10 @@ func (h *consentHandler) createConsent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// getConsent handles GET /consents/{id}
+// getConsent handles GET /consents/{consentId}
 func (h *consentHandler) getConsent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	consentID := r.PathValue("id")
+	consentID := r.PathValue("consentId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
@@ -119,10 +119,10 @@ func (h *consentHandler) listConsents(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// updateConsent handles PUT /consents/{id}
+// updateConsent handles PUT /consents/{consentId}
 func (h *consentHandler) updateConsent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	consentID := r.PathValue("id")
+	consentID := r.PathValue("consentId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
@@ -147,10 +147,10 @@ func (h *consentHandler) updateConsent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// updateConsentStatus handles PATCH /consents/{id}/status
-func (h *consentHandler) updateConsentStatus(w http.ResponseWriter, r *http.Request) {
+// revokeConsent handles POST /consents/{consentId}/revoke
+func (h *consentHandler) revokeConsent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	consentID := r.PathValue("id")
+	consentID := r.PathValue("consentId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
@@ -172,10 +172,10 @@ func (h *consentHandler) updateConsentStatus(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// deleteConsent handles DELETE /consents/{id}
+// deleteConsent handles DELETE /consents/{consentId}
 func (h *consentHandler) deleteConsent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	consentID := r.PathValue("id")
+	consentID := r.PathValue("consentId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {

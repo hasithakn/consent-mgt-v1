@@ -28,18 +28,18 @@ func registerRoutes(mux *http.ServeMux, handler *consentPurposeHandler) {
 		AllowHeaders: []string{"Content-Type", "x-org-id", "Authorization"},
 	}
 
-	// POST /purposes - Create purpose
-	mux.HandleFunc(middleware.WithCORS("POST /purposes", handler.createPurpose, corsOptions))
+	// POST /consent-purposes - Create purpose
+	mux.HandleFunc(middleware.WithCORS("POST /consent-purposes", handler.createPurpose, corsOptions))
 
-	// GET /purposes/{id} - Get purpose by ID
-	mux.HandleFunc(middleware.WithCORS("GET /purposes/{id}", handler.getPurpose, corsOptions))
+	// GET /consent-purposes/{purposeId} - Get purpose by ID
+	mux.HandleFunc(middleware.WithCORS("GET /consent-purposes/{purposeId}", handler.getPurpose, corsOptions))
 
-	// GET /purposes - List purposes
-	mux.HandleFunc(middleware.WithCORS("GET /purposes", handler.listPurposes, corsOptions))
+	// GET /consent-purposes - List purposes
+	mux.HandleFunc(middleware.WithCORS("GET /consent-purposes", handler.listPurposes, corsOptions))
 
-	// PUT /purposes/{id} - Update purpose
-	mux.HandleFunc(middleware.WithCORS("PUT /purposes/{id}", handler.updatePurpose, corsOptions))
+	// PUT /consent-purposes/{purposeId} - Update purpose
+	mux.HandleFunc(middleware.WithCORS("PUT /consent-purposes/{purposeId}", handler.updatePurpose, corsOptions))
 
-	// DELETE /purposes/{id} - Delete purpose
-	mux.HandleFunc(middleware.WithCORS("DELETE /purposes/{id}", handler.deletePurpose, corsOptions))
+	// DELETE /consent-purposes/{purposeId} - Delete purpose
+	mux.HandleFunc(middleware.WithCORS("DELETE /consent-purposes/{purposeId}", handler.deletePurpose, corsOptions))
 }

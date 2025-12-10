@@ -6,9 +6,9 @@ import (
 	"github.com/wso2/consent-management-api/internal/authresource"
 	"github.com/wso2/consent-management-api/internal/consent"
 	"github.com/wso2/consent-management-api/internal/consentpurpose"
-	"github.com/wso2/consent-management-api/internal/system/database"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
 	"github.com/wso2/consent-management-api/internal/system/log"
+	"github.com/wso2/consent-management-api/internal/system/stores"
 )
 
 // Package-level service references for cleanup during shutdown
@@ -23,24 +23,31 @@ var (
 func registerServices(
 	mux *http.ServeMux,
 	dbClient provider.DBClientInterface,
-	db *database.DB,
 ) {
 	logger := log.GetLogger()
 
-	// Initialize AuthResource module (returns service and store)
-	// Store is used by consent module for cross-module transactions
-	var authStore consent.AuthResourceStore
-	authResourceService, authStore = authresource.Initialize(mux, dbClient)
+	// Create all stores first
+	consentStore := consent.NewStore(dbClient)
+	authResourceStore := authresource.NewStore(dbClient)
+	consentPurposeStore := consentpurpose.NewStore(dbClient)
+
+	// Create Store Registry with all stores
+	storeRegistry := stores.NewStoreRegistry(
+		dbClient,
+		consentStore,
+		authResourceStore,
+		consentPurposeStore,
+	)
+	logger.Info("Store Registry initialized with all stores")
+
+	// Initialize all services with the registry
+	authResourceService = authresource.Initialize(mux, storeRegistry)
 	logger.Info("AuthResource module initialized")
 
-	// Initialize ConsentPurpose module (returns service and store)
-	// Store is used by consent module for cross-module transactions
-	var purposeStore consent.ConsentPurposeStore
-	consentPurposeService, purposeStore = consentpurpose.Initialize(mux, dbClient)
+	consentPurposeService = consentpurpose.Initialize(mux, storeRegistry)
 	logger.Info("ConsentPurpose module initialized")
 
-	// Initialize Consent module (needs stores from other modules for transactions)
-	consentService = consent.Initialize(mux, dbClient, db, authStore, purposeStore)
+	consentService = consent.Initialize(mux, storeRegistry)
 	logger.Info("Consent module initialized")
 
 	// Register health check endpoint

@@ -6,20 +6,24 @@ import (
 	"github.com/wso2/consent-management-api/internal/system/constants"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
 	"github.com/wso2/consent-management-api/internal/system/middleware"
+	"github.com/wso2/consent-management-api/internal/system/stores"
 )
 
+// NewStore creates and returns a new consent purpose store (exported for registry)
+func NewStore(dbClient provider.DBClientInterface) interface{} {
+	return newConsentPurposeStore(dbClient)
+}
+
 // Initialize sets up the consent purpose module and registers routes
-// Returns both service and store (store is needed by consent module for transactions)
-func Initialize(mux *http.ServeMux, dbClient provider.DBClientInterface) (ConsentPurposeService, consentPurposeStore) {
-	// Create store, service, and handler
-	store := newConsentPurposeStore(dbClient)
-	service := newConsentPurposeService(store)
+func Initialize(mux *http.ServeMux, registry *stores.StoreRegistry) ConsentPurposeService {
+	// Create service and handler using the registry
+	service := newConsentPurposeService(registry)
 	handler := newConsentPurposeHandler(service)
 
 	// Register routes with CORS middleware
 	registerRoutes(mux, handler)
 
-	return service, store
+	return service
 }
 
 // registerRoutes registers all consent purpose routes

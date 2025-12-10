@@ -6,7 +6,9 @@ import (
 
 	"github.com/wso2/consent-management-api/internal/consentpurpose/model"
 	"github.com/wso2/consent-management-api/internal/consentpurpose/validators"
+	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
+	"github.com/wso2/consent-management-api/internal/system/stores"
 	"github.com/wso2/consent-management-api/internal/system/utils"
 )
 
@@ -21,13 +23,13 @@ type ConsentPurposeService interface {
 
 // consentPurposeService implements the ConsentPurposeService interface
 type consentPurposeService struct {
-	store consentPurposeStore
+	stores *stores.StoreRegistry
 }
 
 // newConsentPurposeService creates a new consent purpose service
-func newConsentPurposeService(store consentPurposeStore) ConsentPurposeService {
+func newConsentPurposeService(registry *stores.StoreRegistry) ConsentPurposeService {
 	return &consentPurposeService{
-		store: store,
+		stores: registry,
 	}
 }
 
@@ -39,7 +41,8 @@ func (s *consentPurposeService) CreatePurpose(ctx context.Context, req model.Cre
 	}
 
 	// Check if purpose name already exists
-	exists, dbErr := s.store.CheckNameExists(ctx, req.Name, orgID)
+	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+	exists, dbErr := store.CheckNameExists(ctx, req.Name, orgID)
 	if dbErr != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to check name existence: %v", dbErr))
 	}
@@ -59,14 +62,10 @@ func (s *consentPurposeService) CreatePurpose(ctx context.Context, req model.Cre
 		Attributes:  req.Attributes,
 	}
 
-	// Store purpose
-	if err := s.store.Create(ctx, purpose); err != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create purpose: %v", err))
-	}
-
-	// Store attributes if provided
+	// Prepare attributes if provided
+	var attributes []model.ConsentPurposeAttribute
 	if len(req.Attributes) > 0 {
-		attributes := make([]model.ConsentPurposeAttribute, 0, len(req.Attributes))
+		attributes = make([]model.ConsentPurposeAttribute, 0, len(req.Attributes))
 		for key, value := range req.Attributes {
 			attr := model.ConsentPurposeAttribute{
 				ID:        utils.GenerateUUID(),
@@ -77,10 +76,23 @@ func (s *consentPurposeService) CreatePurpose(ctx context.Context, req model.Cre
 			}
 			attributes = append(attributes, attr)
 		}
+	}
 
-		if err := s.store.CreateAttributes(ctx, attributes); err != nil {
-			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create attributes: %v", err))
-		}
+	// Store purpose and attributes in a transaction
+	queries := []func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return store.Create(tx, purpose)
+		},
+	}
+	if len(attributes) > 0 {
+		queries = append(queries, func(tx dbmodel.TxInterface) error {
+			return store.CreateAttributes(tx, attributes)
+		})
+	}
+
+	err := s.stores.ExecuteTransaction(queries)
+	if err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create purpose: %v", err))
 	}
 
 	return purpose, nil
@@ -88,7 +100,8 @@ func (s *consentPurposeService) CreatePurpose(ctx context.Context, req model.Cre
 
 // GetPurpose retrieves a consent purpose by ID
 func (s *consentPurposeService) GetPurpose(ctx context.Context, purposeID, orgID string) (*model.ConsentPurpose, *serviceerror.ServiceError) {
-	purpose, err := s.store.GetByID(ctx, purposeID, orgID)
+	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+	purpose, err := store.GetByID(ctx, purposeID, orgID)
 	if err != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to retrieve purpose: %v", err))
 	}
@@ -97,7 +110,7 @@ func (s *consentPurposeService) GetPurpose(ctx context.Context, purposeID, orgID
 	}
 
 	// Load attributes
-	attributes, err := s.store.GetAttributesByPurposeID(ctx, purposeID, orgID)
+	attributes, err := store.GetAttributesByPurposeID(ctx, purposeID, orgID)
 	if err != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to load attributes: %v", err))
 	}
@@ -122,14 +135,15 @@ func (s *consentPurposeService) ListPurposes(ctx context.Context, orgID string, 
 		offset = 0
 	}
 
-	purposes, total, err := s.store.List(ctx, orgID, limit, offset)
+	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+	purposes, total, err := store.List(ctx, orgID, limit, offset)
 	if err != nil {
 		return nil, 0, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to list purposes: %v", err))
 	}
 
 	// Load attributes for each purpose
 	for i := range purposes {
-		attributes, attrErr := s.store.GetAttributesByPurposeID(ctx, purposes[i].ID, orgID)
+		attributes, attrErr := store.GetAttributesByPurposeID(ctx, purposes[i].ID, orgID)
 		if attrErr != nil {
 			return nil, 0, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to load attributes: %v", attrErr))
 		}
@@ -153,7 +167,8 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 	}
 
 	// Check if purpose exists
-	existing, err := s.store.GetByID(ctx, purposeID, orgID)
+	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+	existing, err := store.GetByID(ctx, purposeID, orgID)
 	if err != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to retrieve purpose: %v", err))
 	}
@@ -170,19 +185,10 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 		OrgID:       orgID,
 	}
 
-	if updateErr := s.store.Update(ctx, purpose); updateErr != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to update purpose: %v", updateErr))
-	}
-
-	// Update attributes - delete old and create new
+	// Prepare attributes if provided
+	var attributes []model.ConsentPurposeAttribute
 	if len(req.Attributes) > 0 {
-		// Delete existing attributes
-		if delErr := s.store.DeleteAttributesByPurposeID(ctx, purposeID, orgID); delErr != nil {
-			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to delete old attributes: %v", delErr))
-		}
-
-		// Create new attributes
-		attributes := make([]model.ConsentPurposeAttribute, 0, len(req.Attributes))
+		attributes = make([]model.ConsentPurposeAttribute, 0, len(req.Attributes))
 		for key, value := range req.Attributes {
 			attr := model.ConsentPurposeAttribute{
 				ID:        utils.GenerateUUID(),
@@ -193,12 +199,27 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 			}
 			attributes = append(attributes, attr)
 		}
-
-		if createErr := s.store.CreateAttributes(ctx, attributes); createErr != nil {
-			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create new attributes: %v", createErr))
-		}
-
 		purpose.Attributes = req.Attributes
+	}
+
+	// Execute all updates in a transaction
+	queries := []func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return store.Update(tx, purpose)
+		},
+	}
+	if len(attributes) > 0 {
+		queries = append(queries, func(tx dbmodel.TxInterface) error {
+			return store.DeleteAttributesByPurposeID(tx, purposeID, orgID)
+		})
+		queries = append(queries, func(tx dbmodel.TxInterface) error {
+			return store.CreateAttributes(tx, attributes)
+		})
+	}
+
+	err = s.stores.ExecuteTransaction(queries)
+	if err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to update purpose: %v", err))
 	}
 
 	return purpose, nil
@@ -207,7 +228,8 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 // DeletePurpose deletes a consent purpose
 func (s *consentPurposeService) DeletePurpose(ctx context.Context, purposeID, orgID string) *serviceerror.ServiceError {
 	// Check if purpose exists
-	existing, err := s.store.GetByID(ctx, purposeID, orgID)
+	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+	existing, err := store.GetByID(ctx, purposeID, orgID)
 	if err != nil {
 		return serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to retrieve purpose: %v", err))
 	}
@@ -215,14 +237,17 @@ func (s *consentPurposeService) DeletePurpose(ctx context.Context, purposeID, or
 		return serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("purpose with ID '%s' not found", purposeID))
 	}
 
-	// Delete attributes first
-	if attrErr := s.store.DeleteAttributesByPurposeID(ctx, purposeID, orgID); attrErr != nil {
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to delete attributes: %v", attrErr))
-	}
-
-	// Delete purpose
-	if delErr := s.store.Delete(ctx, purposeID, orgID); delErr != nil {
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to delete purpose: %v", delErr))
+	// Delete attributes and purpose in a transaction
+	err = s.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return store.DeleteAttributesByPurposeID(tx, purposeID, orgID)
+		},
+		func(tx dbmodel.TxInterface) error {
+			return store.Delete(tx, purposeID, orgID)
+		},
+	})
+	if err != nil {
+		return serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to delete purpose: %v", err))
 	}
 
 	return nil

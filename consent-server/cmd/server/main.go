@@ -81,8 +81,8 @@ func main() {
 	// Create HTTP mux
 	mux := http.NewServeMux()
 
-	// Register all services (pass db reference for transaction support)
-	registerServices(mux, dbClient, db)
+	// Register all services
+	registerServices(mux, dbClient)
 
 	// Wrap with correlation ID middleware
 	httpHandler := middleware.WrapWithCorrelationID(mux)

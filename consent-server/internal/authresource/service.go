@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/wso2/consent-management-api/internal/authresource/model"
+	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
+	"github.com/wso2/consent-management-api/internal/system/stores"
 	"github.com/wso2/consent-management-api/internal/system/utils"
 )
 
@@ -24,15 +26,15 @@ type AuthResourceServiceInterface interface {
 	UpdateAllStatusByConsentID(ctx context.Context, consentID, orgID string, status string) *serviceerror.ServiceError
 }
 
-// authResourceService implements AuthResourceServiceInterface
+// authResourceService implements the AuthResourceServiceInterface
 type authResourceService struct {
-	store authResourceStore
+	stores *stores.StoreRegistry
 }
 
 // newAuthResourceService creates a new auth resource service
-func newAuthResourceService(store authResourceStore) AuthResourceServiceInterface {
+func newAuthResourceService(registry *stores.StoreRegistry) AuthResourceServiceInterface {
 	return &authResourceService{
-		store: store,
+		stores: registry,
 	}
 }
 
@@ -77,7 +79,13 @@ func (s *authResourceService) CreateAuthResource(
 	}
 
 	// Create auth resource
-	if err := s.store.Create(ctx, authResource); err != nil {
+	store := s.stores.AuthResource.(AuthResourceStore)
+	err := s.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return store.Create(tx, authResource)
+		},
+	})
+	if err != nil {
 		return nil, serviceerror.CustomServiceError(
 			serviceerror.DatabaseError,
 			fmt.Sprintf("failed to create auth resource: %v", err),
@@ -97,7 +105,8 @@ func (s *authResourceService) GetAuthResource(
 		return nil, err
 	}
 
-	authResource, err := s.store.GetByID(ctx, authID, orgID)
+	store := s.stores.AuthResource.(AuthResourceStore)
+	authResource, err := store.GetByID(ctx, authID, orgID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return nil, serviceerror.CustomServiceError(
@@ -124,11 +133,12 @@ func (s *authResourceService) GetAuthResourcesByConsentID(
 		return nil, err
 	}
 
-	authResources, err := s.store.GetByConsentID(ctx, consentID, orgID)
+	store := s.stores.AuthResource.(AuthResourceStore)
+	authResources, err := store.GetByConsentID(ctx, consentID, orgID)
 	if err != nil {
 		return nil, serviceerror.CustomServiceError(
 			serviceerror.DatabaseError,
-			fmt.Sprintf("failed to retrieve auth resources: %v", err),
+			fmt.Sprintf("failed to fetch auth resources: %v", err),
 		)
 	}
 
@@ -158,11 +168,12 @@ func (s *authResourceService) GetAuthResourcesByUserID(
 		return nil, err
 	}
 
-	authResources, err := s.store.GetByUserID(ctx, userID, orgID)
+	store := s.stores.AuthResource.(AuthResourceStore)
+	authResources, err := store.GetByUserID(ctx, userID, orgID)
 	if err != nil {
 		return nil, serviceerror.CustomServiceError(
 			serviceerror.DatabaseError,
-			fmt.Sprintf("failed to retrieve auth resources: %v", err),
+			fmt.Sprintf("failed to fetch auth resources: %v", err),
 		)
 	}
 
@@ -188,7 +199,8 @@ func (s *authResourceService) UpdateAuthResource(
 	}
 
 	// Get existing auth resource
-	existingAuthResource, err := s.store.GetByID(ctx, authID, orgID)
+	store := s.stores.AuthResource.(AuthResourceStore)
+	existingAuthResource, err := store.GetByID(ctx, authID, orgID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return nil, serviceerror.CustomServiceError(
@@ -227,7 +239,12 @@ func (s *authResourceService) UpdateAuthResource(
 	}
 
 	// Update auth resource
-	if err := s.store.Update(ctx, &updatedAuthResource); err != nil {
+	err = s.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return store.Update(tx, &updatedAuthResource)
+		},
+	})
+	if err != nil {
 		return nil, serviceerror.CustomServiceError(
 			serviceerror.DatabaseError,
 			fmt.Sprintf("failed to update auth resource: %v", err),
@@ -255,7 +272,8 @@ func (s *authResourceService) UpdateAuthResourceStatus(
 	}
 
 	// Get existing auth resource to return updated response
-	existingAuthResource, err := s.store.GetByID(ctx, authID, orgID)
+	store := s.stores.AuthResource.(AuthResourceStore)
+	existingAuthResource, err := store.GetByID(ctx, authID, orgID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return nil, serviceerror.CustomServiceError(
@@ -271,7 +289,12 @@ func (s *authResourceService) UpdateAuthResourceStatus(
 
 	// Update status
 	updatedTime := utils.GetCurrentTimeMillis()
-	if err := s.store.UpdateStatus(ctx, authID, orgID, status, updatedTime); err != nil {
+	err = s.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return store.UpdateStatus(tx, authID, orgID, status, updatedTime)
+		},
+	})
+	if err != nil {
 		return nil, serviceerror.CustomServiceError(
 			serviceerror.DatabaseError,
 			fmt.Sprintf("failed to update auth resource status: %v", err),
@@ -296,7 +319,8 @@ func (s *authResourceService) DeleteAuthResource(
 	}
 
 	// Check if auth resource exists
-	exists, err := s.store.Exists(ctx, authID, orgID)
+	store := s.stores.AuthResource.(AuthResourceStore)
+	exists, err := store.Exists(ctx, authID, orgID)
 	if err != nil {
 		return serviceerror.CustomServiceError(
 			serviceerror.DatabaseError,
@@ -311,7 +335,12 @@ func (s *authResourceService) DeleteAuthResource(
 	}
 
 	// Delete auth resource
-	if err := s.store.Delete(ctx, authID, orgID); err != nil {
+	err = s.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return store.Delete(tx, authID, orgID)
+		},
+	})
+	if err != nil {
 		return serviceerror.CustomServiceError(
 			serviceerror.DatabaseError,
 			fmt.Sprintf("failed to delete auth resource: %v", err),
@@ -332,7 +361,13 @@ func (s *authResourceService) DeleteAuthResourcesByConsentID(
 	}
 
 	// Delete all auth resources for the consent
-	if err := s.store.DeleteByConsentID(ctx, consentID, orgID); err != nil {
+	store := s.stores.AuthResource.(AuthResourceStore)
+	err := s.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return store.DeleteByConsentID(tx, consentID, orgID)
+		},
+	})
+	if err != nil {
 		return serviceerror.CustomServiceError(
 			serviceerror.DatabaseError,
 			fmt.Sprintf("failed to delete auth resources: %v", err),
@@ -360,8 +395,14 @@ func (s *authResourceService) UpdateAllStatusByConsentID(
 	}
 
 	// Update all statuses
+	store := s.stores.AuthResource.(AuthResourceStore)
 	updatedTime := utils.GetCurrentTimeMillis()
-	if err := s.store.UpdateAllStatusByConsentID(ctx, consentID, orgID, status, updatedTime); err != nil {
+	err := s.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return store.UpdateAllStatusByConsentID(tx, consentID, orgID, status, updatedTime)
+		},
+	})
+	if err != nil {
 		return serviceerror.CustomServiceError(
 			serviceerror.DatabaseError,
 			fmt.Sprintf("failed to update auth resource statuses: %v", err),

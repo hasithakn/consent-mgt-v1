@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/wso2/consent-management-api/internal/authresource/model"
-	"github.com/wso2/consent-management-api/internal/system/database"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
 )
@@ -64,38 +63,38 @@ var (
 )
 
 // authResourceStore defines the interface for auth resource data operations
-type authResourceStore interface {
-	Create(ctx context.Context, authResource *model.AuthResource) error
+// AuthResourceStore defines the interface for auth resource data access operations
+type AuthResourceStore interface {
+	// Read operations - use dbClient directly
 	GetByID(ctx context.Context, authID, orgID string) (*model.AuthResource, error)
 	GetByConsentID(ctx context.Context, consentID, orgID string) ([]model.AuthResource, error)
-	Update(ctx context.Context, authResource *model.AuthResource) error
-	UpdateStatus(ctx context.Context, authID, orgID, status string, updatedTime int64) error
-	Delete(ctx context.Context, authID, orgID string) error
-	DeleteByConsentID(ctx context.Context, consentID, orgID string) error
 	Exists(ctx context.Context, authID, orgID string) (bool, error)
 	GetByUserID(ctx context.Context, userID, orgID string) ([]model.AuthResource, error)
-	UpdateAllStatusByConsentID(ctx context.Context, consentID, orgID, status string, updatedTime int64) error
 
-	// Transactional operations
-	CreateWithTx(ctx context.Context, tx *database.Tx, authResource *model.AuthResource) error
-	UpdateAllStatusByConsentIDWithTx(ctx context.Context, tx *database.Tx, consentID, orgID, status string, updatedTime int64) error
+	// Write operations - transactional with tx parameter
+	Create(tx dbmodel.TxInterface, authResource *model.AuthResource) error
+	Update(tx dbmodel.TxInterface, authResource *model.AuthResource) error
+	UpdateStatus(tx dbmodel.TxInterface, authID, orgID, status string, updatedTime int64) error
+	Delete(tx dbmodel.TxInterface, authID, orgID string) error
+	DeleteByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
+	UpdateAllStatusByConsentID(tx dbmodel.TxInterface, consentID, orgID, status string, updatedTime int64) error
 }
 
-// store implements authResourceStore using Thunder pattern
+// store implements AuthResourceStore using Thunder pattern
 type store struct {
 	dbClient provider.DBClientInterface
 }
 
 // newAuthResourceStore creates a new auth resource store
-func newAuthResourceStore(dbClient provider.DBClientInterface) authResourceStore {
+func newAuthResourceStore(dbClient provider.DBClientInterface) AuthResourceStore {
 	return &store{
 		dbClient: dbClient,
 	}
 }
 
-// Create creates a new auth resource
-func (s *store) Create(ctx context.Context, authResource *model.AuthResource) error {
-	_, err := s.dbClient.Execute(QueryCreateAuthResource,
+// Create creates a new auth resource within a transaction
+func (s *store) Create(tx dbmodel.TxInterface, authResource *model.AuthResource) error {
+	_, err := tx.Exec(QueryCreateAuthResource.Query,
 		authResource.AuthID,
 		authResource.ConsentID,
 		authResource.AuthType,
@@ -134,9 +133,9 @@ func (s *store) GetByConsentID(ctx context.Context, consentID, orgID string) ([]
 	return authResources, nil
 }
 
-// Update updates an auth resource
-func (s *store) Update(ctx context.Context, authResource *model.AuthResource) error {
-	_, err := s.dbClient.Execute(QueryUpdateAuthResource,
+// Update updates an auth resource within a transaction
+func (s *store) Update(tx dbmodel.TxInterface, authResource *model.AuthResource) error {
+	_, err := tx.Exec(QueryUpdateAuthResource.Query,
 		authResource.AuthStatus,
 		authResource.UserID,
 		authResource.Resources,
@@ -147,21 +146,21 @@ func (s *store) Update(ctx context.Context, authResource *model.AuthResource) er
 	return err
 }
 
-// UpdateStatus updates only the status of an auth resource
-func (s *store) UpdateStatus(ctx context.Context, authID, orgID, status string, updatedTime int64) error {
-	_, err := s.dbClient.Execute(QueryUpdateAuthResourceStatus, status, updatedTime, authID, orgID)
+// UpdateStatus updates only the status of an auth resource within a transaction
+func (s *store) UpdateStatus(tx dbmodel.TxInterface, authID, orgID, status string, updatedTime int64) error {
+	_, err := tx.Exec(QueryUpdateAuthResourceStatus.Query, status, updatedTime, authID, orgID)
 	return err
 }
 
-// Delete deletes an auth resource
-func (s *store) Delete(ctx context.Context, authID, orgID string) error {
-	_, err := s.dbClient.Execute(QueryDeleteAuthResource, authID, orgID)
+// Delete deletes an auth resource within a transaction
+func (s *store) Delete(tx dbmodel.TxInterface, authID, orgID string) error {
+	_, err := tx.Exec(QueryDeleteAuthResource.Query, authID, orgID)
 	return err
 }
 
-// DeleteByConsentID deletes all auth resources for a consent
-func (s *store) DeleteByConsentID(ctx context.Context, consentID, orgID string) error {
-	_, err := s.dbClient.Execute(QueryDeleteAuthResourcesByConsentID, consentID, orgID)
+// DeleteByConsentID deletes all auth resources for a consent within a transaction
+func (s *store) DeleteByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
+	_, err := tx.Exec(QueryDeleteAuthResourcesByConsentID.Query, consentID, orgID)
 	return err
 }
 
@@ -195,9 +194,9 @@ func (s *store) GetByUserID(ctx context.Context, userID, orgID string) ([]model.
 	return authResources, nil
 }
 
-// UpdateAllStatusByConsentID updates status for all auth resources of a consent
-func (s *store) UpdateAllStatusByConsentID(ctx context.Context, consentID, orgID, status string, updatedTime int64) error {
-	_, err := s.dbClient.Execute(QueryUpdateAllStatusByConsentID, status, updatedTime, consentID, orgID)
+// UpdateAllStatusByConsentID updates status for all auth resources of a consent within a transaction
+func (s *store) UpdateAllStatusByConsentID(tx dbmodel.TxInterface, consentID, orgID, status string, updatedTime int64) error {
+	_, err := tx.Exec(QueryUpdateAllStatusByConsentID.Query, status, updatedTime, consentID, orgID)
 	return err
 }
 
@@ -248,25 +247,4 @@ func executeTransaction(dbClient provider.DBClientInterface, queries []func(tx d
 	}
 
 	return tx.Commit()
-}
-
-// CreateWithTx creates an auth resource within a transaction
-func (s *store) CreateWithTx(ctx context.Context, tx *database.Tx, authResource *model.AuthResource) error {
-	_, err := tx.ExecContext(ctx, QueryCreateAuthResource.Query,
-		authResource.AuthID,
-		authResource.ConsentID,
-		authResource.AuthType,
-		authResource.UserID,
-		authResource.AuthStatus,
-		authResource.UpdatedTime,
-		authResource.Resources,
-		authResource.OrgID,
-	)
-	return err
-}
-
-// UpdateAllStatusByConsentIDWithTx updates all auth resource statuses for a consent within a transaction
-func (s *store) UpdateAllStatusByConsentIDWithTx(ctx context.Context, tx *database.Tx, consentID, orgID, status string, updatedTime int64) error {
-	_, err := tx.ExecContext(ctx, QueryUpdateAllStatusByConsentID.Query, status, updatedTime, consentID, orgID)
-	return err
 }

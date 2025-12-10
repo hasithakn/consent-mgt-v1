@@ -6,20 +6,24 @@ import (
 	"github.com/wso2/consent-management-api/internal/system/constants"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
 	"github.com/wso2/consent-management-api/internal/system/middleware"
+	"github.com/wso2/consent-management-api/internal/system/stores"
 )
 
+// NewStore creates and returns a new auth resource store (exported for registry)
+func NewStore(dbClient provider.DBClientInterface) interface{} {
+	return newAuthResourceStore(dbClient)
+}
+
 // Initialize creates and wires up all auth resource components and registers routes
-// Returns both service and store (store is needed by consent module for transactions)
-func Initialize(mux *http.ServeMux, dbClient provider.DBClientInterface) (AuthResourceServiceInterface, authResourceStore) {
-	// Create layers: store -> service -> handler
-	store := newAuthResourceStore(dbClient)
-	service := newAuthResourceService(store)
+func Initialize(mux *http.ServeMux, registry *stores.StoreRegistry) AuthResourceServiceInterface {
+	// Create service and handler using the registry
+	service := newAuthResourceService(registry)
 	handler := newAuthResourceHandler(service)
 
 	// Register routes
 	registerRoutes(mux, handler)
 
-	return service, store
+	return service
 }
 
 // registerRoutes registers all auth resource HTTP routes with CORS support

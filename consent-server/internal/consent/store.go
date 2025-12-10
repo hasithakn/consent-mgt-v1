@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/wso2/consent-management-api/internal/consent/model"
-	"github.com/wso2/consent-management-api/internal/system/database"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
 )
@@ -80,46 +79,40 @@ var (
 )
 
 // consentStore defines the interface for consent data operations
-type consentStore interface {
-	// Consent operations
-	Create(ctx context.Context, consent *model.Consent) error
+// ConsentStore defines the interface for consent data access operations
+type ConsentStore interface {
+	// Read operations - use dbClient directly
 	GetByID(ctx context.Context, consentID, orgID string) (*model.Consent, error)
 	List(ctx context.Context, orgID string, limit, offset int) ([]model.Consent, int, error)
-	Update(ctx context.Context, consent *model.Consent) error
-	UpdateStatus(ctx context.Context, consentID, orgID, status string, updatedTime int64) error
-	Delete(ctx context.Context, consentID, orgID string) error
 	GetByClientID(ctx context.Context, clientID, orgID string) ([]model.Consent, error)
-
-	// Attribute operations
-	CreateAttributes(ctx context.Context, attributes []model.ConsentAttribute) error
 	GetAttributesByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentAttribute, error)
-	DeleteAttributesByConsentID(ctx context.Context, consentID, orgID string) error
-
-	// Status audit operations
-	CreateStatusAudit(ctx context.Context, audit *model.ConsentStatusAudit) error
 	GetStatusAuditByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentStatusAudit, error)
 
-	// Transactional operations
-	CreateWithTx(ctx context.Context, tx *database.Tx, consent *model.Consent) error
-	CreateAttributesWithTx(ctx context.Context, tx *database.Tx, attributes []model.ConsentAttribute) error
-	CreateStatusAuditWithTx(ctx context.Context, tx *database.Tx, audit *model.ConsentStatusAudit) error
+	// Write operations - transactional with tx parameter
+	Create(tx dbmodel.TxInterface, consent *model.Consent) error
+	Update(tx dbmodel.TxInterface, consent *model.Consent) error
+	UpdateStatus(tx dbmodel.TxInterface, consentID, orgID, status string, updatedTime int64) error
+	Delete(tx dbmodel.TxInterface, consentID, orgID string) error
+	CreateAttributes(tx dbmodel.TxInterface, attributes []model.ConsentAttribute) error
+	DeleteAttributesByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
+	CreateStatusAudit(tx dbmodel.TxInterface, audit *model.ConsentStatusAudit) error
 }
 
-// store implements the consentStore interface
+// store implements the ConsentStore interface
 type store struct {
 	dbClient provider.DBClientInterface
 }
 
 // newConsentStore creates a new consent store
-func newConsentStore(dbClient provider.DBClientInterface) consentStore {
+func newConsentStore(dbClient provider.DBClientInterface) ConsentStore {
 	return &store{
 		dbClient: dbClient,
 	}
 }
 
-// Create creates a new consent
-func (s *store) Create(ctx context.Context, consent *model.Consent) error {
-	_, err := s.dbClient.Execute(QueryCreateConsent,
+// Create creates a new consent within a transaction
+func (s *store) Create(tx dbmodel.TxInterface, consent *model.Consent) error {
+	_, err := tx.Exec(QueryCreateConsent.Query,
 		consent.ConsentID, consent.CreatedTime, consent.UpdatedTime, consent.ClientID,
 		consent.ConsentType, consent.CurrentStatus, consent.ConsentFrequency,
 		consent.ValidityTime, consent.RecurringIndicator, consent.DataAccessValidityDuration,
@@ -169,24 +162,24 @@ func (s *store) List(ctx context.Context, orgID string, limit, offset int) ([]mo
 	return consents, totalCount, nil
 }
 
-// Update updates a consent
-func (s *store) Update(ctx context.Context, consent *model.Consent) error {
-	_, err := s.dbClient.Execute(QueryUpdateConsent,
+// Update updates a consent within a transaction
+func (s *store) Update(tx dbmodel.TxInterface, consent *model.Consent) error {
+	_, err := tx.Exec(QueryUpdateConsent.Query,
 		consent.UpdatedTime, consent.ConsentType, consent.ConsentFrequency,
 		consent.ValidityTime, consent.RecurringIndicator, consent.DataAccessValidityDuration,
 		consent.ConsentID, consent.OrgID)
 	return err
 }
 
-// UpdateStatus updates consent status
-func (s *store) UpdateStatus(ctx context.Context, consentID, orgID, status string, updatedTime int64) error {
-	_, err := s.dbClient.Execute(QueryUpdateConsentStatus, status, updatedTime, consentID, orgID)
+// UpdateStatus updates consent status within a transaction
+func (s *store) UpdateStatus(tx dbmodel.TxInterface, consentID, orgID, status string, updatedTime int64) error {
+	_, err := tx.Exec(QueryUpdateConsentStatus.Query, status, updatedTime, consentID, orgID)
 	return err
 }
 
-// Delete deletes a consent
-func (s *store) Delete(ctx context.Context, consentID, orgID string) error {
-	_, err := s.dbClient.Execute(QueryDeleteConsent, consentID, orgID)
+// Delete deletes a consent within a transaction
+func (s *store) Delete(tx dbmodel.TxInterface, consentID, orgID string) error {
+	_, err := tx.Exec(QueryDeleteConsent.Query, consentID, orgID)
 	return err
 }
 
@@ -208,10 +201,10 @@ func (s *store) GetByClientID(ctx context.Context, clientID, orgID string) ([]mo
 	return consents, nil
 }
 
-// CreateAttributes creates multiple consent attributes
-func (s *store) CreateAttributes(ctx context.Context, attributes []model.ConsentAttribute) error {
+// CreateAttributes creates multiple consent attributes within a transaction
+func (s *store) CreateAttributes(tx dbmodel.TxInterface, attributes []model.ConsentAttribute) error {
 	for _, attr := range attributes {
-		_, err := s.dbClient.Execute(QueryCreateAttribute,
+		_, err := tx.Exec(QueryCreateAttribute.Query,
 			attr.ConsentID, attr.AttKey, attr.AttValue, attr.OrgID)
 		if err != nil {
 			return err
@@ -238,15 +231,15 @@ func (s *store) GetAttributesByConsentID(ctx context.Context, consentID, orgID s
 	return attributes, nil
 }
 
-// DeleteAttributesByConsentID deletes all attributes for a consent
-func (s *store) DeleteAttributesByConsentID(ctx context.Context, consentID, orgID string) error {
-	_, err := s.dbClient.Execute(QueryDeleteAttributesByConsentID, consentID, orgID)
+// DeleteAttributesByConsentID deletes all attributes for a consent within a transaction
+func (s *store) DeleteAttributesByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
+	_, err := tx.Exec(QueryDeleteAttributesByConsentID.Query, consentID, orgID)
 	return err
 }
 
-// CreateStatusAudit creates a status audit entry
-func (s *store) CreateStatusAudit(ctx context.Context, audit *model.ConsentStatusAudit) error {
-	_, err := s.dbClient.Execute(QueryCreateStatusAudit,
+// CreateStatusAudit creates a status audit entry within a transaction
+func (s *store) CreateStatusAudit(tx dbmodel.TxInterface, audit *model.ConsentStatusAudit) error {
+	_, err := tx.Exec(QueryCreateStatusAudit.Query,
 		audit.StatusAuditID, audit.ConsentID, audit.CurrentStatus, audit.ActionTime,
 		audit.Reason, audit.ActionBy, audit.PreviousStatus, audit.OrgID)
 	return err
@@ -375,32 +368,20 @@ func mapToStatusAudit(row map[string]interface{}) *model.ConsentStatusAudit {
 	return audit
 }
 
-// CreateWithTx creates a consent within a transaction
-func (s *store) CreateWithTx(ctx context.Context, tx *database.Tx, consent *model.Consent) error {
-	_, err := tx.ExecContext(ctx, QueryCreateConsent.Query,
-		consent.ConsentID, consent.CreatedTime, consent.UpdatedTime, consent.ClientID,
-		consent.ConsentType, consent.CurrentStatus, consent.ConsentFrequency,
-		consent.ValidityTime, consent.RecurringIndicator, consent.DataAccessValidityDuration,
-		consent.OrgID)
-	return err
-}
+// executeTransaction executes multiple queries within a single transaction
+// This follows Thunder's functional composition pattern
+func executeTransaction(dbClient provider.DBClientInterface, queries []func(tx dbmodel.TxInterface) error) error {
+	tx, err := dbClient.BeginTx()
+	if err != nil {
+		return err
+	}
 
-// CreateAttributesWithTx creates consent attributes within a transaction
-func (s *store) CreateAttributesWithTx(ctx context.Context, tx *database.Tx, attributes []model.ConsentAttribute) error {
-	for _, attr := range attributes {
-		_, err := tx.ExecContext(ctx, QueryCreateAttribute.Query,
-			attr.ConsentID, attr.AttKey, attr.AttValue, attr.OrgID)
-		if err != nil {
+	for _, query := range queries {
+		if err := query(tx); err != nil {
+			tx.Rollback()
 			return err
 		}
 	}
-	return nil
-}
 
-// CreateStatusAuditWithTx creates a status audit record within a transaction
-func (s *store) CreateStatusAuditWithTx(ctx context.Context, tx *database.Tx, audit *model.ConsentStatusAudit) error {
-	_, err := tx.ExecContext(ctx, QueryCreateStatusAudit.Query,
-		audit.StatusAuditID, audit.ConsentID, audit.CurrentStatus, audit.ActionTime,
-		audit.Reason, audit.ActionBy, audit.PreviousStatus, audit.OrgID)
-	return err
+	return tx.Commit()
 }

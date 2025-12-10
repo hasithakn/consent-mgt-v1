@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/wso2/consent-management-api/internal/authresource"
 	authmodel "github.com/wso2/consent-management-api/internal/authresource/model"
 	"github.com/wso2/consent-management-api/internal/consent/model"
 	"github.com/wso2/consent-management-api/internal/consent/validator"
-	"github.com/wso2/consent-management-api/internal/system/database"
+	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
+	"github.com/wso2/consent-management-api/internal/system/stores"
 	"github.com/wso2/consent-management-api/internal/system/utils"
 )
 
@@ -24,34 +26,15 @@ type ConsentService interface {
 	GetConsentsByClientID(ctx context.Context, clientID, orgID string) ([]model.ConsentResponse, *serviceerror.ServiceError)
 }
 
-// AuthResourceStore interface for auth resource operations needed by consent service
-// Exported to allow dependency injection from other modules
-type AuthResourceStore interface {
-	CreateWithTx(ctx context.Context, tx *database.Tx, authResource *authmodel.AuthResource) error
-	UpdateAllStatusByConsentIDWithTx(ctx context.Context, tx *database.Tx, consentID, orgID, status string, updatedTime int64) error
-}
-
-// ConsentPurposeStore interface for purpose operations needed by consent service
-// Exported to allow dependency injection from other modules
-type ConsentPurposeStore interface {
-	LinkPurposeToConsentWithTx(ctx context.Context, tx *database.Tx, consentID, purposeID, orgID string, value *string, isUserApproved, isMandatory bool) error
-}
-
 // consentService implements the ConsentService interface
 type consentService struct {
-	store               consentStore
-	authResourceStore   AuthResourceStore
-	consentPurposeStore ConsentPurposeStore
-	db                  *database.DB
+	stores *stores.StoreRegistry
 }
 
 // newConsentService creates a new consent service
-func newConsentService(store consentStore, authResourceStore AuthResourceStore, consentPurposeStore ConsentPurposeStore, db *database.DB) ConsentService {
+func newConsentService(registry *stores.StoreRegistry) ConsentService {
 	return &consentService{
-		store:               store,
-		authResourceStore:   authResourceStore,
-		consentPurposeStore: consentPurposeStore,
-		db:                  db,
+		stores: registry,
 	}
 }
 
@@ -74,13 +57,6 @@ func (s *consentService) CreateConsent(ctx context.Context, req model.ConsentAPI
 		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
 	}
 
-	// Start transaction
-	tx, err := s.db.BeginTx(ctx)
-	if err != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to begin transaction: %v", err))
-	}
-	defer tx.Rollback()
-
 	// Generate IDs and timestamp
 	consentID := utils.GenerateUUID()
 	currentTime := utils.GetCurrentTimeMillis()
@@ -100,12 +76,19 @@ func (s *consentService) CreateConsent(ctx context.Context, req model.ConsentAPI
 		OrgID:                      orgID,
 	}
 
-	// Store consent within transaction
-	if err := s.store.CreateWithTx(ctx, tx, consent); err != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create consent: %v", err))
+	// Get stores from registry
+	consentStore := s.stores.Consent.(ConsentStore)
+	authResourceStore := s.stores.AuthResource.(authresource.AuthResourceStore)
+
+	// Build list of transactional operations
+	queries := []func(tx dbmodel.TxInterface) error{
+		// Create consent
+		func(tx dbmodel.TxInterface) error {
+			return consentStore.Create(tx, consent)
+		},
 	}
 
-	// Store attributes if provided
+	// Add attributes if provided
 	if len(createReq.Attributes) > 0 {
 		attributes := make([]model.ConsentAttribute, 0, len(createReq.Attributes))
 		for key, value := range createReq.Attributes {
@@ -117,13 +100,12 @@ func (s *consentService) CreateConsent(ctx context.Context, req model.ConsentAPI
 			}
 			attributes = append(attributes, attr)
 		}
-
-		if err := s.store.CreateAttributesWithTx(ctx, tx, attributes); err != nil {
-			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create attributes: %v", err))
-		}
+		queries = append(queries, func(tx dbmodel.TxInterface) error {
+			return consentStore.CreateAttributes(tx, attributes)
+		})
 	}
 
-	// Create initial status audit
+	// Add status audit
 	auditID := utils.GenerateUUID()
 	audit := &model.ConsentStatusAudit{
 		StatusAuditID: auditID,
@@ -132,12 +114,11 @@ func (s *consentService) CreateConsent(ctx context.Context, req model.ConsentAPI
 		ActionTime:    currentTime,
 		OrgID:         orgID,
 	}
+	queries = append(queries, func(tx dbmodel.TxInterface) error {
+		return consentStore.CreateStatusAudit(tx, audit)
+	})
 
-	if err := s.store.CreateStatusAuditWithTx(ctx, tx, audit); err != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create status audit: %v", err))
-	}
-
-	// Create authorization resources if provided
+	// Add authorization resources if provided
 	for _, authReq := range req.Authorizations {
 		authID := utils.GenerateUUID()
 
@@ -169,22 +150,17 @@ func (s *consentService) CreateConsent(ctx context.Context, req model.ConsentAPI
 			OrgID:       orgID,
 		}
 
-		if err := s.authResourceStore.CreateWithTx(ctx, tx, authResource); err != nil {
-			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create auth resource: %v", err))
-		}
+		queries = append(queries, func(tx dbmodel.TxInterface) error {
+			return authResourceStore.Create(tx, authResource)
+		})
 	}
 
 	// Link consent purposes if provided (from ConsentPurpose field)
-	for _, purposeItem := range req.ConsentPurpose {
-		// ConsentPurpose items from API don't have the same structure as the mapping table
-		// For now, we'll skip linking until we clarify the purpose structure
-		// This can be added later when purpose linking is needed
-		_ = purposeItem
-	}
+	// TODO: Implement purpose linking when structure is clarified
 
-	// Commit transaction
-	if err := tx.Commit(); err != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to commit transaction: %v", err))
+	// Execute all operations in a single transaction
+	if err := s.stores.ExecuteTransaction(queries); err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create consent: %v", err))
 	}
 
 	// Build response
@@ -209,7 +185,8 @@ func (s *consentService) CreateConsent(ctx context.Context, req model.ConsentAPI
 
 // GetConsent retrieves a consent by ID
 func (s *consentService) GetConsent(ctx context.Context, consentID, orgID string) (*model.ConsentResponse, *serviceerror.ServiceError) {
-	consent, err := s.store.GetByID(ctx, consentID, orgID)
+	consentStore := s.stores.Consent.(ConsentStore)
+	consent, err := consentStore.GetByID(ctx, consentID, orgID)
 	if err != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
 	}
@@ -218,7 +195,7 @@ func (s *consentService) GetConsent(ctx context.Context, consentID, orgID string
 	}
 
 	// Load attributes
-	_, err = s.store.GetAttributesByConsentID(ctx, consentID, orgID)
+	_, err = consentStore.GetAttributesByConsentID(ctx, consentID, orgID)
 	if err != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
 	}
@@ -250,7 +227,8 @@ func (s *consentService) ListConsents(ctx context.Context, orgID string, limit, 
 		offset = 0
 	}
 
-	consents, total, err := s.store.List(ctx, orgID, limit, offset)
+	store := s.stores.Consent.(ConsentStore)
+	consents, total, err := store.List(ctx, orgID, limit, offset)
 	if err != nil {
 		return nil, 0, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
 	}
@@ -285,7 +263,8 @@ func (s *consentService) UpdateConsent(ctx context.Context, consentID string, re
 	}
 
 	// Check if consent exists
-	existing, err := s.store.GetByID(ctx, consentID, orgID)
+	store := s.stores.Consent.(ConsentStore)
+	existing, err := store.GetByID(ctx, consentID, orgID)
 	if err != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
 	}
@@ -305,16 +284,19 @@ func (s *consentService) UpdateConsent(ctx context.Context, consentID string, re
 		OrgID:                      orgID,
 	}
 
-	if updateErr := s.store.Update(ctx, consent); updateErr != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, updateErr.Error())
+	// Build transactional operations
+	queries := []func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return store.Update(tx, consent)
+		},
 	}
 
 	// Update attributes - delete old and create new
 	if len(updateReq.Attributes) > 0 {
 		// Delete existing attributes
-		if delErr := s.store.DeleteAttributesByConsentID(ctx, consentID, orgID); delErr != nil {
-			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, delErr.Error())
-		}
+		queries = append(queries, func(tx dbmodel.TxInterface) error {
+			return store.DeleteAttributesByConsentID(tx, consentID, orgID)
+		})
 
 		// Create new attributes
 		attributes := make([]model.ConsentAttribute, 0, len(updateReq.Attributes))
@@ -328,13 +310,18 @@ func (s *consentService) UpdateConsent(ctx context.Context, consentID string, re
 			attributes = append(attributes, attr)
 		}
 
-		if createErr := s.store.CreateAttributes(ctx, attributes); createErr != nil {
-			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, createErr.Error())
-		}
+		queries = append(queries, func(tx dbmodel.TxInterface) error {
+			return store.CreateAttributes(tx, attributes)
+		})
+	}
+
+	// Execute transaction
+	if err := s.stores.ExecuteTransaction(queries); err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
 	}
 
 	// Get updated consent
-	updated, getErr := s.store.GetByID(ctx, consentID, orgID)
+	updated, getErr := store.GetByID(ctx, consentID, orgID)
 	if getErr != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, getErr.Error())
 	}
@@ -368,7 +355,8 @@ func (s *consentService) UpdateConsentStatus(ctx context.Context, consentID, org
 	status := "REVOKED"
 
 	// Check if consent exists
-	existing, err := s.store.GetByID(ctx, consentID, orgID)
+	store := s.stores.Consent.(ConsentStore)
+	existing, err := store.GetByID(ctx, consentID, orgID)
 	if err != nil {
 		return serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
 	}
@@ -377,11 +365,6 @@ func (s *consentService) UpdateConsentStatus(ctx context.Context, consentID, org
 	}
 
 	currentTime := utils.GetCurrentTimeMillis()
-
-	// Update status
-	if err := s.store.UpdateStatus(ctx, consentID, orgID, status, currentTime); err != nil {
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
-	}
 
 	// Create audit entry
 	auditID := utils.GenerateUUID()
@@ -397,7 +380,16 @@ func (s *consentService) UpdateConsentStatus(ctx context.Context, consentID, org
 		OrgID:          orgID,
 	}
 
-	if err := s.store.CreateStatusAudit(ctx, audit); err != nil {
+	// Execute transaction
+	err = s.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return store.UpdateStatus(tx, consentID, orgID, status, currentTime)
+		},
+		func(tx dbmodel.TxInterface) error {
+			return store.CreateStatusAudit(tx, audit)
+		},
+	})
+	if err != nil {
 		return serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
 	}
 
@@ -407,7 +399,8 @@ func (s *consentService) UpdateConsentStatus(ctx context.Context, consentID, org
 // DeleteConsent deletes a consent
 func (s *consentService) DeleteConsent(ctx context.Context, consentID, orgID string) *serviceerror.ServiceError {
 	// Check if consent exists
-	existing, err := s.store.GetByID(ctx, consentID, orgID)
+	store := s.stores.Consent.(ConsentStore)
+	existing, err := store.GetByID(ctx, consentID, orgID)
 	if err != nil {
 		return serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
 	}
@@ -415,14 +408,17 @@ func (s *consentService) DeleteConsent(ctx context.Context, consentID, orgID str
 		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("Consent with ID '%s' not found", consentID))
 	}
 
-	// Delete attributes first
-	if attrErr := s.store.DeleteAttributesByConsentID(ctx, consentID, orgID); attrErr != nil {
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, attrErr.Error())
-	}
-
-	// Delete consent (audit entries remain for history)
-	if delErr := s.store.Delete(ctx, consentID, orgID); delErr != nil {
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, delErr.Error())
+	// Delete attributes and consent in transaction
+	err = s.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return store.DeleteAttributesByConsentID(tx, consentID, orgID)
+		},
+		func(tx dbmodel.TxInterface) error {
+			return store.Delete(tx, consentID, orgID)
+		},
+	})
+	if err != nil {
+		return serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
 	}
 
 	return nil
@@ -434,7 +430,8 @@ func (s *consentService) GetConsentsByClientID(ctx context.Context, clientID, or
 		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "Client ID is required")
 	}
 
-	consents, err := s.store.GetByClientID(ctx, clientID, orgID)
+	store := s.stores.Consent.(ConsentStore)
+	consents, err := store.GetByClientID(ctx, clientID, orgID)
 	if err != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/wso2/consent-management-api/internal/consentpurpose/model"
-	"github.com/wso2/consent-management-api/internal/system/database"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
 )
@@ -81,37 +80,39 @@ var (
 )
 
 // consentPurposeStore defines the interface for consent purpose data operations
-type consentPurposeStore interface {
-	Create(ctx context.Context, purpose *model.ConsentPurpose) error
+// ConsentPurposeStore defines the interface for consent purpose data access operations
+type ConsentPurposeStore interface {
+	// Read operations - use dbClient directly
 	GetByID(ctx context.Context, purposeID, orgID string) (*model.ConsentPurpose, error)
 	GetByName(ctx context.Context, name, orgID string) (*model.ConsentPurpose, error)
 	List(ctx context.Context, orgID string, limit, offset int) ([]model.ConsentPurpose, int, error)
-	Update(ctx context.Context, purpose *model.ConsentPurpose) error
-	Delete(ctx context.Context, purposeID, orgID string) error
 	CheckNameExists(ctx context.Context, name, orgID string) (bool, error)
-	CreateAttributes(ctx context.Context, attributes []model.ConsentPurposeAttribute) error
 	GetAttributesByPurposeID(ctx context.Context, purposeID, orgID string) ([]model.ConsentPurposeAttribute, error)
-	DeleteAttributesByPurposeID(ctx context.Context, purposeID, orgID string) error
 
-	// Transactional operations
-	LinkPurposeToConsentWithTx(ctx context.Context, tx *database.Tx, consentID, purposeID, orgID string, value *string, isUserApproved, isMandatory bool) error
+	// Write operations - transactional with tx parameter
+	Create(tx dbmodel.TxInterface, purpose *model.ConsentPurpose) error
+	Update(tx dbmodel.TxInterface, purpose *model.ConsentPurpose) error
+	Delete(tx dbmodel.TxInterface, purposeID, orgID string) error
+	CreateAttributes(tx dbmodel.TxInterface, attributes []model.ConsentPurposeAttribute) error
+	DeleteAttributesByPurposeID(tx dbmodel.TxInterface, purposeID, orgID string) error
+	LinkPurposeToConsent(tx dbmodel.TxInterface, consentID, purposeID, orgID string, value *string, isUserApproved, isMandatory bool) error
 }
 
-// store implements the consentPurposeStore interface
+// store implements the ConsentPurposeStore interface
 type store struct {
 	dbClient provider.DBClientInterface
 }
 
 // newConsentPurposeStore creates a new consent purpose store
-func newConsentPurposeStore(dbClient provider.DBClientInterface) consentPurposeStore {
+func newConsentPurposeStore(dbClient provider.DBClientInterface) ConsentPurposeStore {
 	return &store{
 		dbClient: dbClient,
 	}
 }
 
-// Create creates a new consent purpose
-func (s *store) Create(ctx context.Context, purpose *model.ConsentPurpose) error {
-	_, err := s.dbClient.Execute(QueryCreatePurpose,
+// Create creates a new consent purpose within a transaction
+func (s *store) Create(tx dbmodel.TxInterface, purpose *model.ConsentPurpose) error {
+	_, err := tx.Exec(QueryCreatePurpose.Query,
 		purpose.ID, purpose.Name, purpose.Description, purpose.Type, purpose.OrgID)
 	return err
 }
@@ -172,16 +173,16 @@ func (s *store) List(ctx context.Context, orgID string, limit, offset int) ([]mo
 	return purposes, totalCount, nil
 }
 
-// Update updates an existing consent purpose
-func (s *store) Update(ctx context.Context, purpose *model.ConsentPurpose) error {
-	_, err := s.dbClient.Execute(QueryUpdatePurpose,
+// Update updates an existing consent purpose within a transaction
+func (s *store) Update(tx dbmodel.TxInterface, purpose *model.ConsentPurpose) error {
+	_, err := tx.Exec(QueryUpdatePurpose.Query,
 		purpose.Name, purpose.Description, purpose.Type, purpose.ID, purpose.OrgID)
 	return err
 }
 
-// Delete deletes a consent purpose
-func (s *store) Delete(ctx context.Context, purposeID, orgID string) error {
-	_, err := s.dbClient.Execute(QueryDeletePurpose, purposeID, orgID)
+// Delete deletes a consent purpose within a transaction
+func (s *store) Delete(tx dbmodel.TxInterface, purposeID, orgID string) error {
+	_, err := tx.Exec(QueryDeletePurpose.Query, purposeID, orgID)
 	return err
 }
 
@@ -200,10 +201,10 @@ func (s *store) CheckNameExists(ctx context.Context, name, orgID string) (bool, 
 	return false, nil
 }
 
-// CreateAttributes creates multiple purpose attributes
-func (s *store) CreateAttributes(ctx context.Context, attributes []model.ConsentPurposeAttribute) error {
+// CreateAttributes creates multiple purpose attributes within a transaction
+func (s *store) CreateAttributes(tx dbmodel.TxInterface, attributes []model.ConsentPurposeAttribute) error {
 	for _, attr := range attributes {
-		_, err := s.dbClient.Execute(QueryCreateAttribute,
+		_, err := tx.Exec(QueryCreateAttribute.Query,
 			attr.ID, attr.PurposeID, attr.Key, attr.Value, attr.OrgID)
 		if err != nil {
 			return err
@@ -230,9 +231,9 @@ func (s *store) GetAttributesByPurposeID(ctx context.Context, purposeID, orgID s
 	return attributes, nil
 }
 
-// DeleteAttributesByPurposeID deletes all attributes for a purpose
-func (s *store) DeleteAttributesByPurposeID(ctx context.Context, purposeID, orgID string) error {
-	_, err := s.dbClient.Execute(QueryDeleteAttributesByPurposeID, purposeID, orgID)
+// DeleteAttributesByPurposeID deletes all attributes for a purpose within a transaction
+func (s *store) DeleteAttributesByPurposeID(tx dbmodel.TxInterface, purposeID, orgID string) error {
+	_, err := tx.Exec(QueryDeleteAttributesByPurposeID.Query, purposeID, orgID)
 	return err
 }
 
@@ -294,9 +295,9 @@ func mapToConsentPurposeAttribute(row map[string]interface{}) *model.ConsentPurp
 	return attr
 }
 
-// LinkPurposeToConsentWithTx links a purpose to a consent within a transaction
-func (s *store) LinkPurposeToConsentWithTx(ctx context.Context, tx *database.Tx, consentID, purposeID, orgID string, value *string, isUserApproved, isMandatory bool) error {
-	_, err := tx.ExecContext(ctx, QueryLinkPurposeToConsent.Query,
+// LinkPurposeToConsent links a purpose to a consent within a transaction
+func (s *store) LinkPurposeToConsent(tx dbmodel.TxInterface, consentID, purposeID, orgID string, value *string, isUserApproved, isMandatory bool) error {
+	_, err := tx.Exec(QueryLinkPurposeToConsent.Query,
 		consentID, purposeID, orgID, value, isUserApproved, isMandatory)
 	return err
 }

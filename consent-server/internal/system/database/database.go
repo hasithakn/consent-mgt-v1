@@ -90,3 +90,33 @@ func (db *DB) HealthCheck(ctx context.Context) error {
 
 	return nil
 }
+
+// Tx wraps sqlx.Tx to provide transaction management.
+type Tx struct {
+	*sqlx.Tx
+}
+
+// BeginTx starts a new transaction.
+func (db *DB) BeginTx(ctx context.Context) (*Tx, error) {
+	tx, err := db.DB.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	return &Tx{Tx: tx}, nil
+}
+
+// Commit commits the transaction.
+func (tx *Tx) Commit() error {
+	if err := tx.Tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
+// Rollback rolls back the transaction.
+func (tx *Tx) Rollback() error {
+	if err := tx.Tx.Rollback(); err != nil {
+		return fmt.Errorf("failed to rollback transaction: %w", err)
+	}
+	return nil
+}

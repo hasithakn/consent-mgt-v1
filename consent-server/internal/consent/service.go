@@ -2,9 +2,13 @@ package consent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	authmodel "github.com/wso2/consent-management-api/internal/authresource/model"
 	"github.com/wso2/consent-management-api/internal/consent/model"
+	"github.com/wso2/consent-management-api/internal/consent/validator"
+	"github.com/wso2/consent-management-api/internal/system/database"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
 	"github.com/wso2/consent-management-api/internal/system/utils"
 )
@@ -20,30 +24,68 @@ type ConsentService interface {
 	GetConsentsByClientID(ctx context.Context, clientID, orgID string) ([]model.ConsentResponse, *serviceerror.ServiceError)
 }
 
+// AuthResourceStore interface for auth resource operations needed by consent service
+// Exported to allow dependency injection from other modules
+type AuthResourceStore interface {
+	CreateWithTx(ctx context.Context, tx *database.Tx, authResource *authmodel.AuthResource) error
+	UpdateAllStatusByConsentIDWithTx(ctx context.Context, tx *database.Tx, consentID, orgID, status string, updatedTime int64) error
+}
+
+// ConsentPurposeStore interface for purpose operations needed by consent service
+// Exported to allow dependency injection from other modules
+type ConsentPurposeStore interface {
+	LinkPurposeToConsentWithTx(ctx context.Context, tx *database.Tx, consentID, purposeID, orgID string, value *string, isUserApproved, isMandatory bool) error
+}
+
 // consentService implements the ConsentService interface
 type consentService struct {
-	store consentStore
+	store               consentStore
+	authResourceStore   AuthResourceStore
+	consentPurposeStore ConsentPurposeStore
+	db                  *database.DB
 }
 
 // newConsentService creates a new consent service
-func newConsentService(store consentStore) ConsentService {
+func newConsentService(store consentStore, authResourceStore AuthResourceStore, consentPurposeStore ConsentPurposeStore, db *database.DB) ConsentService {
 	return &consentService{
-		store: store,
+		store:               store,
+		authResourceStore:   authResourceStore,
+		consentPurposeStore: consentPurposeStore,
+		db:                  db,
 	}
 }
 
-// CreateConsent creates a new consent
+// CreateConsent creates a new consent with all related entities in a single transaction
 func (s *consentService) CreateConsent(ctx context.Context, req model.ConsentAPIRequest, clientID, orgID string) (*model.ConsentResponse, *serviceerror.ServiceError) {
-	// Convert API request to internal format and validate
+	// Validate request
+	if err := utils.ValidateOrgID(orgID); err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
+	}
+	if err := utils.ValidateClientID(clientID); err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
+	}
+	if err := validator.ValidateConsentCreateRequest(req, clientID, orgID); err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
+	}
+
+	// Convert API request to internal format
 	createReq, err := req.ToConsentCreateRequest()
 	if err != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
 	}
 
-	// Create consent entity
+	// Start transaction
+	tx, err := s.db.BeginTx(ctx)
+	if err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to begin transaction: %v", err))
+	}
+	defer tx.Rollback()
+
+	// Generate IDs and timestamp
 	consentID := utils.GenerateUUID()
 	currentTime := utils.GetCurrentTimeMillis()
 
+	// Create consent entity
 	consent := &model.Consent{
 		ConsentID:                  consentID,
 		CreatedTime:                currentTime,
@@ -58,9 +100,9 @@ func (s *consentService) CreateConsent(ctx context.Context, req model.ConsentAPI
 		OrgID:                      orgID,
 	}
 
-	// Store consent
-	if err := s.store.Create(ctx, consent); err != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+	// Store consent within transaction
+	if err := s.store.CreateWithTx(ctx, tx, consent); err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create consent: %v", err))
 	}
 
 	// Store attributes if provided
@@ -76,8 +118,8 @@ func (s *consentService) CreateConsent(ctx context.Context, req model.ConsentAPI
 			attributes = append(attributes, attr)
 		}
 
-		if err := s.store.CreateAttributes(ctx, attributes); err != nil {
-			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		if err := s.store.CreateAttributesWithTx(ctx, tx, attributes); err != nil {
+			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create attributes: %v", err))
 		}
 	}
 
@@ -91,8 +133,58 @@ func (s *consentService) CreateConsent(ctx context.Context, req model.ConsentAPI
 		OrgID:         orgID,
 	}
 
-	if err := s.store.CreateStatusAudit(ctx, audit); err != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+	if err := s.store.CreateStatusAuditWithTx(ctx, tx, audit); err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create status audit: %v", err))
+	}
+
+	// Create authorization resources if provided
+	for _, authReq := range req.Authorizations {
+		authID := utils.GenerateUUID()
+
+		// Marshal resources to JSON if present
+		var resourcesJSON *string
+		if authReq.Resources != nil {
+			resourcesBytes, err := json.Marshal(authReq.Resources)
+			if err != nil {
+				return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("failed to marshal resources: %v", err))
+			}
+			resourcesStr := string(resourcesBytes)
+			resourcesJSON = &resourcesStr
+		}
+
+		// Convert to internal format
+		var userIDPtr *string
+		if authReq.UserID != "" {
+			userIDPtr = &authReq.UserID
+		}
+
+		authResource := &authmodel.AuthResource{
+			AuthID:      authID,
+			ConsentID:   consentID,
+			AuthType:    authReq.Type,
+			UserID:      userIDPtr,
+			AuthStatus:  authReq.Status,
+			UpdatedTime: currentTime,
+			Resources:   resourcesJSON,
+			OrgID:       orgID,
+		}
+
+		if err := s.authResourceStore.CreateWithTx(ctx, tx, authResource); err != nil {
+			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create auth resource: %v", err))
+		}
+	}
+
+	// Link consent purposes if provided (from ConsentPurpose field)
+	for _, purposeItem := range req.ConsentPurpose {
+		// ConsentPurpose items from API don't have the same structure as the mapping table
+		// For now, we'll skip linking until we clarify the purpose structure
+		// This can be added later when purpose linking is needed
+		_ = purposeItem
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to commit transaction: %v", err))
 	}
 
 	// Build response

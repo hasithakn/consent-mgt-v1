@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/wso2/consent-management-api/internal/consentpurpose/model"
+	"github.com/wso2/consent-management-api/internal/system/database"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
 )
@@ -72,6 +73,11 @@ var (
 		        INNER JOIN CONSENT_PURPOSE_MAPPING cpm ON cp.ID = cpm.PURPOSE_ID
 		        WHERE cpm.CONSENT_ID = ? AND cpm.ORG_ID = ?`,
 	}
+
+	QueryLinkPurposeToConsent = dbmodel.DBQuery{
+		ID:    "LINK_PURPOSE_TO_CONSENT",
+		Query: "INSERT INTO CONSENT_PURPOSE_MAPPING (CONSENT_ID, PURPOSE_ID, ORG_ID, VALUE, IS_USER_APPROVED, IS_MANDATORY) VALUES (?, ?, ?, ?, ?, ?)",
+	}
 )
 
 // consentPurposeStore defines the interface for consent purpose data operations
@@ -86,6 +92,9 @@ type consentPurposeStore interface {
 	CreateAttributes(ctx context.Context, attributes []model.ConsentPurposeAttribute) error
 	GetAttributesByPurposeID(ctx context.Context, purposeID, orgID string) ([]model.ConsentPurposeAttribute, error)
 	DeleteAttributesByPurposeID(ctx context.Context, purposeID, orgID string) error
+
+	// Transactional operations
+	LinkPurposeToConsentWithTx(ctx context.Context, tx *database.Tx, consentID, purposeID, orgID string, value *string, isUserApproved, isMandatory bool) error
 }
 
 // store implements the consentPurposeStore interface
@@ -283,4 +292,11 @@ func mapToConsentPurposeAttribute(row map[string]interface{}) *model.ConsentPurp
 	}
 
 	return attr
+}
+
+// LinkPurposeToConsentWithTx links a purpose to a consent within a transaction
+func (s *store) LinkPurposeToConsentWithTx(ctx context.Context, tx *database.Tx, consentID, purposeID, orgID string, value *string, isUserApproved, isMandatory bool) error {
+	_, err := tx.ExecContext(ctx, QueryLinkPurposeToConsent.Query,
+		consentID, purposeID, orgID, value, isUserApproved, isMandatory)
+	return err
 }

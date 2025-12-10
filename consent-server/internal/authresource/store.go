@@ -5,8 +5,9 @@ import (
 	"fmt"
 
 	"github.com/wso2/consent-management-api/internal/authresource/model"
-	"github.com/wso2/consent-management-api/internal/system/database/provider"
+	"github.com/wso2/consent-management-api/internal/system/database"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
+	"github.com/wso2/consent-management-api/internal/system/database/provider"
 )
 
 // DBQuery objects for all auth resource operations
@@ -74,6 +75,10 @@ type authResourceStore interface {
 	Exists(ctx context.Context, authID, orgID string) (bool, error)
 	GetByUserID(ctx context.Context, userID, orgID string) ([]model.AuthResource, error)
 	UpdateAllStatusByConsentID(ctx context.Context, consentID, orgID, status string, updatedTime int64) error
+
+	// Transactional operations
+	CreateWithTx(ctx context.Context, tx *database.Tx, authResource *model.AuthResource) error
+	UpdateAllStatusByConsentIDWithTx(ctx context.Context, tx *database.Tx, consentID, orgID, status string, updatedTime int64) error
 }
 
 // store implements authResourceStore using Thunder pattern
@@ -121,7 +126,7 @@ func (s *store) GetByConsentID(ctx context.Context, consentID, orgID string) ([]
 	if err != nil {
 		return nil, err
 	}
-	
+
 	authResources := make([]model.AuthResource, 0, len(results))
 	for _, row := range results {
 		authResources = append(authResources, *mapToAuthResource(row))
@@ -182,7 +187,7 @@ func (s *store) GetByUserID(ctx context.Context, userID, orgID string) ([]model.
 	if err != nil {
 		return nil, err
 	}
-	
+
 	authResources := make([]model.AuthResource, 0, len(results))
 	for _, row := range results {
 		authResources = append(authResources, *mapToAuthResource(row))
@@ -199,7 +204,7 @@ func (s *store) UpdateAllStatusByConsentID(ctx context.Context, consentID, orgID
 // mapToAuthResource converts a database row map to AuthResource
 func mapToAuthResource(row map[string]interface{}) *model.AuthResource {
 	authResource := &model.AuthResource{}
-	
+
 	if v, ok := row["AUTH_ID"].(string); ok {
 		authResource.AuthID = v
 	}
@@ -224,7 +229,7 @@ func mapToAuthResource(row map[string]interface{}) *model.AuthResource {
 	if v, ok := row["ORG_ID"].(string); ok {
 		authResource.OrgID = v
 	}
-	
+
 	return authResource
 }
 
@@ -234,13 +239,34 @@ func executeTransaction(dbClient provider.DBClientInterface, queries []func(tx d
 	if err != nil {
 		return err
 	}
-	
+
 	for _, query := range queries {
 		if err := query(tx); err != nil {
 			tx.Rollback()
 			return err
 		}
 	}
-	
+
 	return tx.Commit()
+}
+
+// CreateWithTx creates an auth resource within a transaction
+func (s *store) CreateWithTx(ctx context.Context, tx *database.Tx, authResource *model.AuthResource) error {
+	_, err := tx.ExecContext(ctx, QueryCreateAuthResource.Query,
+		authResource.AuthID,
+		authResource.ConsentID,
+		authResource.AuthType,
+		authResource.UserID,
+		authResource.AuthStatus,
+		authResource.UpdatedTime,
+		authResource.Resources,
+		authResource.OrgID,
+	)
+	return err
+}
+
+// UpdateAllStatusByConsentIDWithTx updates all auth resource statuses for a consent within a transaction
+func (s *store) UpdateAllStatusByConsentIDWithTx(ctx context.Context, tx *database.Tx, consentID, orgID, status string, updatedTime int64) error {
+	_, err := tx.ExecContext(ctx, QueryUpdateAllStatusByConsentID.Query, status, updatedTime, consentID, orgID)
+	return err
 }

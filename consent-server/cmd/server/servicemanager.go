@@ -6,6 +6,7 @@ import (
 	"github.com/wso2/consent-management-api/internal/authresource"
 	"github.com/wso2/consent-management-api/internal/consent"
 	"github.com/wso2/consent-management-api/internal/consentpurpose"
+	"github.com/wso2/consent-management-api/internal/system/database"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
 	"github.com/wso2/consent-management-api/internal/system/log"
 )
@@ -22,19 +23,24 @@ var (
 func registerServices(
 	mux *http.ServeMux,
 	dbClient provider.DBClientInterface,
+	db *database.DB,
 ) {
 	logger := log.GetLogger()
 
-	// Initialize AuthResource module
-	authResourceService = authresource.Initialize(mux, dbClient)
+	// Initialize AuthResource module (returns service and store)
+	// Store is used by consent module for cross-module transactions
+	var authStore consent.AuthResourceStore
+	authResourceService, authStore = authresource.Initialize(mux, dbClient)
 	logger.Info("AuthResource module initialized")
 
-	// Initialize ConsentPurpose module
-	consentPurposeService = consentpurpose.Initialize(mux, dbClient)
+	// Initialize ConsentPurpose module (returns service and store)
+	// Store is used by consent module for cross-module transactions
+	var purposeStore consent.ConsentPurposeStore
+	consentPurposeService, purposeStore = consentpurpose.Initialize(mux, dbClient)
 	logger.Info("ConsentPurpose module initialized")
 
-	// Initialize Consent module
-	consentService = consent.Initialize(mux, dbClient)
+	// Initialize Consent module (needs stores from other modules for transactions)
+	consentService = consent.Initialize(mux, dbClient, db, authStore, purposeStore)
 	logger.Info("Consent module initialized")
 
 	// Register health check endpoint

@@ -1939,6 +1939,41 @@ This refactoring transforms consent-server from a **traditional layered architec
 
 ---
 
+## TODO: Swagger API Compliance
+
+### Remaining Endpoints to Implement
+
+**Priority: High**
+- [ ] **GET /consents/attributes** - Search consents by attribute key/value
+  - Query params: `key` (required), `value` (optional)
+  - Returns: List of consent IDs matching the attribute criteria
+  
+- [ ] **POST /consents/validate** - Validate consent for authorization
+  - Validates if a consent is valid for a specific authorization request
+  - Used by resource servers to verify consent validity
+
+- [ ] **POST /consent-purposes/validate** - Validate purpose type/value
+  - Validates purpose attribute values against registered type handlers
+  - Used during consent creation to ensure purpose data integrity
+
+**Priority: Medium**
+- [ ] Review and remove DELETE /consents/{consentId} if not in swagger spec
+
+### API Path Corrections Completed ✅
+- ✅ Fixed consent-purpose paths: `/purposes` → `/consent-purposes`
+- ✅ Fixed authorization paths: `/auth-resources` → `/authorizations`
+- ✅ Fixed path parameters: `{id}` → `{consentId}`, `{authId}` → `{authorizationId}`, `{id}` → `{purposeId}`
+- ✅ Fixed revoke endpoint: `PATCH /consents/{id}/status` → `POST /consents/{consentId}/revoke`
+
+### Request/Response Schema Validation
+- [ ] Compare implemented request/response models with swagger definitions
+- [ ] Ensure header names match exactly (org-id, TPP-client-id, etc.)
+- [ ] Validate error response format matches swagger
+- [ ] Verify pagination parameters and response structure
+- [ ] Check query parameter naming conventions
+
+---
+
 **Author:** GitHub Copilot  
 **Date:** December 2025  
-**Version:** 1.2
+**Version:** 1.3

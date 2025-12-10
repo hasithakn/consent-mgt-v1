@@ -3,12 +3,14 @@ package consentpurpose
 import (
 	"net/http"
 
+	"github.com/wso2/consent-management-api/internal/system/constants"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
 	"github.com/wso2/consent-management-api/internal/system/middleware"
 )
 
 // Initialize sets up the consent purpose module and registers routes
-func Initialize(mux *http.ServeMux, dbClient provider.DBClientInterface) ConsentPurposeService {
+// Returns both service and store (store is needed by consent module for transactions)
+func Initialize(mux *http.ServeMux, dbClient provider.DBClientInterface) (ConsentPurposeService, consentPurposeStore) {
 	// Create store, service, and handler
 	store := newConsentPurposeStore(dbClient)
 	service := newConsentPurposeService(store)
@@ -17,7 +19,7 @@ func Initialize(mux *http.ServeMux, dbClient provider.DBClientInterface) Consent
 	// Register routes with CORS middleware
 	registerRoutes(mux, handler)
 
-	return service
+	return service, store
 }
 
 // registerRoutes registers all consent purpose routes
@@ -28,18 +30,18 @@ func registerRoutes(mux *http.ServeMux, handler *consentPurposeHandler) {
 		AllowHeaders: []string{"Content-Type", "x-org-id", "Authorization"},
 	}
 
-	// POST /consent-purposes - Create purpose
-	mux.HandleFunc(middleware.WithCORS("POST /consent-purposes", handler.createPurpose, corsOptions))
+	// POST /api/v1/consent-purposes - Create purpose
+	mux.HandleFunc(middleware.WithCORS("POST "+constants.APIBasePath+"/consent-purposes", handler.createPurpose, corsOptions))
 
-	// GET /consent-purposes/{purposeId} - Get purpose by ID
-	mux.HandleFunc(middleware.WithCORS("GET /consent-purposes/{purposeId}", handler.getPurpose, corsOptions))
+	// GET /api/v1/consent-purposes/{purposeId} - Get purpose by ID
+	mux.HandleFunc(middleware.WithCORS("GET "+constants.APIBasePath+"/consent-purposes/{purposeId}", handler.getPurpose, corsOptions))
 
-	// GET /consent-purposes - List purposes
-	mux.HandleFunc(middleware.WithCORS("GET /consent-purposes", handler.listPurposes, corsOptions))
+	// GET /api/v1/consent-purposes - List purposes
+	mux.HandleFunc(middleware.WithCORS("GET "+constants.APIBasePath+"/consent-purposes", handler.listPurposes, corsOptions))
 
-	// PUT /consent-purposes/{purposeId} - Update purpose
-	mux.HandleFunc(middleware.WithCORS("PUT /consent-purposes/{purposeId}", handler.updatePurpose, corsOptions))
+	// PUT /api/v1/consent-purposes/{purposeId} - Update purpose
+	mux.HandleFunc(middleware.WithCORS("PUT "+constants.APIBasePath+"/consent-purposes/{purposeId}", handler.updatePurpose, corsOptions))
 
-	// DELETE /consent-purposes/{purposeId} - Delete purpose
-	mux.HandleFunc(middleware.WithCORS("DELETE /consent-purposes/{purposeId}", handler.deletePurpose, corsOptions))
+	// DELETE /api/v1/consent-purposes/{purposeId} - Delete purpose
+	mux.HandleFunc(middleware.WithCORS("DELETE "+constants.APIBasePath+"/consent-purposes/{purposeId}", handler.deletePurpose, corsOptions))
 }

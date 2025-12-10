@@ -4,8 +4,9 @@ import (
 	"context"
 
 	"github.com/wso2/consent-management-api/internal/consent/model"
-	"github.com/wso2/consent-management-api/internal/system/database/provider"
+	"github.com/wso2/consent-management-api/internal/system/database"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
+	"github.com/wso2/consent-management-api/internal/system/database/provider"
 )
 
 // DBQuery objects for consent operations
@@ -97,6 +98,11 @@ type consentStore interface {
 	// Status audit operations
 	CreateStatusAudit(ctx context.Context, audit *model.ConsentStatusAudit) error
 	GetStatusAuditByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentStatusAudit, error)
+
+	// Transactional operations
+	CreateWithTx(ctx context.Context, tx *database.Tx, consent *model.Consent) error
+	CreateAttributesWithTx(ctx context.Context, tx *database.Tx, attributes []model.ConsentAttribute) error
+	CreateStatusAuditWithTx(ctx context.Context, tx *database.Tx, audit *model.ConsentStatusAudit) error
 }
 
 // store implements the consentStore interface
@@ -367,4 +373,34 @@ func mapToStatusAudit(row map[string]interface{}) *model.ConsentStatusAudit {
 	}
 
 	return audit
+}
+
+// CreateWithTx creates a consent within a transaction
+func (s *store) CreateWithTx(ctx context.Context, tx *database.Tx, consent *model.Consent) error {
+	_, err := tx.ExecContext(ctx, QueryCreateConsent.Query,
+		consent.ConsentID, consent.CreatedTime, consent.UpdatedTime, consent.ClientID,
+		consent.ConsentType, consent.CurrentStatus, consent.ConsentFrequency,
+		consent.ValidityTime, consent.RecurringIndicator, consent.DataAccessValidityDuration,
+		consent.OrgID)
+	return err
+}
+
+// CreateAttributesWithTx creates consent attributes within a transaction
+func (s *store) CreateAttributesWithTx(ctx context.Context, tx *database.Tx, attributes []model.ConsentAttribute) error {
+	for _, attr := range attributes {
+		_, err := tx.ExecContext(ctx, QueryCreateAttribute.Query,
+			attr.ConsentID, attr.AttKey, attr.AttValue, attr.OrgID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CreateStatusAuditWithTx creates a status audit record within a transaction
+func (s *store) CreateStatusAuditWithTx(ctx context.Context, tx *database.Tx, audit *model.ConsentStatusAudit) error {
+	_, err := tx.ExecContext(ctx, QueryCreateStatusAudit.Query,
+		audit.StatusAuditID, audit.ConsentID, audit.CurrentStatus, audit.ActionTime,
+		audit.Reason, audit.ActionBy, audit.PreviousStatus, audit.OrgID)
+	return err
 }

@@ -249,10 +249,15 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 	return response, nil
 }
 
-// GetConsent retrieves a consent by ID
+// GetConsent retrieves a consent by ID with all related data
 func (consentService *consentService) GetConsent(ctx context.Context, consentID, orgID string) (*model.ConsentResponse, *serviceerror.ServiceError) {
 
+	// Get stores
 	consentStore := consentService.stores.Consent.(ConsentStore)
+	authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
+	purposeStore := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore)
+
+	// Get consent
 	consent, err := consentStore.GetByID(ctx, consentID, orgID)
 	if err != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
@@ -261,26 +266,21 @@ func (consentService *consentService) GetConsent(ctx context.Context, consentID,
 		return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("Consent with ID '%s' not found", consentID))
 	}
 
-	// Load attributes
-	_, err = consentStore.GetAttributesByConsentID(ctx, consentID, orgID)
-	if err != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+	// TODO : check consent expireation and handle accordingly.
+
+	// Retrieve all related data
+	attributes, _ := consentStore.GetAttributesByConsentID(ctx, consentID, orgID)
+	authResources, _ := authResourceStore.GetByConsentID(ctx, consentID, orgID)
+	purposeMappings, _ := purposeStore.GetMappingsByConsentID(ctx, consentID, orgID)
+
+	// Convert attributes slice to map
+	attributesMap := make(map[string]string)
+	for _, a := range attributes {
+		attributesMap[a.AttKey] = a.AttValue
 	}
 
-	// Build response
-	response := &model.ConsentResponse{
-		ConsentID:                  consent.ConsentID,
-		CreatedTime:                consent.CreatedTime,
-		UpdatedTime:                consent.UpdatedTime,
-		ClientID:                   consent.ClientID,
-		ConsentType:                consent.ConsentType,
-		CurrentStatus:              consent.CurrentStatus,
-		ConsentFrequency:           consent.ConsentFrequency,
-		ValidityTime:               consent.ValidityTime,
-		RecurringIndicator:         consent.RecurringIndicator,
-		DataAccessValidityDuration: consent.DataAccessValidityDuration,
-		OrgID:                      consent.OrgID,
-	}
+	// Build complete response with all related data
+	response := buildConsentResponse(consent, attributesMap, authResources, purposeMappings)
 
 	return response, nil
 }

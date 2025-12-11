@@ -2,7 +2,24 @@ package utils
 
 import (
 	"fmt"
+	"net/http"
+
+	"github.com/wso2/consent-management-api/internal/system/constants"
 )
+
+// Validate orgID and clientID in the request headers.
+func ValidateOrgIdAndClientIdIsPresent(r *http.Request) error {
+	orgID := r.Header.Get(constants.HeaderOrgID)
+	clientID := r.Header.Get(constants.HeaderTPPClientID)
+
+	if err := ValidateOrgID(orgID); err != nil {
+		return err
+	}
+	if err := ValidateClientID(clientID); err != nil {
+		return err
+	}
+	return nil
+}
 
 // ValidateOrgID validates organization ID
 func ValidateOrgID(orgID string) error {

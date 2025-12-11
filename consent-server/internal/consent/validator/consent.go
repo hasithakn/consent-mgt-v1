@@ -71,6 +71,23 @@ func ValidateConsentUpdateRequest(req model.ConsentAPIUpdateRequest) error {
 	return nil
 }
 
+// ValidateConsentGetRequest validates consent retrieval request parameters
+func ValidateConsentGetRequest(consentID, orgID string) error {
+	if consentID == "" {
+		return fmt.Errorf("consent ID cannot be empty")
+	}
+	if len(consentID) > 255 {
+		return fmt.Errorf("consent ID too long (max 255 characters)")
+	}
+	if orgID == "" {
+		return fmt.Errorf("organization ID cannot be empty")
+	}
+	if len(orgID) > 255 {
+		return fmt.Errorf("organization ID too long (max 255 characters)")
+	}
+	return nil
+}
+
 // DeriveConsentStatusFromAuthState maps an authorization status to a ConsentStatus when possible.
 // Returns the derived status and true when derivation succeeded. For unknown states it returns
 // empty string and false to indicate that the extension point should be invoked to resolve the final status.

@@ -9,6 +9,7 @@ import (
 	"github.com/wso2/consent-management-api/internal/system/constants"
 	"github.com/wso2/consent-management-api/internal/system/error/apierror"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
+	"github.com/wso2/consent-management-api/internal/system/utils"
 )
 
 type consentHandler struct {
@@ -27,14 +28,8 @@ func (h *consentHandler) createConsent(w http.ResponseWriter, r *http.Request) {
 	orgID := r.Header.Get(constants.HeaderOrgID)
 	clientID := r.Header.Get(constants.HeaderTPPClientID)
 
-	// TODO : can move some of these validations via consent-server/internal/consent/validator/consent.go if needed.
-	if orgID == "" {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Organization ID is required"))
-		return
-	}
-
-	if clientID == "" {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "TPP-client-id header is required"))
+	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
+		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}
 
@@ -62,19 +57,22 @@ func (h *consentHandler) getConsent(w http.ResponseWriter, r *http.Request) {
 	consentID := r.PathValue("consentId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
-	if orgID == "" {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Organization ID is required"))
+	// TODO: Is clientID validation needed?
+
+	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
+		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}
 
-	response, serviceErr := h.service.GetConsent(ctx, consentID, orgID)
+	consent, serviceErr := h.service.GetConsent(ctx, consentID, orgID)
 	if serviceErr != nil {
 		sendError(w, serviceErr)
 		return
 	}
 
+	apiResponse := consent.ToAPIResponse()
 	w.Header().Set(constants.HeaderContentType, "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(apiResponse)
 }
 
 // listConsents handles GET /consents

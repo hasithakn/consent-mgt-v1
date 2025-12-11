@@ -40,6 +40,7 @@ go.work
 
 # Build output
 /bin/
+/consent-server/bin/
 /build/
 /target/
 /dist/

@@ -4,22 +4,8 @@ import (
 	"fmt"
 
 	"github.com/wso2/consent-management-api/internal/authresource/model"
+	"github.com/wso2/consent-management-api/internal/system/config"
 )
-
-// todo : these auth status constance are also generic to app, lets move to common place.
-var validAuthStatuses = map[string]bool{
-	"AUTHORIZED":  true,
-	"REJECTED":    true,
-	"REVOKED":     true,
-	"SYS_REVOKED": true,
-}
-
-// todo : consent type validation is not needed, lets remove this
-var validAuthTypes = map[string]bool{
-	"accounts":       true,
-	"payments":       true,
-	"funds-confirms": true,
-}
 
 // ValidateAuthResourceCreateRequest validates auth resource creation request
 func ValidateAuthResourceCreateRequest(req model.ConsentAuthResourceCreateRequest, consentID, orgID string) error {
@@ -36,11 +22,6 @@ func ValidateAuthResourceCreateRequest(req model.ConsentAuthResourceCreateReques
 		return fmt.Errorf("authStatus is required")
 	}
 
-	// Validate auth type
-	if err := ValidateAuthType(req.AuthType); err != nil {
-		return err
-	}
-
 	// Validate auth status
 	if err := ValidateAuthStatus(req.AuthStatus); err != nil {
 		return err
@@ -49,18 +30,11 @@ func ValidateAuthResourceCreateRequest(req model.ConsentAuthResourceCreateReques
 	return nil
 }
 
-// ValidateAuthType validates authorization type
-func ValidateAuthType(authType string) error {
-	if !validAuthTypes[authType] {
-		return fmt.Errorf("invalid auth type: %s (valid: accounts, payments, funds-confirms)", authType)
-	}
-	return nil
-}
-
 // ValidateAuthStatus validates authorization status
 func ValidateAuthStatus(status string) error {
-	if !validAuthStatuses[status] {
-		return fmt.Errorf("invalid auth status: %s (valid: AUTHORIZED, REJECTED, REVOKED, SYS_REVOKED)", status)
+	cfg := config.Get().Consent
+	if !cfg.IsStatusAllowed(config.ConsentStatus(status)) {
+		return fmt.Errorf("invalid auth status: %s", status)
 	}
 	return nil
 }

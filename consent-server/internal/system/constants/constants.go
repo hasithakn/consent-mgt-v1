@@ -6,6 +6,7 @@ const (
 	ContentTypeHeaderName   = "Content-Type"
 	CorrelationIDHeaderName = "X-Correlation-ID"
 	OrgIDHeaderName         = "org-id"
+	TPPClientIDHeaderName   = "TPP-client-id"
 
 	// Content Types
 	ContentTypeJSON = "application/json"
@@ -23,5 +24,6 @@ const (
 	// Aliases for convenience
 	HeaderContentType = ContentTypeHeaderName
 	HeaderOrgID       = OrgIDHeaderName
+	HeaderTPPClientID = TPPClientIDHeaderName
 	ContentTypeJSON2  = ContentTypeJSON
 )

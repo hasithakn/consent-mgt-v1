@@ -38,7 +38,7 @@ func registerServices(
 	consent.Initialize(mux, storeRegistry)
 	logger.Info("Consent module initialized")
 
-	// todo : is it clean to have health check endpoint here?, check how thunder does it.
+	// TODO : is it clean to have health check endpoint here?, check how thunder does it.
 	// Register health check endpoint
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -47,7 +47,7 @@ func registerServices(
 	})
 }
 
-// todo : compare with tunder and see if we need to add anything below mwthod. if not needed we can remove it
+// TODO : compare with tunder and see if we need to add anything below mwthod. if not needed we can remove it
 // unregisterServices performs cleanup of all services during shutdown.
 // Currently a placeholder for future service cleanup needs.
 func unregisterServices() {

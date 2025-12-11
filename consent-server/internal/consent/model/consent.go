@@ -7,6 +7,7 @@ import (
 	"time"
 
 	authmodel "github.com/wso2/consent-management-api/internal/authresource/model"
+	"github.com/wso2/consent-management-api/internal/system/config"
 )
 
 // Consent represents the CONSENT table
@@ -120,6 +121,8 @@ type AuthorizationAPIRequest struct {
 
 // ToAuthResourceCreateRequest converts API request format to internal format
 func (req *AuthorizationAPIRequest) ToAuthResourceCreateRequest() *authmodel.ConsentAuthResourceCreateRequest {
+
+	AuthStatusMappings := config.Get().Consent.AuthStatusMappings
 	var userID *string
 	if req.UserID != "" {
 		userID = &req.UserID
@@ -128,7 +131,7 @@ func (req *AuthorizationAPIRequest) ToAuthResourceCreateRequest() *authmodel.Con
 	// Default status to "approved" if not provided
 	status := req.Status
 	if status == "" {
-		status = string(AuthStateCreated)
+		status = string(AuthStatusMappings.CreatedState) // Default to "created" state
 	}
 
 	return &authmodel.ConsentAuthResourceCreateRequest{
@@ -264,6 +267,8 @@ func (c *Consent) GetUpdatedTime() time.Time {
 // ToConsentCreateRequest converts API request format to internal format
 // Note: CurrentStatus will be set by the handler based on authorization states
 func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, error) {
+
+	AuthStatusMappings := config.Get().Consent.AuthStatusMappings
 	// Apply defaults and validate purposes
 	consentPurposes := make([]ConsentPurposeItem, len(req.ConsentPurpose))
 	for i, cp := range req.ConsentPurpose {
@@ -320,7 +325,7 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 			// Default status to "approved" if not provided
 			status := auth.Status
 			if status == "" {
-				status = string(AuthStateApproved)
+				status = string(AuthStatusMappings.ApprovedState)
 			}
 
 			createReq.AuthResources[i] = authmodel.ConsentAuthResourceCreateRequest{
@@ -338,6 +343,8 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 // ToConsentUpdateRequest converts API update request format to internal format
 // Note: CurrentStatus will be set by the handler based on authorization states
 func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequest, error) {
+
+	AuthStatusMappings := config.Get().Consent.AuthStatusMappings
 	// Apply defaults and validate purposes
 	var consentPurposes []ConsentPurposeItem
 	if req.ConsentPurpose != nil {
@@ -398,7 +405,7 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 			// Default status to "approved" if not provided
 			status := auth.Status
 			if status == "" {
-				status = string(AuthStateApproved)
+				status = string(AuthStatusMappings.ApprovedState)
 			}
 
 			updateReq.AuthResources[i] = authmodel.ConsentAuthResourceCreateRequest{

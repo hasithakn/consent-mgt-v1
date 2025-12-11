@@ -91,6 +91,11 @@ var (
 		ID:    "GET_IDS_BY_NAMES",
 		Query: "SELECT ID, NAME FROM CONSENT_PURPOSE WHERE ORG_ID = ? AND NAME IN (%s)",
 	}
+
+	QueryDeleteMappingsByConsentID = dbmodel.DBQuery{
+		ID:    "DELETE_MAPPINGS_BY_CONSENT_ID",
+		Query: "DELETE FROM CONSENT_PURPOSE_MAPPING WHERE CONSENT_ID = ? AND ORG_ID = ?",
+	}
 )
 
 // consentPurposeStore defines the interface for consent purpose data operations
@@ -113,6 +118,7 @@ type ConsentPurposeStore interface {
 	CreateAttributes(tx dbmodel.TxInterface, attributes []model.ConsentPurposeAttribute) error
 	DeleteAttributesByPurposeID(tx dbmodel.TxInterface, purposeID, orgID string) error
 	LinkPurposeToConsent(tx dbmodel.TxInterface, consentID, purposeID, orgID string, value *string, isUserApproved, isMandatory bool) error
+	DeleteMappingsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
 }
 
 // store implements the ConsentPurposeStore interface
@@ -505,4 +511,10 @@ func mapToConsentPurposeMapping(row map[string]interface{}) *model.ConsentPurpos
 	}
 
 	return mapping
+}
+
+// DeleteMappingsByConsentID deletes all consent purpose mappings for a consent within a transaction
+func (s *store) DeleteMappingsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
+	_, err := tx.Exec(QueryDeleteMappingsByConsentID.Query, consentID, orgID)
+	return err
 }

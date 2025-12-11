@@ -331,7 +331,7 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 			createReq.AuthResources[i] = authmodel.ConsentAuthResourceCreateRequest{
 				AuthType:   auth.Type,
 				UserID:     userID,
-				AuthStatus: status, // Store the status value
+				AuthStatus: status,
 				Resources:  auth.Resources,
 			}
 		}

@@ -265,6 +265,8 @@ func (s *store) GetStatusAuditByConsentID(ctx context.Context, consentID, orgID 
 
 // Mapper functions
 
+// mapToConsent converts a database row map to Consent
+// Note: DBClient normalizes column names to lowercase
 func mapToConsent(row map[string]interface{}) *model.Consent {
 	if row == nil {
 		return nil
@@ -272,44 +274,70 @@ func mapToConsent(row map[string]interface{}) *model.Consent {
 
 	consent := &model.Consent{}
 
-	if id, ok := row["CONSENT_ID"].(string); ok {
+	// Handle string columns (may be string or []byte from MySQL)
+	if id, ok := row["consent_id"].(string); ok {
 		consent.ConsentID = id
+	} else if id, ok := row["consent_id"].([]byte); ok {
+		consent.ConsentID = string(id)
 	}
-	if created, ok := row["CREATED_TIME"].(int64); ok {
+
+	if created, ok := row["created_time"].(int64); ok {
 		consent.CreatedTime = created
 	}
-	if updated, ok := row["UPDATED_TIME"].(int64); ok {
+
+	if updated, ok := row["updated_time"].(int64); ok {
 		consent.UpdatedTime = updated
 	}
-	if clientID, ok := row["CLIENT_ID"].(string); ok {
+
+	if clientID, ok := row["client_id"].(string); ok {
 		consent.ClientID = clientID
+	} else if clientID, ok := row["client_id"].([]byte); ok {
+		consent.ClientID = string(clientID)
 	}
-	if cType, ok := row["CONSENT_TYPE"].(string); ok {
+
+	if cType, ok := row["consent_type"].(string); ok {
 		consent.ConsentType = cType
+	} else if cType, ok := row["consent_type"].([]byte); ok {
+		consent.ConsentType = string(cType)
 	}
-	if status, ok := row["CURRENT_STATUS"].(string); ok {
+
+	if status, ok := row["current_status"].(string); ok {
 		consent.CurrentStatus = status
+	} else if status, ok := row["current_status"].([]byte); ok {
+		consent.CurrentStatus = string(status)
 	}
-	if freq, ok := row["CONSENT_FREQUENCY"].(int64); ok {
+
+	if freq, ok := row["consent_frequency"].(int64); ok {
 		freqInt := int(freq)
 		consent.ConsentFrequency = &freqInt
 	}
-	if valid, ok := row["VALIDITY_TIME"].(int64); ok {
+
+	if valid, ok := row["validity_time"].(int64); ok {
 		consent.ValidityTime = &valid
 	}
-	if recurring, ok := row["RECURRING_INDICATOR"].(bool); ok {
+
+	if recurring, ok := row["recurring_indicator"].(bool); ok {
 		consent.RecurringIndicator = &recurring
+	} else if recurring, ok := row["recurring_indicator"].(int64); ok {
+		recurringBool := recurring != 0
+		consent.RecurringIndicator = &recurringBool
 	}
-	if duration, ok := row["DATA_ACCESS_VALIDITY_DURATION"].(int64); ok {
+
+	if duration, ok := row["data_access_validity_duration"].(int64); ok {
 		consent.DataAccessValidityDuration = &duration
 	}
-	if orgID, ok := row["ORG_ID"].(string); ok {
+
+	if orgID, ok := row["org_id"].(string); ok {
 		consent.OrgID = orgID
+	} else if orgID, ok := row["org_id"].([]byte); ok {
+		consent.OrgID = string(orgID)
 	}
 
 	return consent
 }
 
+// mapToConsentAttribute converts a database row map to ConsentAttribute
+// Note: DBClient normalizes column names to lowercase
 func mapToConsentAttribute(row map[string]interface{}) *model.ConsentAttribute {
 	if row == nil {
 		return nil
@@ -317,22 +345,36 @@ func mapToConsentAttribute(row map[string]interface{}) *model.ConsentAttribute {
 
 	attr := &model.ConsentAttribute{}
 
-	if consentID, ok := row["CONSENT_ID"].(string); ok {
+	// Handle string columns (may be string or []byte from MySQL)
+	if consentID, ok := row["consent_id"].(string); ok {
 		attr.ConsentID = consentID
+	} else if consentID, ok := row["consent_id"].([]byte); ok {
+		attr.ConsentID = string(consentID)
 	}
-	if key, ok := row["ATT_KEY"].(string); ok {
+
+	if key, ok := row["att_key"].(string); ok {
 		attr.AttKey = key
+	} else if key, ok := row["att_key"].([]byte); ok {
+		attr.AttKey = string(key)
 	}
-	if value, ok := row["ATT_VALUE"].(string); ok {
+
+	if value, ok := row["att_value"].(string); ok {
 		attr.AttValue = value
+	} else if value, ok := row["att_value"].([]byte); ok {
+		attr.AttValue = string(value)
 	}
-	if orgID, ok := row["ORG_ID"].(string); ok {
+
+	if orgID, ok := row["org_id"].(string); ok {
 		attr.OrgID = orgID
+	} else if orgID, ok := row["org_id"].([]byte); ok {
+		attr.OrgID = string(orgID)
 	}
 
 	return attr
 }
 
+// mapToStatusAudit converts a database row map to ConsentStatusAudit
+// Note: DBClient normalizes column names to lowercase
 func mapToStatusAudit(row map[string]interface{}) *model.ConsentStatusAudit {
 	if row == nil {
 		return nil
@@ -340,29 +382,54 @@ func mapToStatusAudit(row map[string]interface{}) *model.ConsentStatusAudit {
 
 	audit := &model.ConsentStatusAudit{}
 
-	if id, ok := row["STATUS_AUDIT_ID"].(string); ok {
+	// Handle string columns (may be string or []byte from MySQL)
+	if id, ok := row["status_audit_id"].(string); ok {
 		audit.StatusAuditID = id
+	} else if id, ok := row["status_audit_id"].([]byte); ok {
+		audit.StatusAuditID = string(id)
 	}
-	if consentID, ok := row["CONSENT_ID"].(string); ok {
+
+	if consentID, ok := row["consent_id"].(string); ok {
 		audit.ConsentID = consentID
+	} else if consentID, ok := row["consent_id"].([]byte); ok {
+		audit.ConsentID = string(consentID)
 	}
-	if status, ok := row["CURRENT_STATUS"].(string); ok {
+
+	if status, ok := row["current_status"].(string); ok {
 		audit.CurrentStatus = status
+	} else if status, ok := row["current_status"].([]byte); ok {
+		audit.CurrentStatus = string(status)
 	}
-	if actionTime, ok := row["ACTION_TIME"].(int64); ok {
+
+	if actionTime, ok := row["action_time"].(int64); ok {
 		audit.ActionTime = actionTime
 	}
-	if reason, ok := row["REASON"].(string); ok {
+
+	if reason, ok := row["reason"].(string); ok {
 		audit.Reason = &reason
+	} else if reason, ok := row["reason"].([]byte); ok {
+		reasonStr := string(reason)
+		audit.Reason = &reasonStr
 	}
-	if actionBy, ok := row["ACTION_BY"].(string); ok {
+
+	if actionBy, ok := row["action_by"].(string); ok {
 		audit.ActionBy = &actionBy
+	} else if actionBy, ok := row["action_by"].([]byte); ok {
+		actionByStr := string(actionBy)
+		audit.ActionBy = &actionByStr
 	}
-	if prevStatus, ok := row["PREVIOUS_STATUS"].(string); ok {
+
+	if prevStatus, ok := row["previous_status"].(string); ok {
 		audit.PreviousStatus = &prevStatus
+	} else if prevStatus, ok := row["previous_status"].([]byte); ok {
+		prevStatusStr := string(prevStatus)
+		audit.PreviousStatus = &prevStatusStr
 	}
-	if orgID, ok := row["ORG_ID"].(string); ok {
+
+	if orgID, ok := row["org_id"].(string); ok {
 		audit.OrgID = orgID
+	} else if orgID, ok := row["org_id"].([]byte); ok {
+		audit.OrgID = string(orgID)
 	}
 
 	return audit

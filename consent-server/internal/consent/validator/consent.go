@@ -2,7 +2,9 @@ package validator
 
 import (
 	"fmt"
+	"strings"
 
+	authmodel "github.com/wso2/consent-management-api/internal/authresource/model"
 	authvalidator "github.com/wso2/consent-management-api/internal/authresource/validator"
 	"github.com/wso2/consent-management-api/internal/consent/model"
 	"github.com/wso2/consent-management-api/internal/system/config"
@@ -47,15 +49,6 @@ func ValidateConsentCreateRequest(req model.ConsentAPIRequest, clientID, orgID s
 	return nil
 }
 
-// ValidateConsentStatus validates consent status value
-func ValidateConsentStatus(status string) error {
-	cfg := config.Get().Consent
-	if !cfg.IsStatusAllowed(config.ConsentStatus(status)) {
-		return fmt.Errorf("invalid consent status: %s", status)
-	}
-	return nil
-}
-
 // ValidateConsentUpdateRequest validates consent update request (keeping for future use)
 func ValidateConsentUpdateRequest(req model.ConsentAPIUpdateRequest) error {
 	// At least one field must be provided
@@ -76,4 +69,50 @@ func ValidateConsentUpdateRequest(req model.ConsentAPIUpdateRequest) error {
 	}
 
 	return nil
+}
+
+// DeriveConsentStatusFromAuthState maps an authorization status to a ConsentStatus when possible.
+// Returns the derived status and true when derivation succeeded. For unknown states it returns
+// empty string and false to indicate that the extension point should be invoked to resolve the final status.
+func DeriveConsentStatusFromAuthState(authState string) (config.ConsentStatus, bool) {
+
+	consentConfig := config.Get().Consent
+
+	authStateString := strings.ToLower(strings.TrimSpace(authState))
+	if authStateString == "" {
+		// default when not defined: treat as approved -> active
+		return consentConfig.GetCreatedConsentStatus(), true
+	}
+	switch authStateString {
+	case strings.ToLower(string(consentConfig.GetApprovedAuthStatus())):
+		return consentConfig.GetActiveConsentStatus(), true
+	case strings.ToLower(string(consentConfig.GetRejectedAuthStatus())):
+		return consentConfig.GetRejectedConsentStatus(), true
+	case strings.ToLower(string(consentConfig.GetCreatedAuthStatus())):
+		return consentConfig.GetCreatedConsentStatus(), true
+	default:
+		// unknown/custom state - extension should resolve to one of known ConsentStatus values
+		return "", false
+	}
+}
+
+// EvaluateConsentStatus determines the consent status based on authorization resource states.
+// This is the main entry point for deriving consent status from auth resources.
+func EvaluateConsentStatus(authResources []authmodel.ConsentAuthResourceCreateRequest) string {
+	if len(authResources) == 0 {
+		// No auth resources - default to created status
+		return string(config.Get().Consent.GetCreatedConsentStatus())
+	}
+
+	// Derive status from the first authorization resource's status
+	// In a multi-auth scenario, you could implement more complex logic (e.g., all must be approved)
+	firstAuthStatus := authResources[0].AuthStatus
+
+	derivedStatus, ok := DeriveConsentStatusFromAuthState(firstAuthStatus)
+	if !ok {
+		// If derivation fails, default to created status
+		return string(config.Get().Consent.GetCreatedConsentStatus())
+	}
+
+	return string(derivedStatus)
 }

@@ -33,7 +33,8 @@ func ValidateAuthResourceCreateRequest(req model.ConsentAuthResourceCreateReques
 // ValidateAuthStatus validates authorization status
 func ValidateAuthStatus(status string) error {
 	cfg := config.Get().Consent
-	if !cfg.IsStatusAllowed(config.ConsentStatus(status)) {
+	if cfg.AuthStatusMappings.SystemExpiredState == status ||
+		cfg.AuthStatusMappings.SystemRevokedState == status {
 		return fmt.Errorf("invalid auth status: %s", status)
 	}
 	return nil

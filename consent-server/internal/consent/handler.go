@@ -44,15 +44,16 @@ func (h *consentHandler) createConsent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, serviceErr := h.service.CreateConsent(ctx, req, clientID, orgID)
+	consent, serviceErr := h.service.CreateConsent(ctx, req, clientID, orgID)
 	if serviceErr != nil {
 		sendError(w, serviceErr)
 		return
 	}
 
+	apiResponse := consent.ToAPIResponse()
 	w.Header().Set(constants.HeaderContentType, "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(apiResponse)
 }
 
 // getConsent handles GET /consents/{consentId}

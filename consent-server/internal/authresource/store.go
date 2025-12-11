@@ -201,32 +201,57 @@ func (s *store) UpdateAllStatusByConsentID(tx dbmodel.TxInterface, consentID, or
 }
 
 // mapToAuthResource converts a database row map to AuthResource
+// Note: DBClient normalizes column names to lowercase
 func mapToAuthResource(row map[string]interface{}) *model.AuthResource {
 	authResource := &model.AuthResource{}
 
-	if v, ok := row["AUTH_ID"].(string); ok {
+	// Handle string columns (may be string or []byte from MySQL)
+	if v, ok := row["auth_id"].(string); ok {
 		authResource.AuthID = v
+	} else if v, ok := row["auth_id"].([]byte); ok {
+		authResource.AuthID = string(v)
 	}
-	if v, ok := row["CONSENT_ID"].(string); ok {
+
+	if v, ok := row["consent_id"].(string); ok {
 		authResource.ConsentID = v
+	} else if v, ok := row["consent_id"].([]byte); ok {
+		authResource.ConsentID = string(v)
 	}
-	if v, ok := row["AUTH_TYPE"].(string); ok {
+
+	if v, ok := row["auth_type"].(string); ok {
 		authResource.AuthType = v
+	} else if v, ok := row["auth_type"].([]byte); ok {
+		authResource.AuthType = string(v)
 	}
-	if v, ok := row["USER_ID"].(string); ok {
+
+	if v, ok := row["user_id"].(string); ok {
 		authResource.UserID = &v
+	} else if v, ok := row["user_id"].([]byte); ok {
+		str := string(v)
+		authResource.UserID = &str
 	}
-	if v, ok := row["AUTH_STATUS"].(string); ok {
+
+	if v, ok := row["auth_status"].(string); ok {
 		authResource.AuthStatus = v
+	} else if v, ok := row["auth_status"].([]byte); ok {
+		authResource.AuthStatus = string(v)
 	}
-	if v, ok := row["UPDATED_TIME"].(int64); ok {
+
+	if v, ok := row["updated_time"].(int64); ok {
 		authResource.UpdatedTime = v
 	}
-	if v, ok := row["RESOURCES"].(string); ok {
+
+	if v, ok := row["resources"].(string); ok {
 		authResource.Resources = &v
+	} else if v, ok := row["resources"].([]byte); ok {
+		str := string(v)
+		authResource.Resources = &str
 	}
-	if v, ok := row["ORG_ID"].(string); ok {
+
+	if v, ok := row["org_id"].(string); ok {
 		authResource.OrgID = v
+	} else if v, ok := row["org_id"].([]byte); ok {
+		authResource.OrgID = string(v)
 	}
 
 	return authResource

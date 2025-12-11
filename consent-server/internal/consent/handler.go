@@ -163,8 +163,13 @@ func (h *consentHandler) revokeConsent(w http.ResponseWriter, r *http.Request) {
 	consentID := r.PathValue("consentId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
-	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Organization ID is required"))
+	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
+		return
+	}
+
+	if err := utils.ValidateConsentID(consentID); err != nil {
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}
 
@@ -174,10 +179,13 @@ func (h *consentHandler) revokeConsent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if serviceErr := h.service.UpdateConsentStatus(ctx, consentID, orgID, req); serviceErr != nil {
+	revokeResponse, serviceErr := h.service.RevokeConsent(ctx, consentID, orgID, req)
+	if serviceErr != nil {
 		utils.SendError(w, serviceErr)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	w.Header().Set(constants.HeaderContentType, "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(revokeResponse)
 }

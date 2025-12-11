@@ -42,5 +42,5 @@ func registerRoutes(mux *http.ServeMux, handler *consentHandler) {
 	mux.HandleFunc(middleware.WithCORS("PUT "+constants.APIBasePath+"/consents/{consentId}", handler.updateConsent, corsOpts))
 
 	// POST /api/v1/consents/{consentId}/revoke - Revoke consent
-	mux.HandleFunc(middleware.WithCORS("POST "+constants.APIBasePath+"/consents/{consentId}/revoke", handler.revokeConsent, corsOpts))
+	mux.HandleFunc(middleware.WithCORS("PUT "+constants.APIBasePath+"/consents/{consentId}/revoke", handler.revokeConsent, corsOpts))
 }

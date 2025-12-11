@@ -11,6 +11,7 @@ import (
 	"github.com/wso2/consent-management-api/internal/consent/validator"
 	"github.com/wso2/consent-management-api/internal/consentpurpose"
 	purposemodel "github.com/wso2/consent-management-api/internal/consentpurpose/model"
+	"github.com/wso2/consent-management-api/internal/system/config"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
 	"github.com/wso2/consent-management-api/internal/system/stores"
@@ -23,7 +24,7 @@ type ConsentService interface {
 	GetConsent(ctx context.Context, consentID, orgID string) (*model.ConsentResponse, *serviceerror.ServiceError)
 	ListConsents(ctx context.Context, orgID string, limit, offset int) ([]model.ConsentResponse, int, *serviceerror.ServiceError)
 	UpdateConsent(ctx context.Context, req model.ConsentAPIUpdateRequest, orgID, consentID string) (*model.ConsentResponse, *serviceerror.ServiceError)
-	UpdateConsentStatus(ctx context.Context, consentID, orgID string, req model.ConsentRevokeRequest) *serviceerror.ServiceError
+	RevokeConsent(ctx context.Context, consentID, orgID string, req model.ConsentRevokeRequest) (*model.ConsentRevokeResponse, *serviceerror.ServiceError)
 	GetConsentsByClientID(ctx context.Context, clientID, orgID string) ([]model.ConsentResponse, *serviceerror.ServiceError)
 }
 
@@ -584,23 +585,23 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 	return response, nil
 }
 
-// UpdateConsentStatus updates consent status and creates audit entry
-func (consentService *consentService) UpdateConsentStatus(ctx context.Context, consentID, orgID string, req model.ConsentRevokeRequest) *serviceerror.ServiceError {
+// RevokeConsent updates consent status and creates audit entry
+func (consentService *consentService) RevokeConsent(ctx context.Context, consentID, orgID string, req model.ConsentRevokeRequest) (*model.ConsentRevokeResponse, *serviceerror.ServiceError) {
 	// Validate action by
 	if req.ActionBy == "" {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, "ActionBy is required")
+		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "ActionBy is required")
 	}
 
-	status := "REVOKED"
+	revokedStatusName := config.Get().Consent.GetRevokedConsentStatus()
 
 	// Check if consent exists
 	store := consentService.stores.Consent.(ConsentStore)
 	existing, err := store.GetByID(ctx, consentID, orgID)
 	if err != nil {
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
 	}
 	if existing == nil {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("Consent with ID '%s' not found", consentID))
+		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("Consent with ID '%s' not found", consentID))
 	}
 
 	currentTime := utils.GetCurrentTimeMillis()
@@ -611,7 +612,7 @@ func (consentService *consentService) UpdateConsentStatus(ctx context.Context, c
 	audit := &model.ConsentStatusAudit{
 		StatusAuditID:  auditID,
 		ConsentID:      consentID,
-		CurrentStatus:  status,
+		CurrentStatus:  string(revokedStatusName),
 		ActionTime:     currentTime,
 		Reason:         &reason,
 		ActionBy:       &req.ActionBy,
@@ -619,20 +620,34 @@ func (consentService *consentService) UpdateConsentStatus(ctx context.Context, c
 		OrgID:          orgID,
 	}
 
-	// Execute transaction
+	// Get auth resource store for cascading status update
+	authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
+
+	// Execute transaction - update consent status, all auth resource statuses, and create audit
 	err = consentService.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
 		func(tx dbmodel.TxInterface) error {
-			return store.UpdateStatus(tx, consentID, orgID, status, currentTime)
+			return store.UpdateStatus(tx, consentID, orgID, string(revokedStatusName), currentTime)
+		},
+		func(tx dbmodel.TxInterface) error {
+			// Update all authorization statuses to SYS_REVOKED when consent is revoked
+			return authResourceStore.UpdateAllStatusByConsentID(tx, consentID, orgID, "SYS_REVOKED", currentTime)
 		},
 		func(tx dbmodel.TxInterface) error {
 			return store.CreateStatusAudit(tx, audit)
 		},
 	})
 	if err != nil {
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
 	}
 
-	return nil
+	// Build and return response
+	response := &model.ConsentRevokeResponse{
+		ActionTime:       currentTime / 1000, // Convert milliseconds to seconds
+		ActionBy:         req.ActionBy,
+		RevocationReason: req.RevocationReason,
+	}
+
+	return response, nil
 }
 
 // GetConsentsByClientID retrieves all consents for a client

@@ -110,14 +110,19 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 		})
 	}
 
-	// Add status audit
+	// Create audit record
 	auditID := utils.GenerateUUID()
+	actionBy := clientID // Client ID as the action initiator
+	reason := "Initial consent creation"
 	audit := &model.ConsentStatusAudit{
-		StatusAuditID: auditID,
-		ConsentID:     consentID,
-		CurrentStatus: consent.CurrentStatus,
-		ActionTime:    currentTime,
-		OrgID:         orgID,
+		StatusAuditID:  auditID,
+		ConsentID:      consentID,
+		CurrentStatus:  consent.CurrentStatus,
+		ActionTime:     currentTime,
+		Reason:         &reason,   // Pointer to string value
+		ActionBy:       &actionBy, // Pointer to string value
+		PreviousStatus: nil,       // nil = no previous status (first creation)
+		OrgID:          orgID,
 	}
 	queries = append(queries, func(tx dbmodel.TxInterface) error {
 		return consentStore.CreateStatusAudit(tx, audit)
@@ -224,6 +229,8 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 	if err := consentService.stores.ExecuteTransaction(queries); err != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create consent: %v", err))
 	}
+
+	// TODO : check consent expireation and handle accordingly.
 
 	// Retrieve related data after creation
 	authResources, _ := authResourceStore.GetByConsentID(ctx, consentID, orgID)

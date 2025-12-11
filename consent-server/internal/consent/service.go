@@ -25,7 +25,7 @@ type ConsentService interface {
 	ListConsents(ctx context.Context, orgID string, limit, offset int) ([]model.ConsentResponse, int, *serviceerror.ServiceError)
 	UpdateConsent(ctx context.Context, req model.ConsentAPIUpdateRequest, orgID, consentID string) (*model.ConsentResponse, *serviceerror.ServiceError)
 	RevokeConsent(ctx context.Context, consentID, orgID string, req model.ConsentRevokeRequest) (*model.ConsentRevokeResponse, *serviceerror.ServiceError)
-	GetConsentsByClientID(ctx context.Context, clientID, orgID string) ([]model.ConsentResponse, *serviceerror.ServiceError)
+	ValidateConsent(ctx context.Context, req model.ValidateRequest, orgID string) (*model.ValidateResponse, *serviceerror.ServiceError)
 }
 
 // consentService implements the ConsentService interface
@@ -650,37 +650,189 @@ func (consentService *consentService) RevokeConsent(ctx context.Context, consent
 	return response, nil
 }
 
-// GetConsentsByClientID retrieves all consents for a client
-func (consentService *consentService) GetConsentsByClientID(ctx context.Context, clientID, orgID string) ([]model.ConsentResponse, *serviceerror.ServiceError) {
-	if clientID == "" {
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "Client ID is required")
+// ValidateConsent validates a consent for data access
+func (consentService *consentService) ValidateConsent(ctx context.Context, req model.ValidateRequest, orgID string) (*model.ValidateResponse, *serviceerror.ServiceError) {
+	// Initialize response with invalid state
+	response := &model.ValidateResponse{
+		IsValid: false,
 	}
 
-	store := consentService.stores.Consent.(ConsentStore)
-	consents, err := store.GetByClientID(ctx, clientID, orgID)
+	// Validate request
+	if req.ConsentID == "" {
+		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "ConsentID is required")
+	}
+
+	// Get consent
+	consentStore := consentService.stores.Consent.(ConsentStore)
+	consent, err := consentStore.GetByID(ctx, req.ConsentID, orgID)
 	if err != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		// return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		response.ErrorCode = 500
+		response.ErrorMessage = "database_error"
+		response.ErrorDescription = "Database error while retrieving consent"
+	}
+	if consent == nil {
+		// return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("Consent with ID '%s' not found", req.ConsentID))
+		response.ErrorCode = 404
+		response.ErrorMessage = "not_found"
+		response.ErrorDescription = "Consent not found"
 	}
 
-	// Convert to responses
-	responses := make([]model.ConsentResponse, 0, len(consents))
-	for _, c := range consents {
-		responses = append(responses, model.ConsentResponse{
-			ConsentID:                  c.ConsentID,
-			CreatedTime:                c.CreatedTime,
-			UpdatedTime:                c.UpdatedTime,
-			ClientID:                   c.ClientID,
-			ConsentType:                c.ConsentType,
-			CurrentStatus:              c.CurrentStatus,
-			ConsentFrequency:           c.ConsentFrequency,
-			ValidityTime:               c.ValidityTime,
-			RecurringIndicator:         c.RecurringIndicator,
-			DataAccessValidityDuration: c.DataAccessValidityDuration,
-			OrgID:                      c.OrgID,
-		})
+	// Check if consent is expired and update status accordingly
+	expiredStatusName := string(config.Get().Consent.GetExpiredConsentStatus())
+	if consent.ValidityTime != nil && validator.IsConsentExpired(*consent.ValidityTime) {
+		// Update consent status to expired if not already expired
+		if consent.CurrentStatus != expiredStatusName {
+			if err := consentService.expireConsent(ctx, consent, orgID); err != nil {
+				// Log error but continue with validation
+				// The consent object is already updated in-memory by expireConsent
+			} else {
+				consent, err = consentStore.GetByID(ctx, req.ConsentID, orgID)
+			}
+		}
 	}
 
-	return responses, nil
+	// Check consent status - only active consents are valid
+	activeStatusName := string(config.Get().Consent.GetActiveConsentStatus())
+	if consent.CurrentStatus != activeStatusName && response.ErrorCode == 0 {
+		response.ErrorCode = 401
+		response.ErrorMessage = "invalid_consent_status"
+		response.ErrorDescription = fmt.Sprintf("Consent status is '%s', expected '%s'", consent.CurrentStatus, activeStatusName)
+	}
+
+	// If no errors, mark as valid
+	if response.ErrorCode == 0 {
+		response.IsValid = true
+	}
+
+	// Retrieve related data for consent information
+	authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
+	purposeStore := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore)
+
+	attributes, _ := consentStore.GetAttributesByConsentID(ctx, consent.ConsentID, orgID)
+	authResources, _ := authResourceStore.GetByConsentID(ctx, consent.ConsentID, orgID)
+	purposeMappings, _ := purposeStore.GetMappingsByConsentID(ctx, consent.ConsentID, orgID)
+
+	// Convert attributes slice to map
+	attributesMap := make(map[string]string)
+	for _, a := range attributes {
+		attributesMap[a.AttKey] = a.AttValue
+	}
+
+	// Build complete consent response
+	consentResponse := buildConsentResponse(consent, attributesMap, authResources, purposeMappings)
+
+	// Convert to API response and then to ValidateConsentAPIResponse (which excludes modifiedResponse)
+	apiResponse := consentService.EnrichedConsentAPIResponseWithPurposeDetails(ctx, consentResponse, orgID)
+	response.ConsentInformation = apiResponse.ToValidateConsentAPIResponse()
+
+	return response, nil
+}
+
+// expireConsent updates consent and all related auth resources to expired status
+func (consentService *consentService) expireConsent(ctx context.Context, consent *model.Consent, orgID string) error {
+	expiredStatusName := string(config.Get().Consent.GetExpiredConsentStatus())
+	currentTime := utils.GetCurrentTimeMillis()
+
+	// Create audit entry
+	auditID := utils.GenerateUUID()
+	reason := "Consent expired based on validityTime"
+	actionBy := "SYSTEM"
+	previousStatus := consent.CurrentStatus
+	audit := &model.ConsentStatusAudit{
+		StatusAuditID:  auditID,
+		ConsentID:      consent.ConsentID,
+		CurrentStatus:  expiredStatusName,
+		ActionTime:     currentTime,
+		Reason:         &reason,
+		ActionBy:       &actionBy,
+		PreviousStatus: &previousStatus,
+		OrgID:          orgID,
+	}
+
+	// Get stores for cascading status update
+	consentStore := consentService.stores.Consent.(ConsentStore)
+	authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
+
+	// Execute transaction - update consent status, all auth resource statuses, and create audit
+	err := consentService.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
+		func(tx dbmodel.TxInterface) error {
+			return consentStore.UpdateStatus(tx, consent.ConsentID, orgID, expiredStatusName, currentTime)
+		},
+		func(tx dbmodel.TxInterface) error {
+			// Update all authorization statuses to SYS_EXPIRED when consent expires
+			return authResourceStore.UpdateAllStatusByConsentID(tx, consent.ConsentID, orgID, "SYS_EXPIRED", currentTime)
+		},
+		func(tx dbmodel.TxInterface) error {
+			return consentStore.CreateStatusAudit(tx, audit)
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Update local consent object
+	consent.CurrentStatus = expiredStatusName
+	consent.UpdatedTime = currentTime
+
+	return nil
+}
+
+func (consentService *consentService) EnrichedConsentAPIResponseWithPurposeDetails(ctx context.Context, consent *model.ConsentResponse, orgID string) *model.ConsentAPIResponse {
+
+	purposeStore := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore)
+
+	if consent == nil {
+		return nil
+	}
+
+	// Use ToAPIResponse to build the complete base response structure
+	apiResponse := consent.ToAPIResponse()
+
+	// Enrich consent purposes with full purpose details (type, description, attributes)
+	if len(apiResponse.ConsentPurpose) > 0 {
+		enrichedPurposes := make([]model.ConsentPurposeItem, 0, len(apiResponse.ConsentPurpose))
+
+		for _, cp := range apiResponse.ConsentPurpose {
+			// Convert base purpose to enriched purpose
+			enrichedPurpose := cp
+
+			// Fetch full purpose details from consent purpose service
+			if cp.Name != "" {
+				purpose, err := purposeStore.GetByName(ctx, cp.Name, orgID)
+				if err == nil && purpose != nil {
+					// Enrich with type, description, and attributes from the purpose definition
+					enrichedPurpose.Type = &purpose.Type
+					enrichedPurpose.Description = purpose.Description
+
+					// Convert map[string]string to map[string]interface{}
+					if len(purpose.Attributes) > 0 {
+						attrs := make(map[string]interface{}, len(purpose.Attributes))
+						for k, v := range purpose.Attributes {
+							attrs[k] = v
+						}
+						enrichedPurpose.Attributes = attrs
+					} else {
+						enrichedPurpose.Attributes = map[string]interface{}{}
+					}
+				} else {
+					// If we can't fetch the purpose, add empty values for enriched fields
+					emptyType := ""
+					emptyDesc := ""
+					enrichedPurpose.Type = &emptyType
+					enrichedPurpose.Description = &emptyDesc
+					enrichedPurpose.Attributes = map[string]interface{}{}
+				}
+			}
+
+			enrichedPurposes = append(enrichedPurposes, enrichedPurpose)
+		}
+
+		// Set enriched purposes
+		apiResponse.ConsentPurpose = enrichedPurposes
+	}
+
+	return apiResponse
 }
 
 // buildConsentResponse constructs a complete ConsentResponse with related data

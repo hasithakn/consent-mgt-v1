@@ -3,6 +3,7 @@ package validator
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	authmodel "github.com/wso2/consent-management-api/internal/authresource/model"
 	authvalidator "github.com/wso2/consent-management-api/internal/authresource/validator"
@@ -132,4 +133,28 @@ func EvaluateConsentStatus(authResources []authmodel.ConsentAuthResourceCreateRe
 	}
 
 	return string(derivedStatus)
+}
+
+// IsExpired checks if a given validity time has expired
+func IsConsentExpired(validityTime int64) bool {
+	if validityTime == 0 {
+		return false // No expiry set
+	}
+
+	// Detect if timestamp is in seconds or milliseconds
+	// A reasonable cutoff: timestamps > 10^11 are likely in milliseconds
+	// This works until year 5138 in seconds (safely covers our use case)
+	const timestampCutoff = 100000000000 // 10^11
+
+	var validityTimeMillis int64
+	if validityTime < timestampCutoff {
+		// Timestamp is in seconds, convert to milliseconds
+		validityTimeMillis = validityTime * 1000
+	} else {
+		// Timestamp is already in milliseconds
+		validityTimeMillis = validityTime
+	}
+
+	currentTimeMillis := time.Now().UnixNano() / int64(time.Millisecond)
+	return currentTimeMillis > validityTimeMillis
 }

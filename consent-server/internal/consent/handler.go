@@ -189,3 +189,32 @@ func (h *consentHandler) revokeConsent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(revokeResponse)
 }
+
+// validateConsent handles POST /consents/validate
+func (h *consentHandler) validateConsent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	orgID := r.Header.Get(constants.HeaderOrgID)
+
+	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
+		return
+	}
+
+	var req model.ValidateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Invalid request body"))
+		return
+	}
+
+	// Call service to validate consent
+	response, serviceErr := h.service.ValidateConsent(ctx, req, orgID)
+	if serviceErr != nil {
+		utils.SendError(w, serviceErr)
+		return
+	}
+
+	// Always return HTTP 200, check isValid field in response
+	w.Header().Set(constants.HeaderContentType, "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}

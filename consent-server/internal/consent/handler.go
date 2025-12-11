@@ -7,7 +7,6 @@ import (
 
 	"github.com/wso2/consent-management-api/internal/consent/model"
 	"github.com/wso2/consent-management-api/internal/system/constants"
-	"github.com/wso2/consent-management-api/internal/system/error/apierror"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
 	"github.com/wso2/consent-management-api/internal/system/utils"
 )
@@ -29,19 +28,19 @@ func (h *consentHandler) createConsent(w http.ResponseWriter, r *http.Request) {
 	clientID := r.Header.Get(constants.HeaderTPPClientID)
 
 	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}
 
 	var req model.ConsentAPIRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Invalid request body"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Invalid request body"))
 		return
 	}
 
 	consent, serviceErr := h.service.CreateConsent(ctx, req, clientID, orgID)
 	if serviceErr != nil {
-		sendError(w, serviceErr)
+		utils.SendError(w, serviceErr)
 		return
 	}
 
@@ -60,13 +59,13 @@ func (h *consentHandler) getConsent(w http.ResponseWriter, r *http.Request) {
 	// TODO: Is clientID validation needed?
 
 	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}
 
 	consent, serviceErr := h.service.GetConsent(ctx, consentID, orgID)
 	if serviceErr != nil {
-		sendError(w, serviceErr)
+		utils.SendError(w, serviceErr)
 		return
 	}
 
@@ -81,7 +80,7 @@ func (h *consentHandler) listConsents(w http.ResponseWriter, r *http.Request) {
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Organization ID is required"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Organization ID is required"))
 		return
 	}
 
@@ -102,7 +101,7 @@ func (h *consentHandler) listConsents(w http.ResponseWriter, r *http.Request) {
 
 	consents, total, serviceErr := h.service.ListConsents(ctx, orgID, limit, offset)
 	if serviceErr != nil {
-		sendError(w, serviceErr)
+		utils.SendError(w, serviceErr)
 		return
 	}
 
@@ -126,19 +125,19 @@ func (h *consentHandler) updateConsent(w http.ResponseWriter, r *http.Request) {
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Organization ID is required"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Organization ID is required"))
 		return
 	}
 
 	var req model.ConsentAPIUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Invalid request body"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Invalid request body"))
 		return
 	}
 
 	response, serviceErr := h.service.UpdateConsent(ctx, consentID, req, orgID)
 	if serviceErr != nil {
-		sendError(w, serviceErr)
+		utils.SendError(w, serviceErr)
 		return
 	}
 
@@ -154,63 +153,20 @@ func (h *consentHandler) revokeConsent(w http.ResponseWriter, r *http.Request) {
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Organization ID is required"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Organization ID is required"))
 		return
 	}
 
 	var req model.ConsentRevokeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Invalid request body"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Invalid request body"))
 		return
 	}
 
 	if serviceErr := h.service.UpdateConsentStatus(ctx, consentID, orgID, req); serviceErr != nil {
-		sendError(w, serviceErr)
+		utils.SendError(w, serviceErr)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// TODO : can remove this as there no API related to this
-// deleteConsent handles DELETE /consents/{consentId}
-func (h *consentHandler) deleteConsent(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	consentID := r.PathValue("consentId")
-	orgID := r.Header.Get(constants.HeaderOrgID)
-
-	if orgID == "" {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Organization ID is required"))
-		return
-	}
-
-	if serviceErr := h.service.DeleteConsent(ctx, consentID, orgID); serviceErr != nil {
-		sendError(w, serviceErr)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// TODO : check if this is common and can move to system/error package.
-func sendError(w http.ResponseWriter, err *serviceerror.ServiceError) {
-	statusCode := http.StatusInternalServerError
-	if err.Type == serviceerror.ClientErrorType {
-		if err.Code == serviceerror.ResourceNotFoundError.Code {
-			statusCode = http.StatusNotFound
-		} else if err.Code == serviceerror.ConflictError.Code {
-			statusCode = http.StatusConflict
-		} else {
-			statusCode = http.StatusBadRequest
-		}
-	}
-
-	errorResponse := apierror.ErrorResponse{
-		Code:        err.Error,
-		Description: err.ErrorDescription,
-	}
-
-	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(errorResponse)
 }

@@ -24,7 +24,6 @@ type ConsentService interface {
 	ListConsents(ctx context.Context, orgID string, limit, offset int) ([]model.ConsentResponse, int, *serviceerror.ServiceError)
 	UpdateConsent(ctx context.Context, consentID string, req model.ConsentAPIUpdateRequest, orgID string) (*model.ConsentResponse, *serviceerror.ServiceError)
 	UpdateConsentStatus(ctx context.Context, consentID, orgID string, req model.ConsentRevokeRequest) *serviceerror.ServiceError
-	DeleteConsent(ctx context.Context, consentID, orgID string) *serviceerror.ServiceError
 	GetConsentsByClientID(ctx context.Context, clientID, orgID string) ([]model.ConsentResponse, *serviceerror.ServiceError)
 }
 
@@ -454,34 +453,6 @@ func (consentService *consentService) UpdateConsentStatus(ctx context.Context, c
 		},
 		func(tx dbmodel.TxInterface) error {
 			return store.CreateStatusAudit(tx, audit)
-		},
-	})
-	if err != nil {
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
-	}
-
-	return nil
-}
-
-// DeleteConsent deletes a consent
-func (consentService *consentService) DeleteConsent(ctx context.Context, consentID, orgID string) *serviceerror.ServiceError {
-	// Check if consent exists
-	store := consentService.stores.Consent.(ConsentStore)
-	existing, err := store.GetByID(ctx, consentID, orgID)
-	if err != nil {
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
-	}
-	if existing == nil {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("Consent with ID '%s' not found", consentID))
-	}
-
-	// Delete attributes and consent in transaction
-	err = consentService.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
-		func(tx dbmodel.TxInterface) error {
-			return store.DeleteAttributesByConsentID(tx, consentID, orgID)
-		},
-		func(tx dbmodel.TxInterface) error {
-			return store.Delete(tx, consentID, orgID)
 		},
 	})
 	if err != nil {

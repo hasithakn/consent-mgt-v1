@@ -8,6 +8,7 @@ import (
 	"github.com/wso2/consent-management-api/internal/consentpurpose/model"
 	"github.com/wso2/consent-management-api/internal/system/constants"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
+	"github.com/wso2/consent-management-api/internal/system/utils"
 )
 
 // consentPurposeHandler handles HTTP requests for consent purposes
@@ -28,19 +29,19 @@ func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Req
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
 		return
 	}
 
 	var req model.CreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
 		return
 	}
 
 	purpose, serviceErr := h.service.CreatePurpose(ctx, req, orgID)
 	if serviceErr != nil {
-		sendError(w, serviceErr)
+		utils.SendError(w, serviceErr)
 		return
 	}
 
@@ -64,13 +65,13 @@ func (h *consentPurposeHandler) getPurpose(w http.ResponseWriter, r *http.Reques
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
 		return
 	}
 
 	purpose, serviceErr := h.service.GetPurpose(ctx, purposeID, orgID)
 	if serviceErr != nil {
-		sendError(w, serviceErr)
+		utils.SendError(w, serviceErr)
 		return
 	}
 
@@ -92,7 +93,7 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
 		return
 	}
 
@@ -114,7 +115,7 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 
 	purposes, total, serviceErr := h.service.ListPurposes(ctx, orgID, limit, offset)
 	if serviceErr != nil {
-		sendError(w, serviceErr)
+		utils.SendError(w, serviceErr)
 		return
 	}
 
@@ -146,19 +147,19 @@ func (h *consentPurposeHandler) updatePurpose(w http.ResponseWriter, r *http.Req
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
 		return
 	}
 
 	var req model.UpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
 		return
 	}
 
 	purpose, serviceErr := h.service.UpdatePurpose(ctx, purposeID, req, orgID)
 	if serviceErr != nil {
-		sendError(w, serviceErr)
+		utils.SendError(w, serviceErr)
 		return
 	}
 
@@ -181,12 +182,12 @@ func (h *consentPurposeHandler) deletePurpose(w http.ResponseWriter, r *http.Req
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		sendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
 		return
 	}
 
 	if serviceErr := h.service.DeletePurpose(ctx, purposeID, orgID); serviceErr != nil {
-		sendError(w, serviceErr)
+		utils.SendError(w, serviceErr)
 		return
 	}
 
@@ -194,16 +195,3 @@ func (h *consentPurposeHandler) deletePurpose(w http.ResponseWriter, r *http.Req
 }
 
 // sendError sends an error response based on ServiceError type
-func sendError(w http.ResponseWriter, err *serviceerror.ServiceError) {
-	statusCode := http.StatusInternalServerError
-	if err.Type == serviceerror.ClientErrorType {
-		statusCode = http.StatusBadRequest
-		if err.Code == "CSE-4004" { // ResourceNotFoundError
-			statusCode = http.StatusNotFound
-		}
-	}
-
-	w.Header().Set(constants.HeaderContentType, "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(err)
-}

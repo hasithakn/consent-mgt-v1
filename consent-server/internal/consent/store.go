@@ -103,8 +103,8 @@ type store struct {
 	dbClient provider.DBClientInterface
 }
 
-// newConsentStore creates a new consent store
-func newConsentStore(dbClient provider.DBClientInterface) ConsentStore {
+// NewConsentStore creates a new consent store
+func NewConsentStore(dbClient provider.DBClientInterface) ConsentStore {
 	return &store{
 		dbClient: dbClient,
 	}

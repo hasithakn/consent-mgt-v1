@@ -11,13 +11,6 @@ import (
 	"github.com/wso2/consent-management-api/internal/system/stores"
 )
 
-// Package-level service references for cleanup during shutdown
-var (
-	authResourceService   authresource.AuthResourceServiceInterface
-	consentPurposeService consentpurpose.ConsentPurposeService
-	consentService        consent.ConsentService
-)
-
 // registerServices registers all consent management services with the provided HTTP multiplexer.
 // This follows Thunder's service manager pattern for clean separation of concerns.
 func registerServices(
@@ -26,30 +19,26 @@ func registerServices(
 ) {
 	logger := log.GetLogger()
 
-	// Create all stores first
-	consentStore := consent.NewStore(dbClient)
-	authResourceStore := authresource.NewStore(dbClient)
-	consentPurposeStore := consentpurpose.NewStore(dbClient)
-
 	// Create Store Registry with all stores
 	storeRegistry := stores.NewStoreRegistry(
 		dbClient,
-		consentStore,
-		authResourceStore,
-		consentPurposeStore,
+		consent.NewConsentStore(dbClient),
+		authresource.NewAuthResourceStore(dbClient),
+		consentpurpose.NewConsentPurposeStore(dbClient),
 	)
 	logger.Info("Store Registry initialized with all stores")
 
 	// Initialize all services with the registry
-	authResourceService = authresource.Initialize(mux, storeRegistry)
+	authresource.Initialize(mux, storeRegistry)
 	logger.Info("AuthResource module initialized")
 
-	consentPurposeService = consentpurpose.Initialize(mux, storeRegistry)
+	consentpurpose.Initialize(mux, storeRegistry)
 	logger.Info("ConsentPurpose module initialized")
 
-	consentService = consent.Initialize(mux, storeRegistry)
+	consent.Initialize(mux, storeRegistry)
 	logger.Info("Consent module initialized")
 
+	// todo : is it clean to have health check endpoint here?, check how thunder does it.
 	// Register health check endpoint
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -58,6 +47,7 @@ func registerServices(
 	})
 }
 
+// todo : compare with tunder and see if we need to add anything below mwthod. if not needed we can remove it
 // unregisterServices performs cleanup of all services during shutdown.
 // Currently a placeholder for future service cleanup needs.
 func unregisterServices() {

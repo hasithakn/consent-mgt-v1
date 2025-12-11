@@ -26,8 +26,7 @@ func main() {
 	// Initialize logger
 	logger := log.GetLogger()
 
-	logger.Info("Starting Consent Management API Server...",
-		log.String("version", version),
+	logger.Info("Starting Consent Management API Server...", log.String("version", version),
 		log.String("build_date", buildDate))
 
 	// Load configuration
@@ -39,16 +38,14 @@ func main() {
 		logger.Fatal("Failed to load configuration", log.Error(err))
 	}
 
-	logger.Info("Configuration loaded successfully",
-		log.String("config_path", configPath))
+	logger.Info("Configuration loaded successfully", log.String("config_path", configPath))
 
 	// Update log level from configuration
 	if cfg.Logging.Level != "" {
 		if err := log.SetLogLevel(cfg.Logging.Level); err != nil {
 			logger.Error("Failed to set log level from configuration", log.Error(err))
 		} else {
-			logger.Debug("Log level updated from configuration",
-				log.String("level", cfg.Logging.Level))
+			logger.Debug("Log level updated from configuration", log.String("level", cfg.Logging.Level))
 		}
 	}
 

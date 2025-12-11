@@ -85,8 +85,8 @@ type store struct {
 	dbClient provider.DBClientInterface
 }
 
-// newAuthResourceStore creates a new auth resource store
-func newAuthResourceStore(dbClient provider.DBClientInterface) AuthResourceStore {
+// NewAuthResourceStore creates a new auth resource store
+func NewAuthResourceStore(dbClient provider.DBClientInterface) AuthResourceStore {
 	return &store{
 		dbClient: dbClient,
 	}

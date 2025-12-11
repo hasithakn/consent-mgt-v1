@@ -25,8 +25,10 @@ func newConsentHandler(service ConsentService) *consentHandler {
 func (h *consentHandler) createConsent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
+	// todo :  better to have constance for "TPP-client-id" header in consent-server/internal/system/constants/constants.go and use that in all usecases.
 	clientID := r.Header.Get("TPP-client-id")
 
+	// todo : can move some of these validations via consent-server/internal/consent/validator/consent.go if needed.
 	if orgID == "" {
 		sendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "Organization ID is required"))
 		return
@@ -172,6 +174,7 @@ func (h *consentHandler) revokeConsent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// todo : can remove this as there no API related to this
 // deleteConsent handles DELETE /consents/{consentId}
 func (h *consentHandler) deleteConsent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -191,6 +194,7 @@ func (h *consentHandler) deleteConsent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// todo : check if this is common and can move to system/error package.
 func sendError(w http.ResponseWriter, err *serviceerror.ServiceError) {
 	statusCode := http.StatusInternalServerError
 	if err.Type == serviceerror.ClientErrorType {

@@ -6,6 +6,7 @@ import (
 	"github.com/wso2/consent-management-api/internal/authresource/model"
 )
 
+// todo : these auth status constance are also generic to app, lets move to common place.
 var validAuthStatuses = map[string]bool{
 	"AUTHORIZED":  true,
 	"REJECTED":    true,
@@ -13,6 +14,7 @@ var validAuthStatuses = map[string]bool{
 	"SYS_REVOKED": true,
 }
 
+// todo : consent type validation is not needed, lets remove this
 var validAuthTypes = map[string]bool{
 	"accounts":       true,
 	"payments":       true,

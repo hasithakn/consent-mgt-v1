@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	authmodel "github.com/wso2/consent-management-api/internal/authresource/model"
 )
 
 // Consent represents the CONSENT table
@@ -117,7 +119,7 @@ type AuthorizationAPIRequest struct {
 }
 
 // ToAuthResourceCreateRequest converts API request format to internal format
-func (req *AuthorizationAPIRequest) ToAuthResourceCreateRequest() *ConsentAuthResourceCreateRequest {
+func (req *AuthorizationAPIRequest) ToAuthResourceCreateRequest() *authmodel.ConsentAuthResourceCreateRequest {
 	var userID *string
 	if req.UserID != "" {
 		userID = &req.UserID
@@ -129,7 +131,7 @@ func (req *AuthorizationAPIRequest) ToAuthResourceCreateRequest() *ConsentAuthRe
 		status = string(AuthStateCreated)
 	}
 
-	return &ConsentAuthResourceCreateRequest{
+	return &authmodel.ConsentAuthResourceCreateRequest{
 		AuthType:   req.Type,
 		UserID:     userID,
 		AuthStatus: status, // Store the status value in AuthStatus field
@@ -146,13 +148,13 @@ type AuthorizationAPIUpdateRequest struct {
 }
 
 // ToAuthResourceUpdateRequest converts API update request format to internal format
-func (req *AuthorizationAPIUpdateRequest) ToAuthResourceUpdateRequest() *ConsentAuthResourceUpdateRequest {
+func (req *AuthorizationAPIUpdateRequest) ToAuthResourceUpdateRequest() *authmodel.ConsentAuthResourceUpdateRequest {
 	var userID *string
 	if req.UserID != "" {
 		userID = &req.UserID
 	}
 
-	return &ConsentAuthResourceUpdateRequest{
+	return &authmodel.ConsentAuthResourceUpdateRequest{
 		AuthStatus: req.Status,
 		UserID:     userID,
 		Resources:  req.Resources,
@@ -174,46 +176,46 @@ type ConsentAPIUpdateRequest struct {
 
 // ConsentCreateRequest represents the internal request payload for creating a consent
 type ConsentCreateRequest struct {
-	ConsentPurpose             []ConsentPurposeItem               `json:"consentPurpose" binding:"required"`
-	ConsentType                string                             `json:"consentType" binding:"required"`
-	CurrentStatus              string                             `json:"currentStatus" binding:"required"`
-	ConsentFrequency           *int                               `json:"consentFrequency,omitempty"`
-	ValidityTime               *int64                             `json:"validityTime,omitempty"`
-	RecurringIndicator         *bool                              `json:"recurringIndicator,omitempty"`
-	DataAccessValidityDuration *int64                             `json:"dataAccessValidityDuration,omitempty"`
-	Attributes                 map[string]string                  `json:"attributes,omitempty"`
-	AuthResources              []ConsentAuthResourceCreateRequest `json:"authResources,omitempty"`
+	ConsentPurpose             []ConsentPurposeItem                         `json:"consentPurpose" binding:"required"`
+	ConsentType                string                                       `json:"consentType" binding:"required"`
+	CurrentStatus              string                                       `json:"currentStatus" binding:"required"`
+	ConsentFrequency           *int                                         `json:"consentFrequency,omitempty"`
+	ValidityTime               *int64                                       `json:"validityTime,omitempty"`
+	RecurringIndicator         *bool                                        `json:"recurringIndicator,omitempty"`
+	DataAccessValidityDuration *int64                                       `json:"dataAccessValidityDuration,omitempty"`
+	Attributes                 map[string]string                            `json:"attributes,omitempty"`
+	AuthResources              []authmodel.ConsentAuthResourceCreateRequest `json:"authResources,omitempty"`
 }
 
 // ConsentUpdateRequest represents the request payload for updating a consent
 type ConsentUpdateRequest struct {
-	ConsentPurpose             []ConsentPurposeItem               `json:"consentPurpose,omitempty"`
-	ConsentType                string                             `json:"consentType,omitempty"`
-	CurrentStatus              string                             `json:"currentStatus,omitempty"`
-	ConsentFrequency           *int                               `json:"consentFrequency,omitempty"`
-	ValidityTime               *int64                             `json:"validityTime,omitempty"`
-	RecurringIndicator         *bool                              `json:"recurringIndicator,omitempty"`
-	DataAccessValidityDuration *int64                             `json:"dataAccessValidityDuration,omitempty"`
-	Attributes                 map[string]string                  `json:"attributes,omitempty"`
-	AuthResources              []ConsentAuthResourceCreateRequest `json:"authResources,omitempty"`
+	ConsentPurpose             []ConsentPurposeItem                         `json:"consentPurpose,omitempty"`
+	ConsentType                string                                       `json:"consentType,omitempty"`
+	CurrentStatus              string                                       `json:"currentStatus,omitempty"`
+	ConsentFrequency           *int                                         `json:"consentFrequency,omitempty"`
+	ValidityTime               *int64                                       `json:"validityTime,omitempty"`
+	RecurringIndicator         *bool                                        `json:"recurringIndicator,omitempty"`
+	DataAccessValidityDuration *int64                                       `json:"dataAccessValidityDuration,omitempty"`
+	Attributes                 map[string]string                            `json:"attributes,omitempty"`
+	AuthResources              []authmodel.ConsentAuthResourceCreateRequest `json:"authResources,omitempty"`
 }
 
 // ConsentResponse represents the response after consent creation/retrieval
 type ConsentResponse struct {
-	ConsentID                  string                `json:"consentId"`
-	ConsentPurpose             []ConsentPurposeItem  `json:"consentPurpose,omitempty"`
-	CreatedTime                int64                 `json:"createdTime"`
-	UpdatedTime                int64                 `json:"updatedTime"`
-	ClientID                   string                `json:"clientId"`
-	ConsentType                string                `json:"consentType"`
-	CurrentStatus              string                `json:"currentStatus"`
-	ConsentFrequency           *int                  `json:"consentFrequency,omitempty"`
-	ValidityTime               *int64                `json:"validityTime,omitempty"`
-	RecurringIndicator         *bool                 `json:"recurringIndicator,omitempty"`
-	DataAccessValidityDuration *int64                `json:"dataAccessValidityDuration,omitempty"`
-	OrgID                      string                `json:"orgId"`
-	Attributes                 map[string]string     `json:"attributes,omitempty"`
-	AuthResources              []ConsentAuthResource `json:"authResources,omitempty"`
+	ConsentID                  string                          `json:"consentId"`
+	ConsentPurpose             []ConsentPurposeItem            `json:"consentPurpose,omitempty"`
+	CreatedTime                int64                           `json:"createdTime"`
+	UpdatedTime                int64                           `json:"updatedTime"`
+	ClientID                   string                          `json:"clientId"`
+	ConsentType                string                          `json:"consentType"`
+	CurrentStatus              string                          `json:"currentStatus"`
+	ConsentFrequency           *int                            `json:"consentFrequency,omitempty"`
+	ValidityTime               *int64                          `json:"validityTime,omitempty"`
+	RecurringIndicator         *bool                           `json:"recurringIndicator,omitempty"`
+	DataAccessValidityDuration *int64                          `json:"dataAccessValidityDuration,omitempty"`
+	OrgID                      string                          `json:"orgId"`
+	Attributes                 map[string]string               `json:"attributes,omitempty"`
+	AuthResources              []authmodel.ConsentAuthResource `json:"authResources,omitempty"`
 }
 
 // ConsentSearchParams represents search parameters for consent queries
@@ -308,7 +310,7 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 
 	// Map authorizations to auth resources
 	if len(req.Authorizations) > 0 {
-		createReq.AuthResources = make([]ConsentAuthResourceCreateRequest, len(req.Authorizations))
+		createReq.AuthResources = make([]authmodel.ConsentAuthResourceCreateRequest, len(req.Authorizations))
 		for i, auth := range req.Authorizations {
 			var userID *string
 			if auth.UserID != "" {
@@ -321,7 +323,7 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 				status = string(AuthStateApproved)
 			}
 
-			createReq.AuthResources[i] = ConsentAuthResourceCreateRequest{
+			createReq.AuthResources[i] = authmodel.ConsentAuthResourceCreateRequest{
 				AuthType:   auth.Type,
 				UserID:     userID,
 				AuthStatus: status, // Store the status value
@@ -386,7 +388,7 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 	// Map authorizations to auth resources
 	// If Authorizations is not nil (even if empty), set AuthResources to indicate intent to update
 	if req.Authorizations != nil {
-		updateReq.AuthResources = make([]ConsentAuthResourceCreateRequest, len(req.Authorizations))
+		updateReq.AuthResources = make([]authmodel.ConsentAuthResourceCreateRequest, len(req.Authorizations))
 		for i, auth := range req.Authorizations {
 			var userID *string
 			if auth.UserID != "" {
@@ -399,7 +401,7 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 				status = string(AuthStateApproved)
 			}
 
-			updateReq.AuthResources[i] = ConsentAuthResourceCreateRequest{
+			updateReq.AuthResources[i] = authmodel.ConsentAuthResourceCreateRequest{
 				AuthType:   auth.Type,
 				UserID:     userID,
 				AuthStatus: status, // Store the status value

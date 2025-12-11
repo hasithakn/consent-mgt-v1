@@ -3,9 +3,11 @@ package validator
 import (
 	"fmt"
 
+	authvalidator "github.com/wso2/consent-management-api/internal/authresource/validator"
 	"github.com/wso2/consent-management-api/internal/consent/model"
 )
 
+// todo : these configs are genaric and consent-server/internal/consent/model/common.go alredy use this, lets move to common place and use it from both cases.
 var validConsentStatuses = map[string]bool{
 	"CREATED":    true,
 	"AUTHORIZED": true,
@@ -15,6 +17,7 @@ var validConsentStatuses = map[string]bool{
 	"EXPIRED":    true,
 }
 
+// todo : these consent types validation not needed lets remove this.
 var validConsentTypes = map[string]bool{
 	"accounts":       true,
 	"payments":       true,
@@ -44,12 +47,12 @@ func ValidateConsentCreateRequest(req model.ConsentAPIRequest, clientID, orgID s
 		if authReq.Type == "" {
 			return fmt.Errorf("authorizations[%d].type is required", i)
 		}
-		if err := ValidateAuthType(authReq.Type); err != nil {
+		if err := authvalidator.ValidateAuthType(authReq.Type); err != nil {
 			return fmt.Errorf("authorizations[%d]: %w", i, err)
 		}
 		// Status is optional and defaults to "approved" in the ToAuthResourceCreateRequest method
 		if authReq.Status != "" {
-			if err := ValidateAuthStatus(authReq.Status); err != nil {
+			if err := authvalidator.ValidateAuthStatus(authReq.Status); err != nil {
 				return fmt.Errorf("authorizations[%d]: %w", i, err)
 			}
 		}

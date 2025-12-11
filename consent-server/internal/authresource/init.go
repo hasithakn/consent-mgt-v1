@@ -4,17 +4,11 @@ import (
 	"net/http"
 
 	"github.com/wso2/consent-management-api/internal/system/constants"
-	"github.com/wso2/consent-management-api/internal/system/database/provider"
 	"github.com/wso2/consent-management-api/internal/system/middleware"
 	"github.com/wso2/consent-management-api/internal/system/stores"
 )
 
-// NewStore creates and returns a new auth resource store (exported for registry)
-func NewStore(dbClient provider.DBClientInterface) interface{} {
-	return newAuthResourceStore(dbClient)
-}
-
-// Initialize creates and wires up all auth resource components and registers routes
+// Initialize sets up the auth resource module and registers routes
 func Initialize(mux *http.ServeMux, registry *stores.StoreRegistry) AuthResourceServiceInterface {
 	// Create service and handler using the registry
 	service := newAuthResourceService(registry)

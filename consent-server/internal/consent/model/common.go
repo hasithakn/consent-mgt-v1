@@ -9,6 +9,8 @@ import (
 // AuthorizationState represents known authorization states produced by authorizations
 type AuthorizationState string
 
+// todo move below consent status constance to common constance package in system maybe?
+// todo genaric constance we can think to move to common place
 const (
 	// AuthStateCreated indicates the authorization is created but not yet approved/rejected
 	AuthStateCreated AuthorizationState = "CREATED"

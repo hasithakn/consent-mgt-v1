@@ -4,15 +4,9 @@ import (
 	"net/http"
 
 	"github.com/wso2/consent-management-api/internal/system/constants"
-	"github.com/wso2/consent-management-api/internal/system/database/provider"
 	"github.com/wso2/consent-management-api/internal/system/middleware"
 	"github.com/wso2/consent-management-api/internal/system/stores"
 )
-
-// NewStore creates and returns a new consent store (exported for registry)
-func NewStore(dbClient provider.DBClientInterface) interface{} {
-	return newConsentStore(dbClient)
-}
 
 // Initialize sets up the consent module and registers routes
 func Initialize(mux *http.ServeMux, registry *stores.StoreRegistry) ConsentService {

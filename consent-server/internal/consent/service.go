@@ -26,6 +26,7 @@ type ConsentService interface {
 	UpdateConsent(ctx context.Context, req model.ConsentAPIUpdateRequest, orgID, consentID string) (*model.ConsentResponse, *serviceerror.ServiceError)
 	RevokeConsent(ctx context.Context, consentID, orgID string, req model.ConsentRevokeRequest) (*model.ConsentRevokeResponse, *serviceerror.ServiceError)
 	ValidateConsent(ctx context.Context, req model.ValidateRequest, orgID string) (*model.ValidateResponse, *serviceerror.ServiceError)
+	SearchConsentsByAttribute(ctx context.Context, key, value, orgID string) (*model.ConsentAttributeSearchResponse, *serviceerror.ServiceError)
 }
 
 // consentService implements the ConsentService interface
@@ -872,4 +873,30 @@ func buildConsentResponse(
 		Attributes:                 attributes,
 		AuthResources:              authResourcesResp,
 	}
+}
+
+// SearchConsentsByAttribute searches for consents by attribute key and optionally value
+// If value is empty, it searches by key only
+func (consentService *consentService) SearchConsentsByAttribute(ctx context.Context, key, value, orgID string) (*model.ConsentAttributeSearchResponse, *serviceerror.ServiceError) {
+	consentStore := consentService.stores.Consent.(ConsentStore)
+
+	var consentIDs []string
+	var err error
+
+	// If value is provided and not empty, search by key-value pair
+	// Otherwise, search by key only
+	if value != "" {
+		consentIDs, err = consentStore.FindConsentIDsByAttribute(ctx, key, value, orgID)
+	} else {
+		consentIDs, err = consentStore.FindConsentIDsByAttributeKey(ctx, key, orgID)
+	}
+
+	if err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+	}
+
+	return &model.ConsentAttributeSearchResponse{
+		ConsentIDs: consentIDs,
+		Count:      len(consentIDs),
+	}, nil
 }

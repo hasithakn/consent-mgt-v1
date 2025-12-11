@@ -46,4 +46,7 @@ func registerRoutes(mux *http.ServeMux, handler *consentHandler) {
 
 	// POST /api/v1/consents/validate - Validate consent
 	mux.HandleFunc(middleware.WithCORS("POST "+constants.APIBasePath+"/consents/validate", handler.validateConsent, corsOpts))
+
+	// GET /api/v1/consents/attributes - Search consents by attribute
+	mux.HandleFunc(middleware.WithCORS("GET "+constants.APIBasePath+"/consents/attributes", handler.searchConsentsByAttribute, corsOpts))
 }

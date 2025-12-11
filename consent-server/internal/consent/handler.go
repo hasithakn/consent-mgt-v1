@@ -218,3 +218,35 @@ func (h *consentHandler) validateConsent(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
+
+// searchConsentsByAttribute handles GET /consents/attributes
+func (h *consentHandler) searchConsentsByAttribute(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	orgID := r.Header.Get(constants.HeaderOrgID)
+
+	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
+		return
+	}
+
+	// Get query parameters
+	key := r.URL.Query().Get("key")
+	value := r.URL.Query().Get("value")
+
+	// Validate that key parameter is present
+	if key == "" {
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "key parameter is required"))
+		return
+	}
+
+	// Call service to search consents by attribute
+	response, serviceErr := h.service.SearchConsentsByAttribute(ctx, key, value, orgID)
+	if serviceErr != nil {
+		utils.SendError(w, serviceErr)
+		return
+	}
+
+	w.Header().Set(constants.HeaderContentType, "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}

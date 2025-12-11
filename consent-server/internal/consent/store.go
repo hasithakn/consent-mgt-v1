@@ -66,6 +66,16 @@ var (
 		Query: "DELETE FROM CONSENT_ATTRIBUTE WHERE CONSENT_ID = ? AND ORG_ID = ?",
 	}
 
+	QueryFindConsentIDsByAttributeKey = dbmodel.DBQuery{
+		ID:    "FIND_CONSENT_IDS_BY_ATTRIBUTE_KEY",
+		Query: "SELECT DISTINCT CONSENT_ID FROM CONSENT_ATTRIBUTE WHERE ATT_KEY = ? AND ORG_ID = ? ORDER BY CONSENT_ID",
+	}
+
+	QueryFindConsentIDsByAttribute = dbmodel.DBQuery{
+		ID:    "FIND_CONSENT_IDS_BY_ATTRIBUTE",
+		Query: "SELECT DISTINCT CONSENT_ID FROM CONSENT_ATTRIBUTE WHERE ATT_KEY = ? AND ATT_VALUE = ? AND ORG_ID = ? ORDER BY CONSENT_ID",
+	}
+
 	// Status audit queries
 	QueryCreateStatusAudit = dbmodel.DBQuery{
 		ID:    "CREATE_STATUS_AUDIT",
@@ -87,6 +97,8 @@ type ConsentStore interface {
 	GetByClientID(ctx context.Context, clientID, orgID string) ([]model.Consent, error)
 	GetAttributesByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentAttribute, error)
 	GetStatusAuditByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentStatusAudit, error)
+	FindConsentIDsByAttributeKey(ctx context.Context, key, orgID string) ([]string, error)
+	FindConsentIDsByAttribute(ctx context.Context, key, value, orgID string) ([]string, error)
 
 	// Write operations - transactional with tx parameter
 	Create(tx dbmodel.TxInterface, consent *model.Consent) error
@@ -235,6 +247,54 @@ func (s *store) GetAttributesByConsentID(ctx context.Context, consentID, orgID s
 func (s *store) DeleteAttributesByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
 	_, err := tx.Exec(QueryDeleteAttributesByConsentID.Query, consentID, orgID)
 	return err
+}
+
+// FindConsentIDsByAttributeKey finds all consent IDs that have a specific attribute key
+func (s *store) FindConsentIDsByAttributeKey(ctx context.Context, key, orgID string) ([]string, error) {
+	rows, err := s.dbClient.Query(QueryFindConsentIDsByAttributeKey, key, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	consentIDs := make([]string, 0, len(rows))
+	for _, row := range rows {
+		// Try lowercase first (normalized), then uppercase (raw)
+		if consentID, ok := row["consent_id"].(string); ok {
+			consentIDs = append(consentIDs, consentID)
+		} else if consentID, ok := row["consent_id"].([]byte); ok {
+			consentIDs = append(consentIDs, string(consentID))
+		} else if consentID, ok := row["CONSENT_ID"].(string); ok {
+			consentIDs = append(consentIDs, consentID)
+		} else if consentID, ok := row["CONSENT_ID"].([]byte); ok {
+			consentIDs = append(consentIDs, string(consentID))
+		}
+	}
+
+	return consentIDs, nil
+}
+
+// FindConsentIDsByAttribute finds all consent IDs that have a specific attribute key-value pair
+func (s *store) FindConsentIDsByAttribute(ctx context.Context, key, value, orgID string) ([]string, error) {
+	rows, err := s.dbClient.Query(QueryFindConsentIDsByAttribute, key, value, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	consentIDs := make([]string, 0, len(rows))
+	for _, row := range rows {
+		// Try lowercase first (normalized), then uppercase (raw)
+		if consentID, ok := row["consent_id"].(string); ok {
+			consentIDs = append(consentIDs, consentID)
+		} else if consentID, ok := row["consent_id"].([]byte); ok {
+			consentIDs = append(consentIDs, string(consentID))
+		} else if consentID, ok := row["CONSENT_ID"].(string); ok {
+			consentIDs = append(consentIDs, consentID)
+		} else if consentID, ok := row["CONSENT_ID"].([]byte); ok {
+			consentIDs = append(consentIDs, string(consentID))
+		}
+	}
+
+	return consentIDs, nil
 }
 
 // CreateStatusAudit creates a status audit entry within a transaction

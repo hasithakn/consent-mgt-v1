@@ -20,6 +20,7 @@ type ConsentPurposeService interface {
 	ListPurposes(ctx context.Context, orgID string, limit, offset int) ([]model.ConsentPurpose, int, *serviceerror.ServiceError)
 	UpdatePurpose(ctx context.Context, purposeID string, req model.UpdateRequest, orgID string) (*model.ConsentPurpose, *serviceerror.ServiceError)
 	DeletePurpose(ctx context.Context, purposeID, orgID string) *serviceerror.ServiceError
+	ValidatePurposeNames(ctx context.Context, orgID string, purposeNames []string) ([]string, *serviceerror.ServiceError)
 }
 
 // consentPurposeService implements the ConsentPurposeService interface
@@ -341,6 +342,35 @@ func (s *consentPurposeService) DeletePurpose(ctx context.Context, purposeID, or
 	}
 
 	return nil
+}
+
+// ValidatePurposeNames validates a list of purpose names and returns only the valid ones
+func (s *consentPurposeService) ValidatePurposeNames(ctx context.Context, orgID string, purposeNames []string) ([]string, *serviceerror.ServiceError) {
+	// Validate input
+	if len(purposeNames) == 0 {
+		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "at least one purpose name must be provided")
+	}
+
+	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+
+	// Get purposes that exist
+	purposeIDMap, err := store.GetIDsByNames(ctx, purposeNames, orgID)
+	if err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to validate purpose names: %v", err))
+	}
+
+	// Extract valid names from the map
+	validNames := make([]string, 0, len(purposeIDMap))
+	for name := range purposeIDMap {
+		validNames = append(validNames, name)
+	}
+
+	// Return error if no valid purposes found
+	if len(validNames) == 0 {
+		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "no valid purposes found")
+	}
+
+	return validNames, nil
 }
 
 // validateCreateRequest validates create request

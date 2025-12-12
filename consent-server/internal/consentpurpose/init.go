@@ -37,6 +37,9 @@ func registerRoutes(mux *http.ServeMux, handler *consentPurposeHandler) {
 	// GET /api/v1/consent-purposes - List purposes
 	mux.HandleFunc(middleware.WithCORS("GET "+constants.APIBasePath+"/consent-purposes", handler.listPurposes, corsOptions))
 
+	// POST /api/v1/consent-purposes/validate - Validate purpose names
+	mux.HandleFunc(middleware.WithCORS("POST "+constants.APIBasePath+"/consent-purposes/validate", handler.validatePurposes, corsOptions))
+
 	// PUT /api/v1/consent-purposes/{purposeId} - Update purpose
 	mux.HandleFunc(middleware.WithCORS("PUT "+constants.APIBasePath+"/consent-purposes/{purposeId}", handler.updatePurpose, corsOptions))
 

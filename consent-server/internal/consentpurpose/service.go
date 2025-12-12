@@ -15,6 +15,7 @@ import (
 // ConsentPurposeService defines the exported service interface
 type ConsentPurposeService interface {
 	CreatePurpose(ctx context.Context, req model.CreateRequest, orgID string) (*model.ConsentPurpose, *serviceerror.ServiceError)
+	CreatePurposesInBatch(ctx context.Context, requests []model.CreateRequest, orgID string) ([]model.ConsentPurpose, *serviceerror.ServiceError)
 	GetPurpose(ctx context.Context, purposeID, orgID string) (*model.ConsentPurpose, *serviceerror.ServiceError)
 	ListPurposes(ctx context.Context, orgID string, limit, offset int) ([]model.ConsentPurpose, int, *serviceerror.ServiceError)
 	UpdatePurpose(ctx context.Context, purposeID string, req model.UpdateRequest, orgID string) (*model.ConsentPurpose, *serviceerror.ServiceError)
@@ -96,6 +97,96 @@ func (s *consentPurposeService) CreatePurpose(ctx context.Context, req model.Cre
 	}
 
 	return purpose, nil
+}
+
+// CreatePurposesInBatch creates multiple consent purposes in a single transaction
+// Either all purposes are created or none (atomic operation)
+func (s *consentPurposeService) CreatePurposesInBatch(ctx context.Context, requests []model.CreateRequest, orgID string) ([]model.ConsentPurpose, *serviceerror.ServiceError) {
+	// Validate inputs
+	if len(requests) == 0 {
+		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "at least one purpose must be provided")
+	}
+
+	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+
+	// Pre-validate all requests and check for duplicate names within the batch
+	namesSeen := make(map[string]bool)
+	for i, req := range requests {
+		// Validate request
+		if valErr := s.validateCreateRequest(req); valErr != nil {
+			// Return error with index information
+			return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("invalid request at index %d: %v", i, valErr))
+		}
+
+		// Check for duplicate names within the batch
+		if namesSeen[req.Name] {
+			return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("duplicate purpose name '%s' in request batch at index %d", req.Name, i))
+		}
+		namesSeen[req.Name] = true
+
+		// Check if purpose name already exists in database
+		exists, dbErr := store.CheckNameExists(ctx, req.Name, orgID)
+		if dbErr != nil {
+			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to validate purpose name at index %d: %v", i, dbErr))
+		}
+		if exists {
+			return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("purpose name '%s' already exists for this organization (at index %d)", req.Name, i))
+		}
+	}
+
+	// Prepare transaction operations
+	var queries []func(tx dbmodel.TxInterface) error
+	createdPurposes := make([]model.ConsentPurpose, 0, len(requests))
+
+	// Create all purposes within the transaction
+	for _, req := range requests {
+		purposeID := utils.GenerateUUID()
+		desc := req.Description
+
+		purpose := &model.ConsentPurpose{
+			ID:          purposeID,
+			Name:        req.Name,
+			Description: &desc,
+			Type:        req.Type,
+			OrgID:       orgID,
+			Attributes:  req.Attributes,
+		}
+
+		// Add purpose creation to transaction
+		purposeCopy := *purpose // Create a copy for the closure
+		queries = append(queries, func(tx dbmodel.TxInterface) error {
+			return store.Create(tx, &purposeCopy)
+		})
+
+		// Add attributes if provided
+		if len(req.Attributes) > 0 {
+			attributes := make([]model.ConsentPurposeAttribute, 0, len(req.Attributes))
+			for key, value := range req.Attributes {
+				attr := model.ConsentPurposeAttribute{
+					PurposeID: purposeID,
+					Key:       key,
+					Value:     value,
+					OrgID:     orgID,
+				}
+				attributes = append(attributes, attr)
+			}
+
+			// Capture attributes for this iteration
+			attrsCopy := attributes
+			queries = append(queries, func(tx dbmodel.TxInterface) error {
+				return store.CreateAttributes(tx, attrsCopy)
+			})
+		}
+
+		createdPurposes = append(createdPurposes, *purpose)
+	}
+
+	// Execute all operations in a single transaction
+	if err := s.stores.ExecuteTransaction(queries); err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create purposes in batch: %v", err))
+	}
+
+	return createdPurposes, nil
 }
 
 // GetPurpose retrieves a consent purpose by ID
@@ -191,7 +282,6 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 		attributes = make([]model.ConsentPurposeAttribute, 0, len(req.Attributes))
 		for key, value := range req.Attributes {
 			attr := model.ConsentPurposeAttribute{
-				ID:        utils.GenerateUUID(),
 				PurposeID: purposeID,
 				Key:       key,
 				Value:     value,

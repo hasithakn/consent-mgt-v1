@@ -23,34 +23,54 @@ func newConsentPurposeHandler(service ConsentPurposeService) *consentPurposeHand
 	}
 }
 
-// createPurpose handles POST /purposes
+// createPurpose handles POST /consent-purposes
+// Supports both single and batch creation (array input)
 func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
-	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+	// Validate required headers
+	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}
 
-	var req model.CreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// Decode as array of requests (batch creation)
+	var requests []model.CreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
 		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
 		return
 	}
 
-	purpose, serviceErr := h.service.CreatePurpose(ctx, req, orgID)
+	// Validate at least one purpose provided
+	if len(requests) == 0 {
+		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "at least one purpose must be provided"))
+		return
+	}
+
+	// Create purposes in batch (atomic transaction)
+	purposes, serviceErr := h.service.CreatePurposesInBatch(ctx, requests, orgID)
 	if serviceErr != nil {
 		utils.SendError(w, serviceErr)
 		return
 	}
 
-	response := model.Response{
-		ID:          purpose.ID,
-		Name:        purpose.Name,
-		Description: purpose.Description,
-		Type:        purpose.Type,
-		Attributes:  purpose.Attributes,
+	// Convert to response format
+	responses := make([]model.Response, 0, len(purposes))
+	for _, p := range purposes {
+		responses = append(responses, model.Response{
+			ID:          p.ID,
+			Name:        p.Name,
+			Description: p.Description,
+			Type:        p.Type,
+			Attributes:  p.Attributes,
+		})
+	}
+
+	// Return response with data wrapper
+	response := map[string]interface{}{
+		"data":    responses,
+		"message": "Consent purposes created successfully",
 	}
 
 	w.Header().Set(constants.HeaderContentType, "application/json")

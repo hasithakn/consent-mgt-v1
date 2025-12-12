@@ -53,7 +53,7 @@ var (
 
 	QueryCreateAttribute = dbmodel.DBQuery{
 		ID:    "CREATE_PURPOSE_ATTRIBUTE",
-		Query: "INSERT INTO CONSENT_PURPOSE_ATTRIBUTE (ID, PURPOSE_ID, ATTR_KEY, ATTR_VALUE, ORG_ID) VALUES (?, ?, ?, ?, ?)",
+		Query: "INSERT INTO CONSENT_PURPOSE_ATTRIBUTE (PURPOSE_ID, ATT_KEY, ATT_VALUE, ORG_ID) VALUES (?, ?, ?, ?)",
 	}
 
 	QueryGetAttributesByPurposeID = dbmodel.DBQuery{
@@ -228,7 +228,7 @@ func (s *store) CheckNameExists(ctx context.Context, name, orgID string) (bool, 
 func (s *store) CreateAttributes(tx dbmodel.TxInterface, attributes []model.ConsentPurposeAttribute) error {
 	for _, attr := range attributes {
 		_, err := tx.Exec(QueryCreateAttribute.Query,
-			attr.ID, attr.PurposeID, attr.Key, attr.Value, attr.OrgID)
+			attr.PurposeID, attr.Key, attr.Value, attr.OrgID)
 		if err != nil {
 			return err
 		}

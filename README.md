@@ -1,26 +1,24 @@
 # Consent Management API
 
-A RESTful API service for managing consents and consent purposes with support for dynamic attribute validation through pluggable type handlers.
+A high-performance RESTful API service for managing user consents, consent purposes, and authorization resources with organization-level multi-tenancy support.
 
 ## Features
 
-- **Consent Management**: Create, retrieve, update, revoke consents
-- **Consent Purposes**: Manage consent purposes with type-based validation
-  - String type: Simple string values (no mandatory attributes)
-  - JSON Schema type: Schema-based validation (requires `validationSchema`)
-  - Attribute type: Resource-based attributes (requires `resourcePath` and `jsonPath`)
-- **Authorization Resources**: Handle consent authorization resources
-- **Multi-tenancy**: Organization-level isolation with `org-id` header
-- **Extensible Type Handlers**: Pluggable architecture for custom purpose types
+- **Consent Management**: Create, retrieve, update, revoke, and validate consents
+- **Consent Purposes**: Define and manage consent purposes with type-based validation
+- **Authorization Resources**: Handle consent authorization resources with status tracking
+- **Attribute Search**: Search consents by custom attributes (key or key-value pairs)
+- **Status Auditing**: Complete audit trail for consent status changes
+- **Multi-tenancy**: Organization-level data isolation with `org-id` header
+- **Expiration Handling**: Automatic consent expiration with cascading status updates
 
 ## Technology Stack
 
 - **Go** 1.21+
-- **Web Framework**: Gin
+- **Web Framework**: net/http (standard library)
 - **Database**: MySQL 8.0+
-- **Database Driver**: sqlx
-- **Configuration**: Viper
-- **Testing**: Testify
+- **Architecture**: Clean architecture with layered design
+- **Transaction Management**: atomic operations
 
 ## Prerequisites
 
@@ -31,33 +29,43 @@ A RESTful API service for managing consents and consent purposes with support fo
 
 ```
 consent-mgt-v1/
-├── cmd/server/                    # Application entry point
-│   └── main.go
-├── internal/
-│   ├── models/                    # Data models & DTOs
-│   ├── dao/                       # Data Access Objects
-│   ├── service/                   # Business logic
-│   ├── handlers/                  # HTTP handlers
-│   ├── router/                    # Route definitions
-│   ├── purpose_type_handlers/     # Type handler registry
-│   │   ├── string_handler.go     # String type handler
-│   │   ├── json_schema_handler.go # JSON Schema type handler
-│   │   ├── attribute_handler.go  # Attribute type handler
-│   │   └── registry.go           # Handler registration
-│   ├── database/                  # Database connection
-│   ├── config/                    # Configuration
-│   └── utils/                     # Utilities
-├── configs/
-│   └── config.yaml               # Configuration file
-├── db_scripts/
-│   └── db_schema_mysql.sql       # Database schema
-├── integration-tests/            # Integration tests
+├── api/                                    # OpenAPI specifications
+│   ├── consent-management-API.yaml        # Consent API spec
+│   └── config-management-API.yaml         # Config API spec
+├── consent-server/                         # Main application
+│   ├── cmd/
+│   │   └── server/
+│   │       ├── main.go                    # Application entry point
+│   │       └── servicemanager.go          # Service initialization
+│   ├── internal/
+│   │   ├── consent/                       # Consent module
+│   │   │   ├── handler.go                # HTTP handlers
+│   │   │   ├── service.go                # Business logic
+│   │   │   ├── store.go                  # Data access layer
+│   │   │   ├── init.go                   # Route registration
+│   │   │   ├── model/                    # Domain models
+│   │   │   └── validator/                # Request validators
+│   │   ├── consentpurpose/               # Consent purpose module
+│   │   ├── authresource/                 # Auth resource module
+│   │   └── system/                       # Shared system components
+│   │       ├── config/                   # Configuration management
+│   │       ├── database/                 # Database client & transactions
+│   │       ├── error/                    # Error handling
+│   │       ├── middleware/               # HTTP middleware
+│   │       ├── stores/                   # Store registry
+│   │       └── utils/                    # Utilities
+│   ├── dbscripts/
+│   │   ├── db_schema_mysql.sql           # Consent tables schema
+│   │   └── db_schema_config_mysql.sql    # Config tables schema
+│   └── bin/                              # Build output directory
+├── tests/integration/                     # Integration tests
 │   └── api/
-│       ├── consent-purpose/      # 58 tests (CRUD + type handlers)
-│       ├── auth_resource_api_test.go
-│       ├── consent_api_test.go
-│       └── ...
-└── README.md
+│       ├── consent/                      # Consent API tests
+│       ├── consent-purpose/              # Purpose API tests
+│       └── auth_resource_api_test.go     # Auth resource tests
+├── build.sh                              # Build script
+├── start.sh                              # Server startup script
+└── version.txt                           # Version information
 ```
 
 ## Quick Start
@@ -66,93 +74,197 @@ consent-mgt-v1/
 
 ```bash
 # Create database
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS AAconsent_mgt_v3;"
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS consent_mgt;"
 
-# Import schema
-mysql -u root -p AAconsent_mgt_v3 < db_scripts/db_schema_mysql.sql
+# Import schemas
+mysql -u root -p consent_mgt < consent-server/dbscripts/db_schema_mysql.sql
+mysql -u root -p consent_mgt < consent-server/dbscripts/db_schema_config_mysql.sql
 ```
 
 ### 2. Configure Application
 
-Edit `configs/config.yaml`:
+Create configuration file at `consent-server/bin/repository/conf/deployment.yaml`:
 
 ```yaml
 server:
-  port: 3000
+  port: 9090
+  host: "0.0.0.0"
 
 database:
-  host: localhost
+  host: "localhost"
   port: 3306
-  user: root
-  password: your_password
-  database: AAconsent_mgt_v3
-  maxOpenConns: 25
-  maxIdleConns: 5
+  username: "root"
+  password: "your_password"
+  database: "consent_mgt"
+  max_open_connections: 25
+  max_idle_connections: 10
+  connection_max_lifetime_minutes: 5
+
+consent:
+  status:
+    active: "ACTIVE"
+    revoked: "REVOKED"
+    expired: "EXPIRED"
 ```
 
-### 3. Run the Server
+### 3. Build and Run
 
-**Option A: Run directly**
+**Using build.sh (Recommended)**
+
 ```bash
-go run cmd/server/main.go
+# Build the application
+./build.sh build
+
+# This creates:
+# - consent-server/bin/consent-server (binary)
+# - consent-server/bin/repository/conf/ (config directory)
+# - consent-server/bin/api/ (API specs)
+# - consent-server/bin/dbscripts/ (database scripts)
 ```
 
-**Option B: Build executable and run**
+**Using start.sh**
+
 ```bash
-# Build executable
-go build -o consent-api-server cmd/server/main.go
+# Run in normal mode
+cd bin
+./start.sh
 
-# Run with default config (configs/config.yaml)
-./consent-api-server
+# Run in debug mode (with remote debugging on port 2345)
+./start.sh --debug
 
-# Run with custom config
-./consent-api-server -config=/path/to/config.yaml
+# Run in debug mode with custom port
+./start.sh --debug --debug-port 3000
 ```
 
-Server starts at `http://localhost:3000`
+Server starts at `http://localhost:9090`
 
-Health check: `curl http://localhost:3000/health`
+Health check: `curl http://localhost:9090/health`
 
-## Testing
+## API Endpoints
 
-### Run All Integration Tests
+### Consent Management
+- `POST /api/v1/consents` - Create a new consent
+- `GET /api/v1/consents/{consentId}` - Retrieve consent details
+- `GET /api/v1/consents` - List consents (paginated)
+- `PUT /api/v1/consents/{consentId}` - Update consent
+- `PUT /api/v1/consents/{consentId}/revoke` - Revoke consent
+- `POST /api/v1/consents/validate` - Validate consent
+- `GET /api/v1/consents/attributes` - Search consents by attributes
+
+### Consent Purpose Management
+- `POST /api/v1/consent-purposes` - Create consent purpose
+- `POST /api/v1/consent-purposes/batch` - Batch create purposes
+- `GET /api/v1/consent-purposes/{purposeId}` - Get purpose details
+- `GET /api/v1/consent-purposes` - List purposes (paginated)
+- `PUT /api/v1/consent-purposes/{purposeId}` - Update purpose
+- `DELETE /api/v1/consent-purposes/{purposeId}` - Delete purpose
+
+### Authorization Resources
+- `POST /api/v1/auth-resources` - Create auth resource
+- `GET /api/v1/auth-resources/{authId}` - Get auth resource
+- `GET /api/v1/auth-resources` - List auth resources
+- `PUT /api/v1/auth-resources/{authId}` - Update auth resource
+- `DELETE /api/v1/auth-resources/{authId}` - Delete auth resource
+
+All requests require headers:
+- `org-id`: Organization identifier
+- `client-id`: Client application identifier
+
+## Development
+
+### Build from Source
 
 ```bash
-cd integration-tests
+# Navigate to server directory
+cd consent-server
+
+# Build binary
+go build -o bin/consent-server cmd/server/main.go
+
+# Run
+./bin/consent-server
+```
+
+### Run Tests
+
+```bash
+# Navigate to test directory
+cd tests/integration
+
+# Run all tests
 go test ./... -v
-```
 
-### Run Specific Test Suite
-
-```bash
-# Consent Purpose tests (58 tests)
+# Run specific module tests
+go test ./api/consent/... -v
 go test ./api/consent-purpose/... -v
 
-# Consent API tests
-go test ./api/ -run TestConsent -v
+# Run with coverage
+go test ./... -v -cover
 ```
 
-### Test Database Setup
+## Architecture
 
-Integration tests require:
-- MySQL running on `localhost:3306`
-- Database: `AAconsent-mgt-v3`
-- User/Password configured in test files
+### Layered Architecture
+- **Handler Layer**: HTTP request/response handling, validation
+- **Service Layer**: Business logic, transaction orchestration
+- **Store Layer**: Data access, database operations
+- **Model Layer**: Domain models, DTOs, request/response structures
 
-### Test Coverage
+### Key Design Patterns
+- **Store Registry**: Centralized store management with dependency injection
+- **Thunder Pattern**: Transaction management with functional composition
+- **Clean Architecture**: Separation of concerns with clear boundaries
 
-**Consent Purpose Tests** (58 tests total):
-- **CREATE**: 24 tests
-  - General CRUD: 11 tests
-  - Type handlers: 13 tests (string, json-schema, attribute)
-- **READ**: 13 tests
-  - General: 4 tests
-  - Type handlers: 7 tests
-  - List operations: 2 tests
-- **UPDATE**: 13 tests
-  - General: 4 tests
-  - Type handlers: 9 tests
-- **DELETE**: 6 tests
-  - General: 2 tests
-  - Type handlers: 4 tests
-- **VALIDATE**: 5 tests
+## Configuration
+
+The application uses YAML configuration with the following structure:
+
+```yaml
+server:
+  port: 9090              # HTTP server port
+  host: "0.0.0.0"        # Bind address
+
+database:
+  host: "localhost"
+  port: 3306
+  username: "root"
+  password: "password"
+  database: "consent_mgt"
+  max_open_connections: 25
+  max_idle_connections: 10
+  connection_max_lifetime_minutes: 5
+
+consent:
+  status:
+    active: "ACTIVE"
+    revoked: "REVOKED"
+    expired: "EXPIRED"
+```
+
+Configuration file location: `bin/repository/conf/deployment.yaml`
+
+## Scripts
+
+### build.sh
+Builds the application and creates a deployable package structure:
+- Compiles Go binary for target OS/architecture
+- Copies configuration files to `bin/repository/conf/`
+- Copies API specifications to `bin/api/`
+- Copies database scripts to `bin/dbscripts/`
+
+Options:
+```bash
+./build.sh               # Build for current platform
+./build.sh darwin amd64  # Build for specific OS/arch
+```
+
+### start.sh
+Starts the consent management server with optional debug mode:
+
+```bash
+./start.sh               # Normal mode
+./start.sh --debug       # Debug mode (port 2345)
+./start.sh --debug --debug-port 3000  # Custom debug port
+```
+
+Debug mode enables remote debugging using Delve debugger.

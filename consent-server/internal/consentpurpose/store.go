@@ -58,7 +58,7 @@ var (
 
 	QueryGetAttributesByPurposeID = dbmodel.DBQuery{
 		ID:    "GET_ATTRIBUTES_BY_PURPOSE_ID",
-		Query: "SELECT ID, PURPOSE_ID, ATTR_KEY, ATTR_VALUE, ORG_ID FROM CONSENT_PURPOSE_ATTRIBUTE WHERE PURPOSE_ID = ? AND ORG_ID = ?",
+		Query: "SELECT PURPOSE_ID, ATT_KEY, ATT_VALUE, ORG_ID FROM CONSENT_PURPOSE_ATTRIBUTE WHERE PURPOSE_ID = ? AND ORG_ID = ?",
 	}
 
 	QueryDeleteAttributesByPurposeID = dbmodel.DBQuery{
@@ -330,15 +330,32 @@ func mapToConsentPurposeAttribute(row map[string]interface{}) *model.ConsentPurp
 		attr.PurposeID = string(purposeID)
 	}
 
+	// Try lowercase first (normalized), then uppercase (raw column names)
 	if key, ok := row["attr_key"].(string); ok {
 		attr.Key = key
 	} else if key, ok := row["attr_key"].([]byte); ok {
+		attr.Key = string(key)
+	} else if key, ok := row["att_key"].(string); ok {
+		attr.Key = key
+	} else if key, ok := row["att_key"].([]byte); ok {
+		attr.Key = string(key)
+	} else if key, ok := row["ATT_KEY"].(string); ok {
+		attr.Key = key
+	} else if key, ok := row["ATT_KEY"].([]byte); ok {
 		attr.Key = string(key)
 	}
 
 	if value, ok := row["attr_value"].(string); ok {
 		attr.Value = value
 	} else if value, ok := row["attr_value"].([]byte); ok {
+		attr.Value = string(value)
+	} else if value, ok := row["att_value"].(string); ok {
+		attr.Value = value
+	} else if value, ok := row["att_value"].([]byte); ok {
+		attr.Value = string(value)
+	} else if value, ok := row["ATT_VALUE"].(string); ok {
+		attr.Value = value
+	} else if value, ok := row["ATT_VALUE"].([]byte); ok {
 		attr.Value = string(value)
 	}
 

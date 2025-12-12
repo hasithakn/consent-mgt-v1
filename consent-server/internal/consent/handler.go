@@ -195,7 +195,7 @@ func (h *consentHandler) validateConsent(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
-	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
+	if err := utils.ValidateOrgID(orgID); err != nil {
 		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}

@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,19 +42,19 @@ func WithCORS(pattern string, handler http.HandlerFunc, opts CORSOptions) (strin
 		// Set CORS headers
 		origin := r.Header.Get("Origin")
 		if origin == "" || opts.AllowOrigin == "*" {
-			w.Header().Set("Access-Control-Allow-Origin", opts.AllowOrigin)
+			// w.Header().Set("Access-Control-Allow-Origin", opts.AllowOrigin)
 		} else {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
+			// w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
-		w.Header().Set("Access-Control-Allow-Methods", strings.Join(opts.AllowMethods, ", "))
-		w.Header().Set("Access-Control-Allow-Headers", strings.Join(opts.AllowHeaders, ", "))
+		// w.Header().Set("Access-Control-Allow-Methods", strings.Join(opts.AllowMethods, ", "))
+		// w.Header().Set("Access-Control-Allow-Headers", strings.Join(opts.AllowHeaders, ", "))
 		if opts.AllowCredentials {
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			// w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
 
 		// Handle preflight OPTIONS request
 		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusNoContent)
+			// w.WriteHeader(http.StatusNoContent)
 			return
 		}
 

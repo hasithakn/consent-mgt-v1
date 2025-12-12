@@ -806,11 +806,13 @@ func (consentService *consentService) EnrichedConsentAPIResponseWithPurposeDetai
 					enrichedPurpose.Type = &purpose.Type
 					enrichedPurpose.Description = purpose.Description
 
-					// Convert map[string]string to map[string]interface{}
-					if len(purpose.Attributes) > 0 {
-						attrs := make(map[string]interface{}, len(purpose.Attributes))
-						for k, v := range purpose.Attributes {
-							attrs[k] = v
+					attributes, _ := purposeStore.GetAttributesByPurposeID(ctx, purpose.ID, orgID)
+
+					// Convert []ConsentPurposeAttribute to map[string]interface{}
+					if len(attributes) > 0 {
+						attrs := make(map[string]interface{}, len(attributes))
+						for _, attr := range attributes {
+							attrs[attr.Key] = attr.Value
 						}
 						enrichedPurpose.Attributes = attrs
 					} else {

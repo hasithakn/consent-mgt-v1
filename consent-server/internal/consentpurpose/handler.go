@@ -118,22 +118,25 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Parse pagination parameters
-	limit := 10
+	limit := 100 // default from swagger spec
 	offset := 0
 
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
 			limit = l
 		}
 	}
 
 	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		if o, err := strconv.Atoi(offsetStr); err == nil {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
 			offset = o
 		}
 	}
 
-	purposes, total, serviceErr := h.service.ListPurposes(ctx, orgID, limit, offset)
+	// Parse optional name filter
+	name := r.URL.Query().Get("name")
+
+	purposes, total, serviceErr := h.service.ListPurposes(ctx, orgID, limit, offset, name)
 	if serviceErr != nil {
 		utils.SendError(w, serviceErr)
 		return
@@ -151,9 +154,15 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 		})
 	}
 
-	response := model.ListResponse{
-		Purposes: purposeResponses,
-		Total:    total,
+	// Build response with metadata as per swagger spec
+	response := map[string]interface{}{
+		"data": purposeResponses,
+		"metadata": map[string]int{
+			"total":  total,
+			"offset": offset,
+			"count":  len(purposeResponses),
+			"limit":  limit,
+		},
 	}
 
 	w.Header().Set(constants.HeaderContentType, "application/json")

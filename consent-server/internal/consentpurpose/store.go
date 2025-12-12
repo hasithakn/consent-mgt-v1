@@ -31,9 +31,19 @@ var (
 		Query: "SELECT ID, NAME, DESCRIPTION, TYPE, ORG_ID FROM CONSENT_PURPOSE WHERE ORG_ID = ? ORDER BY NAME LIMIT ? OFFSET ?",
 	}
 
+	QueryListPurposesWithName = dbmodel.DBQuery{
+		ID:    "LIST_CONSENT_PURPOSES_WITH_NAME",
+		Query: "SELECT ID, NAME, DESCRIPTION, TYPE, ORG_ID FROM CONSENT_PURPOSE WHERE ORG_ID = ? AND NAME LIKE ? ORDER BY NAME LIMIT ? OFFSET ?",
+	}
+
 	QueryCountPurposes = dbmodel.DBQuery{
 		ID:    "COUNT_CONSENT_PURPOSES",
 		Query: "SELECT COUNT(*) as count FROM CONSENT_PURPOSE WHERE ORG_ID = ?",
+	}
+
+	QueryCountPurposesWithName = dbmodel.DBQuery{
+		ID:    "COUNT_CONSENT_PURPOSES_WITH_NAME",
+		Query: "SELECT COUNT(*) as count FROM CONSENT_PURPOSE WHERE ORG_ID = ? AND NAME LIKE ?",
 	}
 
 	QueryUpdatePurpose = dbmodel.DBQuery{
@@ -104,7 +114,7 @@ type ConsentPurposeStore interface {
 	// Read operations - use dbClient directly
 	GetByID(ctx context.Context, purposeID, orgID string) (*model.ConsentPurpose, error)
 	GetByName(ctx context.Context, name, orgID string) (*model.ConsentPurpose, error)
-	List(ctx context.Context, orgID string, limit, offset int) ([]model.ConsentPurpose, int, error)
+	List(ctx context.Context, orgID string, limit, offset int, name string) ([]model.ConsentPurpose, int, error)
 	CheckNameExists(ctx context.Context, name, orgID string) (bool, error)
 	GetAttributesByPurposeID(ctx context.Context, purposeID, orgID string) ([]model.ConsentPurposeAttribute, error)
 	GetPurposesByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentPurpose, error)
@@ -165,11 +175,39 @@ func (s *store) GetByName(ctx context.Context, name, orgID string) (*model.Conse
 }
 
 // List retrieves a paginated list of consent purposes
-func (s *store) List(ctx context.Context, orgID string, limit, offset int) ([]model.ConsentPurpose, int, error) {
-	// Get total count
-	countRows, err := s.dbClient.Query(QueryCountPurposes, orgID)
-	if err != nil {
-		return nil, 0, err
+func (s *store) List(ctx context.Context, orgID string, limit, offset int, name string) ([]model.ConsentPurpose, int, error) {
+	var countRows []map[string]interface{}
+	var rows []map[string]interface{}
+	var err error
+
+	// Use different queries based on whether name filter is provided
+	if name != "" {
+		// Add wildcards for partial match (case-insensitive search)
+		namePattern := "%" + name + "%"
+
+		// Get total count with name filter
+		countRows, err = s.dbClient.Query(QueryCountPurposesWithName, orgID, namePattern)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		// Get paginated results with name filter
+		rows, err = s.dbClient.Query(QueryListPurposesWithName, orgID, namePattern, limit, offset)
+		if err != nil {
+			return nil, 0, err
+		}
+	} else {
+		// Get total count without name filter
+		countRows, err = s.dbClient.Query(QueryCountPurposes, orgID)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		// Get paginated results without name filter
+		rows, err = s.dbClient.Query(QueryListPurposes, orgID, limit, offset)
+		if err != nil {
+			return nil, 0, err
+		}
 	}
 
 	totalCount := 0
@@ -177,12 +215,6 @@ func (s *store) List(ctx context.Context, orgID string, limit, offset int) ([]mo
 		if count, ok := countRows[0]["count"].(int64); ok {
 			totalCount = int(count)
 		}
-	}
-
-	// Get paginated results
-	rows, err := s.dbClient.Query(QueryListPurposes, orgID, limit, offset)
-	if err != nil {
-		return nil, 0, err
 	}
 
 	purposes := make([]model.ConsentPurpose, 0, len(rows))

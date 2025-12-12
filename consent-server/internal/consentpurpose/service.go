@@ -17,7 +17,7 @@ type ConsentPurposeService interface {
 	CreatePurpose(ctx context.Context, req model.CreateRequest, orgID string) (*model.ConsentPurpose, *serviceerror.ServiceError)
 	CreatePurposesInBatch(ctx context.Context, requests []model.CreateRequest, orgID string) ([]model.ConsentPurpose, *serviceerror.ServiceError)
 	GetPurpose(ctx context.Context, purposeID, orgID string) (*model.ConsentPurpose, *serviceerror.ServiceError)
-	ListPurposes(ctx context.Context, orgID string, limit, offset int) ([]model.ConsentPurpose, int, *serviceerror.ServiceError)
+	ListPurposes(ctx context.Context, orgID string, limit, offset int, name string) ([]model.ConsentPurpose, int, *serviceerror.ServiceError)
 	UpdatePurpose(ctx context.Context, purposeID string, req model.UpdateRequest, orgID string) (*model.ConsentPurpose, *serviceerror.ServiceError)
 	DeletePurpose(ctx context.Context, purposeID, orgID string) *serviceerror.ServiceError
 	ValidatePurposeNames(ctx context.Context, orgID string, purposeNames []string) ([]string, *serviceerror.ServiceError)
@@ -218,17 +218,17 @@ func (s *consentPurposeService) GetPurpose(ctx context.Context, purposeID, orgID
 	return purpose, nil
 }
 
-// ListPurposes retrieves paginated list of consent purposes
-func (s *consentPurposeService) ListPurposes(ctx context.Context, orgID string, limit, offset int) ([]model.ConsentPurpose, int, *serviceerror.ServiceError) {
+// ListPurposes retrieves paginated list of consent purposes with optional name filter
+func (s *consentPurposeService) ListPurposes(ctx context.Context, orgID string, limit, offset int, name string) ([]model.ConsentPurpose, int, *serviceerror.ServiceError) {
 	if limit <= 0 {
-		limit = 10
+		limit = 100
 	}
 	if offset < 0 {
 		offset = 0
 	}
 
 	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
-	purposes, total, err := store.List(ctx, orgID, limit, offset)
+	purposes, total, err := store.List(ctx, orgID, limit, offset, name)
 	if err != nil {
 		return nil, 0, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to list purposes: %v", err))
 	}

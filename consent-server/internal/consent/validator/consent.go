@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	authmodel "github.com/wso2/consent-management-api/internal/authresource/model"
 	authvalidator "github.com/wso2/consent-management-api/internal/authresource/validator"
 	"github.com/wso2/consent-management-api/internal/consent/model"
 	"github.com/wso2/consent-management-api/internal/system/config"
@@ -89,50 +88,80 @@ func ValidateConsentGetRequest(consentID, orgID string) error {
 	return nil
 }
 
-// DeriveConsentStatusFromAuthState maps an authorization status to a ConsentStatus when possible.
-// Returns the derived status and true when derivation succeeded. For unknown states it returns
-// empty string and false to indicate that the extension point should be invoked to resolve the final status.
-func DeriveConsentStatusFromAuthState(authState string) (config.ConsentStatus, bool) {
-
+// EvaluateConsentStatusFromAuthStatuses determines consent status from a list of auth status strings.
+// This is a helper function for authresource package to avoid import cycles.
+// Uses the same priority logic as EvaluateConsentStatus.
+func EvaluateConsentStatusFromAuthStatuses(authStatuses []string) string {
 	consentConfig := config.Get().Consent
 
-	authStateString := strings.ToLower(strings.TrimSpace(authState))
-	if authStateString == "" {
-		// default when not defined: treat as approved -> active
-		return consentConfig.GetCreatedConsentStatus(), true
-	}
-	switch authStateString {
-	case strings.ToLower(string(consentConfig.GetApprovedAuthStatus())):
-		return consentConfig.GetActiveConsentStatus(), true
-	case strings.ToLower(string(consentConfig.GetRejectedAuthStatus())):
-		return consentConfig.GetRejectedConsentStatus(), true
-	case strings.ToLower(string(consentConfig.GetCreatedAuthStatus())):
-		return consentConfig.GetCreatedConsentStatus(), true
-	default:
-		// unknown/custom state - extension should resolve to one of known ConsentStatus values
-		return "", false
-	}
-}
+	// Debug logging
+	fmt.Printf("[DEBUG] EvaluateConsentStatusFromAuthStatuses called with %d statuses: %v\n", len(authStatuses), authStatuses)
+	fmt.Printf("[DEBUG] Config - Approved: %s, Rejected: %s, Created: %s\n",
+		consentConfig.GetApprovedAuthStatus(),
+		consentConfig.GetRejectedAuthStatus(),
+		consentConfig.GetCreatedAuthStatus())
 
-// EvaluateConsentStatus determines the consent status based on authorization resource states.
-// This is the main entry point for deriving consent status from auth resources.
-func EvaluateConsentStatus(authResources []authmodel.ConsentAuthResourceCreateRequest) string {
-	if len(authResources) == 0 {
+	if len(authStatuses) == 0 {
 		// No auth resources - default to created status
-		return string(config.Get().Consent.GetCreatedConsentStatus())
+		result := string(consentConfig.GetCreatedConsentStatus())
+		fmt.Printf("[DEBUG] No auth statuses, returning: %s\n", result)
+		return result
 	}
 
-	// Derive status from the first authorization resource's status
-	// In a multi-auth scenario, you could implement more complex logic (e.g., all must be approved)
-	firstAuthStatus := authResources[0].AuthStatus
+	// Evaluate ALL auth statuses with priority logic
+	hasRejected := false
+	hasCreated := false
+	allApproved := true
 
-	derivedStatus, ok := DeriveConsentStatusFromAuthState(firstAuthStatus)
-	if !ok {
-		// If derivation fails, default to created status
-		return string(config.Get().Consent.GetCreatedConsentStatus())
+	for i, authStatus := range authStatuses {
+		// Map auth status to consent status first (case-insensitive comparison)
+		authStatusUpper := strings.ToUpper(authStatus)
+		var mappedConsentStatus string
+
+		// Check if auth status matches known auth states
+		if authStatusUpper == strings.ToUpper(string(consentConfig.GetApprovedAuthStatus())) || authStatus == "" {
+			// Approved or empty/missing status → active consent
+			mappedConsentStatus = string(consentConfig.GetActiveConsentStatus())
+		} else if authStatusUpper == strings.ToUpper(string(consentConfig.GetRejectedAuthStatus())) {
+			// Rejected auth → rejected consent
+			mappedConsentStatus = string(consentConfig.GetRejectedConsentStatus())
+		} else if authStatusUpper == strings.ToUpper(string(consentConfig.GetCreatedAuthStatus())) {
+			// Created auth → created consent
+			mappedConsentStatus = string(consentConfig.GetCreatedConsentStatus())
+		} else {
+			// Unknown status - treat as created
+			mappedConsentStatus = string(consentConfig.GetCreatedConsentStatus())
+		}
+
+		fmt.Printf("[DEBUG] Auth status[%d]: '%s' → mapped to consent status: '%s'\n", i, authStatus, mappedConsentStatus)
+
+		// Now check the mapped consent status
+		if mappedConsentStatus == string(consentConfig.GetRejectedConsentStatus()) {
+			hasRejected = true
+			allApproved = false
+		} else if mappedConsentStatus == string(consentConfig.GetCreatedConsentStatus()) {
+			hasCreated = true
+			allApproved = false
+		} else if mappedConsentStatus != string(consentConfig.GetActiveConsentStatus()) {
+			allApproved = false
+		}
 	}
 
-	return string(derivedStatus)
+	// Priority: rejected > created > approved (active)
+	var result string
+	if hasRejected {
+		result = string(consentConfig.GetRejectedConsentStatus())
+	} else if hasCreated {
+		result = string(consentConfig.GetCreatedConsentStatus())
+	} else if allApproved {
+		result = string(consentConfig.GetActiveConsentStatus())
+	} else {
+		result = string(consentConfig.GetCreatedConsentStatus())
+	}
+
+	fmt.Printf("[DEBUG] Final result - hasRejected=%v, hasCreated=%v, allApproved=%v → returning: %s\n",
+		hasRejected, hasCreated, allApproved, result)
+	return result
 }
 
 // IsExpired checks if a given validity time has expired

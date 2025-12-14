@@ -60,8 +60,14 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
 	}
 
+	// Extract auth statuses
+	authStatuses := make([]string, 0, len(createReq.AuthResources))
+	for _, ar := range createReq.AuthResources {
+		authStatuses = append(authStatuses, ar.AuthStatus)
+	}
+
 	// Derive consent status from authorization states
-	consentStatus := validator.EvaluateConsentStatus(createReq.AuthResources)
+	consentStatus := validator.EvaluateConsentStatusFromAuthStatuses(authStatuses)
 
 	// Generate IDs and timestamp
 	consentID := utils.GenerateUUID()
@@ -368,7 +374,14 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 	var newStatus string
 	var statusChanged bool
 	if updateReq.AuthResources != nil {
-		newStatus = validator.EvaluateConsentStatus(updateReq.AuthResources)
+
+		// Extract auth statuses
+		authStatuses := make([]string, 0, len(updateReq.AuthResources))
+		for _, ar := range updateReq.AuthResources {
+			authStatuses = append(authStatuses, ar.AuthStatus)
+		}
+
+		newStatus = validator.EvaluateConsentStatusFromAuthStatuses(authStatuses)
 		statusChanged = (newStatus != previousStatus)
 	} else {
 		newStatus = existing.CurrentStatus

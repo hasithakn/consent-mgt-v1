@@ -15,29 +15,27 @@ type ConsentAuthResource struct {
 
 // ConsentAuthResourceCreateRequest represents the request payload for creating an authorization resource
 type ConsentAuthResourceCreateRequest struct {
-	AuthType   string      `json:"authType" binding:"required"`
+	AuthType   string      `json:"type" binding:"required"`
 	UserID     *string     `json:"userId,omitempty"`
-	AuthStatus string      `json:"authStatus" binding:"required"`
+	AuthStatus string      `json:"status" binding:"required"`
 	Resources  interface{} `json:"resources,omitempty"`
 }
 
 // ConsentAuthResourceUpdateRequest represents the request payload for updating an authorization resource
 type ConsentAuthResourceUpdateRequest struct {
-	AuthStatus string      `json:"authStatus,omitempty"`
+	AuthStatus string      `json:"status,omitempty"`
 	UserID     *string     `json:"userId,omitempty"`
 	Resources  interface{} `json:"resources,omitempty"`
 }
 
 // ConsentAuthResourceResponse represents the response for authorization resource operations
 type ConsentAuthResourceResponse struct {
-	AuthID      string      `json:"authId"`
-	ConsentID   string      `json:"consentId"`
-	AuthType    string      `json:"authType"`
+	AuthID      string      `json:"id"`
+	AuthType    string      `json:"type"`
 	UserID      *string     `json:"userId,omitempty"`
-	AuthStatus  string      `json:"authStatus"`
+	AuthStatus  string      `json:"status"`
 	UpdatedTime int64       `json:"updatedTime"`
 	Resources   interface{} `json:"resources,omitempty"`
-	OrgID       string      `json:"orgId"`
 }
 
 // ConsentAuthResourceListResponse represents the response for listing authorization resources

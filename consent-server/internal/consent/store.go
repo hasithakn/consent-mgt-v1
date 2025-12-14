@@ -2,6 +2,7 @@ package consent
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/wso2/consent-management-api/internal/consent/model"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
@@ -185,8 +186,21 @@ func (s *store) Update(tx dbmodel.TxInterface, consent *model.Consent) error {
 
 // UpdateStatus updates consent status within a transaction
 func (s *store) UpdateStatus(tx dbmodel.TxInterface, consentID, orgID, status string, updatedTime int64) error {
-	_, err := tx.Exec(QueryUpdateConsentStatus.Query, status, updatedTime, consentID, orgID)
-	return err
+	result, err := tx.Exec(QueryUpdateConsentStatus.Query, status, updatedTime, consentID, orgID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no consent found with CONSENT_ID=%s and ORG_ID=%s", consentID, orgID)
+	}
+
+	return nil
 }
 
 // Delete deletes a consent within a transaction

@@ -230,56 +230,6 @@ func (h *authResourceHandler) handleUpdate(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(response)
 }
 
-// handleUpdateStatus handles PATCH /consents/{consentId}/auth-resources/{authId}/status
-func (h *authResourceHandler) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	// Extract path parameters
-	consentID := r.PathValue("consentId")
-	authID := r.PathValue("authId")
-	if consentID == "" || authID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
-			"consent ID and auth ID are required",
-		))
-		return
-	}
-
-	// Extract organization ID from header
-	orgID := r.Header.Get(constants.HeaderOrgID)
-	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
-			"organization ID header is required",
-		))
-		return
-	}
-
-	// Parse request body
-	var statusRequest struct {
-		Status string `json:"status"`
-	}
-	if err := utils.DecodeJSONBody(r, &statusRequest); err != nil {
-		utils.SendError(w, serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
-			fmt.Sprintf("invalid request body: %v", err),
-		))
-		return
-	}
-
-	// Call service
-	response, serviceErr := h.service.UpdateAuthResourceStatus(ctx, authID, orgID, statusRequest.Status)
-	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
-		return
-	}
-
-	// Send response
-	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
-}
-
 // handleDelete handles DELETE /consents/{consentId}/auth-resources/{authId}
 func (h *authResourceHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

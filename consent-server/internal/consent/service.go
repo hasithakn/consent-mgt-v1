@@ -386,7 +386,7 @@ func (consentService *consentService) SearchConsentsDetailed(ctx context.Context
 
 	if len(consents) == 0 {
 		return &model.ConsentDetailSearchResponse{
-			Data:     []model.ConsentDetailResponse{},
+			Data: []model.ConsentDetailResponse{},
 			Metadata: model.ConsentSearchMetadata{
 				Total:  0,
 				Limit:  filters.Limit,
@@ -525,7 +525,7 @@ func (consentService *consentService) SearchConsentsDetailed(ctx context.Context
 	}
 
 	return &model.ConsentDetailSearchResponse{
-		Data:     detailedResponses,
+		Data: detailedResponses,
 		Metadata: model.ConsentSearchMetadata{
 			Total:  total,
 			Limit:  filters.Limit,

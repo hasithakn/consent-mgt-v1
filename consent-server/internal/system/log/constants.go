@@ -22,5 +22,5 @@ const (
 	// LoggerKeyComponentName is the key used to identify the component name in the logger.
 	LoggerKeyComponentName = "component"
 	// LoggerKeyTraceID is the key used to identify the trace ID (correlation ID) in the logger.
-	LoggerKeyTraceID = "trace_id"
+	LoggerKeyTraceID = "correlation-id"
 )

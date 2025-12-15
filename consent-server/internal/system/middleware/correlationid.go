@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/wso2/consent-management-api/internal/system/log"
 )
 
 func CorrelationIDMiddleware() gin.HandlerFunc {
@@ -14,7 +15,7 @@ func CorrelationIDMiddleware() gin.HandlerFunc {
 		if correlationID == "" {
 			correlationID = uuid.New().String()
 		}
-		c.Set("correlation_id", correlationID)
+		c.Set(log.LoggerKeyTraceID, correlationID)
 		c.Header("X-Correlation-ID", correlationID)
 		c.Next()
 	}
@@ -42,8 +43,8 @@ func WrapWithCorrelationID(next http.Handler) http.Handler {
 		// Set correlation ID in response header
 		w.Header().Set("X-Correlation-ID", correlationID)
 
-		// Add correlation ID to request context
-		ctx := context.WithValue(r.Context(), "correlation_id", correlationID)
+		// Add correlation ID to request context using the correct key for logger
+		ctx := context.WithValue(r.Context(), log.LoggerKeyTraceID, correlationID)
 
 		// Call next handler with updated context
 		next.ServeHTTP(w, r.WithContext(ctx))

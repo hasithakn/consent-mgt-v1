@@ -67,6 +67,25 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/ConsentCreatePayload"
+            example:
+              type: "accounts"
+              validityTime: 0
+              recurringIndicator: false
+              dataAccessValidityDuration: 86400
+              frequency: 0
+              consentPurpose:
+                - name: "first_name"
+                  value: {}
+                  isUserApproved: true
+                  isMandatory: true
+              attributes:
+                department: "sales"
+              authorizations:
+                - userId: "user1@example.com"
+                  type: "authorisation"
+                  status: "APPROVED"
+                  resources:
+                    accountIds: ["acc-123", "acc-456"]
       responses:
         "201":
           description: Successfully initiated the consent. The response body contains the details of the newly created consent resource, including its `consentID`.
@@ -103,50 +122,59 @@ paths:
           description: "Organisation ID."
           schema:
             type: string
+          example: "org1"
         - name: consentTypes
           in: query
           description: A comma-separated list of consent types to filter by (e.g., 'accounts,payments').
           schema:
             type: string
+          example: "accounts,payments"
         - name: consentStatuses
           in: query
-          description: A comma-separated list of consent statuses to filter by (e.g., 'active,revoked'). Valid values are 'created', 'active', 'rejected', 'revoked', 'expired'.
+          description: "A comma-separated list of consent statuses to filter by (e.g., 'ACTIVE,REVOKED'). Valid values are: CREATED, ACTIVE, REJECTED, REVOKED, EXPIRED."
           schema:
             type: string
+          example: "ACTIVE,CREATED"
         - name: clientIds
           in: query
           description: A comma-separated list of TPP client IDs to filter by.
           schema:
             type: string
+          example: "tpp-client-123,tpp-client-456"
         - name: userIds
           in: query
           description: A comma-separated list of end-user IDs to filter by.
           schema:
             type: string
+          example: "user1@example.com,user2@example.com"
         - name: fromTime
           in: query
-          description: The start of the time window for the search, as a Unix timestamp (integer).
+          description: The start of the time window for the search, as a Unix timestamp in seconds (integer).
           schema:
             type: integer
-            format: int32
+            format: int64
+          example: 1702800000
         - name: toTime
           in: query
-          description: The end of the time window for the search, as a Unix timestamp (integer).
+          description: The end of the time window for the search, as a Unix timestamp in seconds (integer).
           schema:
             type: integer
-            format: int32
+            format: int64
+          example: 1734422400
         - name: limit
           in: query
           description: The maximum number of results to return in a single page. Used for pagination.
           schema:
             type: integer
             format: int32
+          example: 10
         - name: offset
           in: query
           description: The number of results to skip. Used for pagination.
           schema:
             type: integer
             format: int32
+          example: 0
       responses:
         "200":
           description: OK. Returns a list of consents matching the search criteria, along with pagination metadata.
@@ -320,6 +348,26 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/ConsentUpdateRequest"
+            example:
+              type: "accounts"
+              validityTime: 0
+              recurringIndicator: false
+              dataAccessValidityDuration: 86400
+              frequency: 0
+              consentPurpose:
+                - name: "first_name"
+                  value: {}
+                  isUserApproved: true
+                  isMandatory: true
+              attributes:
+                department: "sales"
+                region: "APAC"
+              authorizations:
+                - userId: "user1@example.com"
+                  type: "authorisation"
+                  status: "APPROVED"
+                  resources:
+                    accountIds: ["acc-123", "acc-456"]
         required: true
       responses:
         "200":
@@ -643,6 +691,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ValidateResponse"
+              example:
+                isValid: true
+                consentInformation:
+                  id: "CONSENT-123e4567-e89b-12d3-a456-426614174000"
+                  type: "accounts"
+                  clientId: "tpp-client-123"
+                  status: "ACTIVE"
+                  createdTime: 1702800000
+                  updatedTime: 1702800000
+                  validityTime: 1734422400
+                  recurringIndicator: true
+                  frequency: 10
+                  dataAccessValidityDuration: 86400
+                  consentPurpose:
+                    - name: "first_name"
+                      value: {}
+                      isUserApproved: true
+                      isMandatory: true
+                      type: "attribute"
+                      description: "Allows access to the user's first name"
+                      attributes:
+                        jsonPath: "$.personal.firstName"
+                        resourcePath: "/user/{nic}"
+                  attributes:
+                    department: "sales"
+                    region: "APAC"
+                  authorizations:
+                    - authId: "AUTH-123e4567-e89b-12d3-a456-426614174000"
+                      userId: "user1@example.com"
+                      type: "authorization"
+                      status: "APPROVED"
+                      resources:
+                        accountIds: ["acc-123", "acc-456"]
+                      updatedTime: 1702800000
       security:
         - basicAuth: []
   /consent-purposes:
@@ -732,12 +814,12 @@ paths:
               attributeType:
                 summary: Attribute type with resource and json paths
                 value:
-                  - name: "user_permissions"
-                    description: "Dynamic user permissions from API"
+                  - name: "first_name"
+                    description: "Allows access to the user's first name"
                     type: "attribute"
                     attributes:
-                      resourcePath: "/api/v1/users"
-                      jsonPath: "$.permissions.scopes"
+                      resourcePath: "/user/{nic}"
+                      jsonPath: "$.personal.firstName"
               multiplePurposes:
                 summary: Create multiple purposes with different types
                 value:
@@ -797,12 +879,12 @@ paths:
                   value:
                     data:
                       - id: "PURPOSE-c3d4e5f6-a7b8-9012-cdef-123456789012"
-                        name: "user_permissions"
-                        description: "Dynamic user permissions from API"
+                        name: "first_name"
+                        description: "Allows access to the user's first name"
                         type: "attribute"
                         attributes:
-                          resourcePath: "/api/v1/users"
-                          jsonPath: "$.permissions.scopes"
+                          resourcePath: "/user/{nic}"
+                          jsonPath: "$.personal.firstName"
                     message: "Consent purposes created successfully"
         "400":
           description: Bad Request - Invalid input or validation error
@@ -917,20 +999,24 @@ paths:
               example:
                 data:
                   - id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                    name: "Marketing"
-                    description: "Purpose for marketing and promotional communications"
-                    type: "string"
-                    value: "marketing:communications"
+                    name: "first_name"
+                    description: "Allows access to the user's first name"
+                    type: "attribute"
+                    attributes:
+                      jsonPath: "$.personal.firstName"
+                      resourcePath: "/user/{nic}"
                   - id: "PURPOSE-b2c3d4e5-f6a7-8901-bcde-f12345678901"
                     name: "readAccountBasic"
                     description: "Allows reading basic account information"
                     type: "string"
-                    value: "account:read:basic"
+                    attributes:
+                      value: "account:read:basic"
                   - id: "PURPOSE-c3d4e5f6-a7b8-9012-cdef-123456789012"
                     name: "readTransactions"
                     description: "Allows reading transaction history"
                     type: "string"
-                    value: "account:read:transactions"
+                    attributes:
+                      value: "account:read:transactions"
                 metadata:
                   total: 3
                   offset: 0
@@ -1086,11 +1172,12 @@ paths:
                 $ref: "#/components/schemas/ConsentPurposeResponse"
               example:
                 id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                name: "readAccountBasic"
-                description: "Allows reading basic account information"
-                type: "string"
+                name: "first_name"
+                description: "Allows access to the user's first name"
+                type: "attribute"
                 attributes:
-                  value: "account:read:basic"
+                  jsonPath: "$.personal.firstName"
+                  resourcePath: "/user/{nic}"
         "404":
           description: Consent purpose not found
           content:
@@ -1185,13 +1272,12 @@ paths:
               updateToAttribute:
                 summary: Update to Attribute type (requires resourcePath and jsonPath)
                 value:
-                  name: "user_roles_v2"
-                  description: "Updated dynamic user roles"
+                  name: "first_name"
+                  description: "Allows access to the user's first name"
                   type: "attribute"
                   attributes:
-                    resourcePath: "/api/v2/users"
-                    jsonPath: "$.data.roles"
-                    validationSchema: '{"type":"array"}'
+                    resourcePath: "/user/{nic}"
+                    jsonPath: "$.personal.firstName"
       responses:
         "200":
           description: Successfully updated consent purpose
@@ -1222,13 +1308,12 @@ paths:
                   summary: Updated to Attribute type
                   value:
                     id: "PURPOSE-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                    name: "user_roles_v2"
-                    description: "Updated dynamic user roles"
+                    name: "first_name"
+                    description: "Allows access to the user's first name"
                     type: "attribute"
                     attributes:
-                      resourcePath: "/api/v2/users"
-                      jsonPath: "$.data.roles"
-                      validationSchema: '{"type":"array"}'
+                      resourcePath: "/user/{nic}"
+                      jsonPath: "$.personal.firstName"
         "400":
           description: Bad Request - Invalid input or validation error
           content:
@@ -1354,7 +1439,13 @@ components:
             - type: string
             - type: object
             - type: array
-          example: "license_read"
+          example:
+            type: "attribute"
+            name: "first_name"
+            description: "Allows access to the user's first name"
+            attributes:
+              jsonPath: "$.personal.firstName"
+              resourcePath: "/user/{nic}"
         isUserApproved:
           type: boolean
           description: |
@@ -1402,13 +1493,17 @@ components:
           description: |
             The current status/state of this specific authorization.
             
-            Defaults to "approved" if not provided. Known states:
-            - `approved`: Authorization approved (default) → consent becomes "active"
-            - `created`: Authorization created but not yet approved → consent becomes "created"  
-            - `rejected`: Authorization rejected → consent becomes "rejected"
+            Defaults to "APPROVED" if not provided. Known states:
+            - `APPROVED`: Authorization approved (default) → consent becomes ACTIVE
+            - `CREATED`: Authorization created but not yet approved → consent becomes CREATED
+            - `REJECTED`: Authorization rejected → consent becomes REJECTED
             - Custom states: Resolved via extension point
           type: string
-          example: "approved"
+          example: "APPROVED"
+          enum:
+            - CREATED
+            - APPROVED
+            - REJECTED
         resources:
           description: |
             Flexible resources field that can contain any valid JSON structure.
@@ -1448,17 +1543,17 @@ components:
         
         **Status Derivation:**
         The consent status is NOT provided in the request. Instead, it is automatically derived by the API based on the authorization states:
-        - If any authorization has status "rejected" → consent status = "rejected"
-        - If any authorization has status "created" → consent status = "created"  
-        - If all authorizations have status "approved" (or empty/default) → consent status = "active"
+        - If any authorization has status REJECTED → consent status = REJECTED
+        - If any authorization has status CREATED → consent status = CREATED
+        - If all authorizations have status APPROVED (or empty/default) → consent status = ACTIVE
         - For custom authorization states → consent status is resolved via extension point (must return a known status)
         
         **Known Consent Statuses:**
-        - `created`: Consent is created but not yet approved
-        - `active`: Consent is approved and active
-        - `rejected`: Consent was rejected
-        - `revoked`: Consent was revoked
-        - `expired`: Consent has expired
+        - `CREATED`: Consent is created but not yet approved
+        - `ACTIVE`: Consent is approved and active
+        - `REJECTED`: Consent was rejected
+        - `REVOKED`: Consent was revoked
+        - `EXPIRED`: Consent has expired
       required:
         - type
         - consentPurpose
@@ -1499,9 +1594,11 @@ components:
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
-          properties:
-            key:
-              type: string
+          additionalProperties:
+            type: string
+          example:
+            department: "sales"
+            region: "APAC"
         authorizations:
           description: An array of authorization resources linked to this consent, detailing which users have acted upon it.
           type: array
@@ -1514,9 +1611,9 @@ components:
         
         **Authorization State:**
         The status field represents the authorization state which determines the consent status:
-        - `approved` (default if not provided): Authorization is approved → consent will be "active"
-        - `created`: Authorization is created but not yet approved → consent will be "created"
-        - `rejected`: Authorization was rejected → consent will be "rejected"
+        - `APPROVED` (default if not provided): Authorization is approved → consent will be ACTIVE
+        - `CREATED`: Authorization is created but not yet approved → consent will be CREATED
+        - `REJECTED`: Authorization was rejected → consent will be REJECTED
         - Custom states: Will be resolved via extension point to determine final consent status
       properties:
         userId:
@@ -1529,11 +1626,15 @@ components:
           example: "authorisation"
         status:
           description: |
-            The authorization state (defaults to "approved" if not provided).
-            Known states: approved, created, rejected.
+            The authorization state (defaults to APPROVED if not provided).
+            Known states: APPROVED, CREATED, REJECTED.
             Custom states will be resolved via extension point.
           type: string
-          example: "approved"
+          example: "APPROVED"
+          enum:
+            - CREATED
+            - APPROVED
+            - REJECTED
         resources:
           description: |
             Flexible resources field that can contain any valid JSON structure.
@@ -1602,7 +1703,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ConsentDetail"
-        meatadata:
+        metadata:
           $ref: "#/components/schemas/ConsentSearchMetadata"
     ConsentUpdateRequest:
       type: object
@@ -1658,9 +1759,11 @@ components:
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
-          properties:
-            key:
-              type: string
+          additionalProperties:
+            type: string
+          example:
+            department: "sales"
+            region: "APAC"
         authorizations:
           description: An array of authorization resources linked to this consent, detailing which users have acted upon it.
           type: array
@@ -1669,6 +1772,32 @@ components:
     ConsentUpdateResponse:
       type: object
       description: A generic success response for consent management operations that return consent details.
+      example:
+        id: "consent-abc123"
+        consentPurpose:
+          - name: "first_name"
+            value: {}
+            isUserApproved: true
+            isMandatory: true
+        createdTime: 1702800000
+        updatedTime: 1702800000
+        clientId: "tpp-client-123"
+        type: "accounts"
+        status: "ACTIVE"
+        frequency: 0
+        validityTime: 0
+        recurringIndicator: false
+        dataAccessValidityDuration: 86400
+        attributes:
+          department: "sales"
+        authorizations:
+          - id: "auth-xyz789"
+            userId: "user1@example.com"
+            type: "authorisation"
+            status: "APPROVED"
+            updatedTime: 1702800000
+            resources:
+              accountIds: ["acc-123", "acc-456"]
       properties:
         id:
           description: Consent Id
@@ -1681,10 +1810,12 @@ components:
             $ref: "#/components/schemas/ConsentPurposeItem"
         createdTime:
           type: integer
-          format: int32
+          format: int64
+          example: 1702800000
         updatedTime:
           type: integer
-          format: int32
+          format: int64
+          example: 1702800000
         clientId:
           type: string
         type:
@@ -1692,9 +1823,9 @@ components:
           type: string
           example: "accounts"
         status:
-          description: The current status of the consent in its lifecycle. Valid values are 'created', 'active', 'rejected', 'revoked', 'expired'. Status is derived from authorization state - approved authorization yields 'active', created authorization yields 'created', rejected authorization yields 'rejected'.
+          description: "The current status of the consent in its lifecycle. Valid values are: CREATED, ACTIVE, REJECTED, REVOKED, EXPIRED. Status is derived from authorization state - APPROVED authorization yields ACTIVE, CREATED authorization yields CREATED, REJECTED authorization yields REJECTED."
           type: string
-          example: "active"
+          example: "ACTIVE"
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
           type: integer
@@ -1717,9 +1848,11 @@ components:
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
-          properties:
-            key:
-              type: string
+          additionalProperties:
+            type: string
+          example:
+            department: "sales"
+            region: "APAC"
         authorizations:
           description: An array of authorization resources linked to this consent, detailing which users have acted upon it.
           type: array
@@ -1730,6 +1863,32 @@ components:
           type: object
     ConsentRetrievalResponse:
       description: The response body returned after successfully initiating a new consent.
+      example:
+        id: "consent-abc123"
+        consentPurpose:
+          - name: "first_name"
+            value: {}
+            isUserApproved: true
+            isMandatory: true
+        createdTime: 1702800000
+        updatedTime: 1702800000
+        clientId: "tpp-client-123"
+        type: "accounts"
+        status: "ACTIVE"
+        frequency: 0
+        validityTime: 0
+        recurringIndicator: false
+        dataAccessValidityDuration: 86400
+        attributes:
+          department: "sales"
+        authorizations:
+          - id: "auth-xyz789"
+            userId: "user1@example.com"
+            type: "authorisation"
+            status: "APPROVED"
+            updatedTime: 1702800000
+            resources:
+              accountIds: ["acc-123", "acc-456"]
       properties:
         id:
           description: Consent Id
@@ -1742,10 +1901,12 @@ components:
             $ref: "#/components/schemas/ConsentPurposeItem"
         createdTime:
           type: integer
-          format: int32
+          format: int64
+          example: 1702800000
         updatedTime:
           type: integer
-          format: int32
+          format: int64
+          example: 1702800000
         clientId:
           type: string
         type:
@@ -1779,9 +1940,11 @@ components:
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
-          properties:
-            key:
-              type: string
+          additionalProperties:
+            type: string
+          example:
+            department: "sales"
+            region: "APAC"
         authorizations:
           description: An array of authorization resources linked to this consent, detailing which users have acted upon it.
           type: array
@@ -1810,6 +1973,32 @@ components:
     ConsentCreatedResponse:
       type: object
       description: The response body returned after successfully initiating a new consent.
+      example:
+        id: "consent-abc123"
+        consentPurpose:
+          - name: "first_name"
+            value: {}
+            isUserApproved: true
+            isMandatory: true
+        createdTime: 1702800000
+        updatedTime: 1702800000
+        clientId: "tpp-client-123"
+        type: "accounts"
+        status: "ACTIVE"
+        frequency: 0
+        validityTime: 0
+        recurringIndicator: false
+        dataAccessValidityDuration: 86400
+        attributes:
+          department: "sales"
+        authorizations:
+          - id: "auth-xyz789"
+            userId: "user1@example.com"
+            type: "authorisation"
+            status: "APPROVED"
+            updatedTime: 1702800000
+            resources:
+              accountIds: ["acc-123", "acc-456"]
       properties:
         id:
           description: Consent Id
@@ -1822,10 +2011,12 @@ components:
             $ref: "#/components/schemas/ConsentPurposeItem"
         createdTime:
           type: integer
-          format: int32
+          format: int64
+          example: 1702800000
         updatedTime:
           type: integer
-          format: int32
+          format: int64
+          example: 1702800000
         clientId:
           type: string
         type:
@@ -1833,9 +2024,9 @@ components:
           type: string
           example: "accounts"
         status:
-          description: The current status of the consent in its lifecycle. Valid values are 'created', 'active', 'rejected', 'revoked', 'expired'. Status is derived from authorization state - approved authorization yields 'active', created authorization yields 'created', rejected authorization yields 'rejected'.
+          description: "The current status of the consent in its lifecycle. Valid values are: CREATED, ACTIVE, REJECTED, REVOKED, EXPIRED. Status is derived from authorization state - APPROVED authorization yields ACTIVE, CREATED authorization yields CREATED, REJECTED authorization yields REJECTED."
           type: string
-          example: "active"
+          example: "ACTIVE"
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
           type: integer
@@ -1858,9 +2049,11 @@ components:
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
-          properties:
-            key:
-              type: string
+          additionalProperties:
+            type: string
+          example:
+            department: "sales"
+            region: "APAC"
         authorizations:
           description: An array of authorization resources linked to this consent, detailing which users have acted upon it.
           type: array
@@ -1872,6 +2065,32 @@ components:
     ConsentDetail:
       type: object
       description: A comprehensive object representing a single consent and all its associated data.
+      example:
+        id: "consent-abc123"
+        consentPurpose:
+          - name: "first_name"
+            value: {}
+            isUserApproved: true
+            isMandatory: true
+        createdTime: 1702800000
+        updatedTime: 1702800000
+        clientId: "tpp-client-123"
+        type: "accounts"
+        status: "ACTIVE"
+        frequency: 0
+        validityTime: 0
+        recurringIndicator: false
+        dataAccessValidityDuration: 86400
+        attributes:
+          department: "sales"
+        authorizations:
+          - id: "auth-xyz789"
+            userId: "user1@example.com"
+            type: "authorisation"
+            status: "APPROVED"
+            updatedTime: 1702800000
+            resources:
+              accountIds: ["acc-123", "acc-456"]
       properties:
         id:
           description: Consent Id
@@ -1884,10 +2103,12 @@ components:
             $ref: "#/components/schemas/ConsentPurposeItem"
         createdTime:
           type: integer
-          format: int32
+          format: int64
+          example: 1702800000
         updatedTime:
           type: integer
-          format: int32
+          format: int64
+          example: 1702800000
         clientId:
           type: string
         type:
@@ -1895,9 +2116,9 @@ components:
           type: string
           example: "accounts"
         status:
-          description: The current status of the consent in its lifecycle. Valid values are 'created', 'active', 'rejected', 'revoked', 'expired'. Status is derived from authorization state - approved authorization yields 'active', created authorization yields 'created', rejected authorization yields 'rejected'.
+          description: "The current status of the consent in its lifecycle. Valid values are: CREATED, ACTIVE, REJECTED, REVOKED, EXPIRED. Status is derived from authorization state - APPROVED authorization yields ACTIVE, CREATED authorization yields CREATED, REJECTED authorization yields REJECTED."
           type: string
-          example: "active"
+          example: "ACTIVE"
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
           type: integer
@@ -1920,9 +2141,11 @@ components:
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
-          properties:
-            key:
-              type: string
+          additionalProperties:
+            type: string
+          example:
+            department: "sales"
+            region: "APAC"
         authorizations:
           description: An array of authorization resources linked to this consent, detailing which users have acted upon it.
           type: array
@@ -1935,15 +2158,19 @@ components:
         total:
           description: The total number of results available for the query, ignoring pagination.
           type: integer
+          example: 100
         offset:
           description: The starting position of the returned result set.
           type: integer
+          example: 0
         count:
-          description: The number of results included in the current response.
+          description: The number of results included in the current response (size of data array).
           type: integer
+          example: 10
         limit:
           description: The maximum number of results requested per page.
           type: integer
+          example: 10
     ConsentAuthorizationResource:
       type: object
       description: Represents a specific authorization action taken on a consent by a user.
@@ -2141,18 +2368,19 @@ components:
                     type: string
                     enum: [string, json-schema, attribute]
                     description: Purpose type from the consent purpose definition
-                    example: "string"
+                    example: "attribute"
                   description:
                     type: string
                     description: Purpose description from the consent purpose definition
-                    example: "Allows accessing utility API"
+                    example: "Allows access to the user's first name"
                   attributes:
                     type: object
                     additionalProperties:
                       type: string
                     description: Purpose attributes from the consent purpose definition
                     example:
-                      value: "utility:read"
+                      jsonPath: "$.personal.firstName"
+                      resourcePath: "/user/{nic}"
         attributes:
           type: object
           additionalProperties:

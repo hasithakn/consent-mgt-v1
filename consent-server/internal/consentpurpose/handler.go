@@ -31,27 +31,27 @@ func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Req
 
 	// Validate required headers
 	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
-		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}
 
 	// Decode as array of requests (batch creation)
 	var requests []model.CreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
-		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
 		return
 	}
 
 	// Validate at least one purpose provided
 	if len(requests) == 0 {
-		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "at least one purpose must be provided"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "at least one purpose must be provided"))
 		return
 	}
 
 	// Create purposes in batch (atomic transaction)
 	purposes, serviceErr := h.service.CreatePurposesInBatch(ctx, requests, orgID)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 
@@ -85,13 +85,13 @@ func (h *consentPurposeHandler) getPurpose(w http.ResponseWriter, r *http.Reques
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
 		return
 	}
 
 	purpose, serviceErr := h.service.GetPurpose(ctx, purposeID, orgID)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 
@@ -113,7 +113,7 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
 		return
 	}
 
@@ -138,7 +138,7 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 
 	purposes, total, serviceErr := h.service.ListPurposes(ctx, orgID, limit, offset, name)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 
@@ -177,19 +177,19 @@ func (h *consentPurposeHandler) updatePurpose(w http.ResponseWriter, r *http.Req
 
 	// Validate required headers
 	if err := utils.ValidateOrgID(orgID); err != nil {
-		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}
 
 	var req model.UpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
 		return
 	}
 
 	purpose, serviceErr := h.service.UpdatePurpose(ctx, purposeID, req, orgID)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 
@@ -212,12 +212,12 @@ func (h *consentPurposeHandler) deletePurpose(w http.ResponseWriter, r *http.Req
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
 		return
 	}
 
 	if serviceErr := h.service.DeletePurpose(ctx, purposeID, orgID); serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 
@@ -230,19 +230,19 @@ func (h *consentPurposeHandler) validatePurposes(w http.ResponseWriter, r *http.
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
 		return
 	}
 
 	var purposeNames []string
 	if err := json.NewDecoder(r.Body).Decode(&purposeNames); err != nil {
-		utils.SendError(w, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
 		return
 	}
 
 	validNames, serviceErr := h.service.ValidatePurposeNames(ctx, orgID, purposeNames)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 

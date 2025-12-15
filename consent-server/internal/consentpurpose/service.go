@@ -47,7 +47,7 @@ func (s *consentPurposeService) CreatePurpose(ctx context.Context, req model.Cre
 
 	// Validate request
 	if err := s.validateCreateRequest(req); err != nil {
-		logger.Warn("Consent purpose create request validation failed", log.String("error", err.Error))
+		logger.Warn("Consent purpose create request validation failed", log.String("error", err.Error()))
 		return nil, err
 	}
 
@@ -322,7 +322,7 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 
 	// Validate request
 	if err := s.validateUpdateRequest(req); err != nil {
-		logger.Warn("Update purpose request validation failed", log.String("error", err.Error))
+		logger.Warn("Update purpose request validation failed", log.String("error", err.Error()))
 		return nil, err
 	}
 

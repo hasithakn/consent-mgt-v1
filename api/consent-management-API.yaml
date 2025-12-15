@@ -2601,25 +2601,24 @@ components:
       properties:
         code:
           type: string
-          description: Error code identifying the type of error
-          enum:
-            - BAD_REQUEST
-            - UNAUTHORIZED
-            - FORBIDDEN
-            - NOT_FOUND
-            - INTERNAL_SERVER_ERROR
-          example: "BAD_REQUEST"
+          description: Specific error code identifying the type of error
+          example: "OCM-60002"
         message:
           type: string
           description: Human-readable error message
-          example: "Invalid request body"
-        details:
+          example: "No organization discovery configuration found."
+        description:
           type: string
-          description: Additional details about the error
-          example: "Key: 'ConsentPurposeCreateRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag"
+          description: Detailed description of the error with context
+          example: "There is no organization discovery configuration for organization with ID: c5e33086-585d-4578-88c9-3a048025b95e."
+        traceId:
+          type: string
+          description: Unique trace identifier for request tracking and debugging
+          example: "20251215T101734Z-r1797cbb47b9vtjrhC1SG14uv00000000gh0000000002vhz"
       required:
         - code
         - message
+        - traceId
     AuthorizationState:
       type: string
       description: |

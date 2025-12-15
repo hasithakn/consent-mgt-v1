@@ -30,7 +30,7 @@ func (h *authResourceHandler) handleCreate(w http.ResponseWriter, r *http.Reques
 	// Extract path parameters
 	consentID := r.PathValue("consentId")
 	if consentID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"consent ID is required",
 		))
@@ -40,7 +40,7 @@ func (h *authResourceHandler) handleCreate(w http.ResponseWriter, r *http.Reques
 	// Extract organization ID from header
 	orgID := r.Header.Get(constants.HeaderOrgID)
 	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"organization ID header is required",
 		))
@@ -50,7 +50,7 @@ func (h *authResourceHandler) handleCreate(w http.ResponseWriter, r *http.Reques
 	// Parse request body
 	var request model.CreateRequest
 	if err := utils.DecodeJSONBody(r, &request); err != nil {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			fmt.Sprintf("invalid request body: %v", err),
 		))
@@ -60,7 +60,7 @@ func (h *authResourceHandler) handleCreate(w http.ResponseWriter, r *http.Reques
 	// Call service
 	response, serviceErr := h.service.CreateAuthResource(ctx, consentID, orgID, &request)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *authResourceHandler) handleGet(w http.ResponseWriter, r *http.Request) 
 	consentID := r.PathValue("consentId")
 	authID := r.PathValue("authorizationId")
 	if consentID == "" || authID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"consent ID and auth ID are required",
 		))
@@ -88,7 +88,7 @@ func (h *authResourceHandler) handleGet(w http.ResponseWriter, r *http.Request) 
 	// Extract organization ID from header
 	orgID := r.Header.Get(constants.HeaderOrgID)
 	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"organization ID header is required",
 		))
@@ -98,7 +98,7 @@ func (h *authResourceHandler) handleGet(w http.ResponseWriter, r *http.Request) 
 	// Call service
 	response, serviceErr := h.service.GetAuthResource(ctx, authID, orgID)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 
@@ -115,7 +115,7 @@ func (h *authResourceHandler) handleListByConsent(w http.ResponseWriter, r *http
 	// Extract path parameters
 	consentID := r.PathValue("consentId")
 	if consentID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"consent ID is required",
 		))
@@ -125,7 +125,7 @@ func (h *authResourceHandler) handleListByConsent(w http.ResponseWriter, r *http
 	// Extract organization ID from header
 	orgID := r.Header.Get(constants.HeaderOrgID)
 	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"organization ID header is required",
 		))
@@ -135,7 +135,7 @@ func (h *authResourceHandler) handleListByConsent(w http.ResponseWriter, r *http
 	// Call service
 	response, serviceErr := h.service.GetAuthResourcesByConsentID(ctx, consentID, orgID)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 
@@ -152,7 +152,7 @@ func (h *authResourceHandler) handleListByUser(w http.ResponseWriter, r *http.Re
 	// Extract query parameters
 	userID := r.URL.Query().Get("userId")
 	if userID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"userId query parameter is required",
 		))
@@ -162,7 +162,7 @@ func (h *authResourceHandler) handleListByUser(w http.ResponseWriter, r *http.Re
 	// Extract organization ID from header
 	orgID := r.Header.Get(constants.HeaderOrgID)
 	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"organization ID header is required",
 		))
@@ -172,7 +172,7 @@ func (h *authResourceHandler) handleListByUser(w http.ResponseWriter, r *http.Re
 	// Call service
 	response, serviceErr := h.service.GetAuthResourcesByUserID(ctx, userID, orgID)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 
@@ -190,7 +190,7 @@ func (h *authResourceHandler) handleUpdate(w http.ResponseWriter, r *http.Reques
 	consentID := r.PathValue("consentId")
 	authID := r.PathValue("authorizationId")
 	if consentID == "" || authID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"consent ID and auth ID are required",
 		))
@@ -200,7 +200,7 @@ func (h *authResourceHandler) handleUpdate(w http.ResponseWriter, r *http.Reques
 	// Extract organization ID from header
 	orgID := r.Header.Get(constants.HeaderOrgID)
 	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"organization ID header is required",
 		))
@@ -210,7 +210,7 @@ func (h *authResourceHandler) handleUpdate(w http.ResponseWriter, r *http.Reques
 	// Parse request body
 	var request model.UpdateRequest
 	if err := utils.DecodeJSONBody(r, &request); err != nil {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			fmt.Sprintf("invalid request body: %v", err),
 		))
@@ -220,7 +220,7 @@ func (h *authResourceHandler) handleUpdate(w http.ResponseWriter, r *http.Reques
 	// Call service
 	response, serviceErr := h.service.UpdateAuthResource(ctx, authID, orgID, &request)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 
@@ -238,7 +238,7 @@ func (h *authResourceHandler) handleDelete(w http.ResponseWriter, r *http.Reques
 	consentID := r.PathValue("consentId")
 	authID := r.PathValue("authId")
 	if consentID == "" || authID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"consent ID and auth ID are required",
 		))
@@ -248,7 +248,7 @@ func (h *authResourceHandler) handleDelete(w http.ResponseWriter, r *http.Reques
 	// Extract organization ID from header
 	orgID := r.Header.Get(constants.HeaderOrgID)
 	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"organization ID header is required",
 		))
@@ -258,7 +258,7 @@ func (h *authResourceHandler) handleDelete(w http.ResponseWriter, r *http.Reques
 	// Call service
 	serviceErr := h.service.DeleteAuthResource(ctx, authID, orgID)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 
@@ -273,7 +273,7 @@ func (h *authResourceHandler) handleDeleteByConsent(w http.ResponseWriter, r *ht
 	// Extract path parameters
 	consentID := r.PathValue("consentId")
 	if consentID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"consent ID is required",
 		))
@@ -283,7 +283,7 @@ func (h *authResourceHandler) handleDeleteByConsent(w http.ResponseWriter, r *ht
 	// Extract organization ID from header
 	orgID := r.Header.Get(constants.HeaderOrgID)
 	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"organization ID header is required",
 		))
@@ -293,7 +293,7 @@ func (h *authResourceHandler) handleDeleteByConsent(w http.ResponseWriter, r *ht
 	// Call service
 	serviceErr := h.service.DeleteAuthResourcesByConsentID(ctx, consentID, orgID)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 
@@ -308,7 +308,7 @@ func (h *authResourceHandler) handleUpdateAllStatusByConsent(w http.ResponseWrit
 	// Extract path parameters
 	consentID := r.PathValue("consentId")
 	if consentID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"consent ID is required",
 		))
@@ -318,7 +318,7 @@ func (h *authResourceHandler) handleUpdateAllStatusByConsent(w http.ResponseWrit
 	// Extract organization ID from header
 	orgID := r.Header.Get(constants.HeaderOrgID)
 	if orgID == "" {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"organization ID header is required",
 		))
@@ -330,7 +330,7 @@ func (h *authResourceHandler) handleUpdateAllStatusByConsent(w http.ResponseWrit
 		Status string `json:"status"`
 	}
 	if err := utils.DecodeJSONBody(r, &statusRequest); err != nil {
-		utils.SendError(w, serviceerror.CustomServiceError(
+		utils.SendError(w, r, serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			fmt.Sprintf("invalid request body: %v", err),
 		))
@@ -340,7 +340,7 @@ func (h *authResourceHandler) handleUpdateAllStatusByConsent(w http.ResponseWrit
 	// Call service
 	serviceErr := h.service.UpdateAllStatusByConsentID(ctx, consentID, orgID, statusRequest.Status)
 	if serviceErr != nil {
-		utils.SendError(w, serviceErr)
+		utils.SendError(w, r, serviceErr)
 		return
 	}
 

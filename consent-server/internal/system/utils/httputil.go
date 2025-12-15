@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2025, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package utils
 
 import (
@@ -6,7 +24,9 @@ import (
 
 	"github.com/wso2/consent-management-api/internal/system/constants"
 	"github.com/wso2/consent-management-api/internal/system/error/apierror"
+	"github.com/wso2/consent-management-api/internal/system/error/codes"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
+	"github.com/wso2/consent-management-api/internal/system/log"
 )
 
 func DecodeJSONBody(r *http.Request, v interface{}) error {
@@ -19,6 +39,8 @@ func JSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {
 	json.NewEncoder(w).Encode(data)
 }
 
+// WriteJSONError writes a JSON error response with the new format.
+// Deprecated: Use SendError instead which provides better error handling with trace IDs.
 func WriteJSONError(w http.ResponseWriter, code, description string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
@@ -28,25 +50,58 @@ func WriteJSONError(w http.ResponseWriter, code, description string, statusCode 
 	})
 }
 
-// SendError writes a ServiceError as an HTTP response with appropriate status code
-func SendError(w http.ResponseWriter, err *serviceerror.ServiceError) {
-	statusCode := http.StatusInternalServerError
-	if err.Type == serviceerror.ClientErrorType {
-		if err.Code == serviceerror.ResourceNotFoundError.Code {
-			statusCode = http.StatusNotFound
-		} else if err.Code == serviceerror.ConflictError.Code {
-			statusCode = http.StatusConflict
-		} else {
-			statusCode = http.StatusBadRequest
-		}
-	}
+// SendError writes a ServiceError as an HTTP response with appropriate status code and trace ID.
+// This function extracts the trace ID from the request context and includes it in the error response.
+func SendError(w http.ResponseWriter, r *http.Request, err *serviceerror.ServiceError) {
+	// Determine HTTP status code based on error type and code
+	statusCode := mapErrorToStatusCode(err)
 
-	errorResponse := apierror.ErrorResponse{
-		Code:        err.Error,
-		Description: err.ErrorDescription,
-	}
+	// Extract trace ID from request context
+	traceID := extractTraceID(r)
+
+	// Create error response with new format
+	errorResponse := apierror.NewErrorResponse(
+		err.Code,
+		err.Message,
+		err.Description,
+		traceID,
+	)
 
 	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(errorResponse)
+}
+
+// mapErrorToStatusCode maps service error codes to HTTP status codes
+func mapErrorToStatusCode(err *serviceerror.ServiceError) int {
+	if err.Type == serviceerror.ServerErrorType {
+		return http.StatusInternalServerError
+	}
+
+	// Client error type - map specific codes
+	switch err.Code {
+	case codes.ResourceNotFound, codes.ConsentNotFound, codes.PurposeNotFound, codes.AuthResourceNotFound:
+		return http.StatusNotFound
+	case codes.ConflictError, codes.PurposeInUse:
+		return http.StatusConflict
+	case codes.ValidationError, codes.InvalidRequest:
+		return http.StatusBadRequest
+	default:
+		return http.StatusBadRequest
+	}
+}
+
+// extractTraceID extracts the trace ID (correlation ID) from the request context
+func extractTraceID(r *http.Request) string {
+	if r == nil || r.Context() == nil {
+		return ""
+	}
+
+	traceID := r.Context().Value(log.ContextKeyTraceID)
+	if traceID != nil {
+		if tid, ok := traceID.(string); ok {
+			return tid
+		}
+	}
+	return ""
 }

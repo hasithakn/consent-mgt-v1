@@ -18,9 +18,15 @@
 
 package log
 
+// contextKey is a custom type for context keys to avoid collisions.
+type contextKey string
+
 const (
 	// LoggerKeyComponentName is the key used to identify the component name in the logger.
 	LoggerKeyComponentName = "component"
 	// LoggerKeyTraceID is the key used to identify the trace ID (correlation ID) in the logger.
 	LoggerKeyTraceID = "correlation-id"
+
+	// ContextKeyTraceID is the context key for storing the trace ID.
+	ContextKeyTraceID contextKey = "trace_id"
 )

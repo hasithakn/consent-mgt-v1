@@ -44,7 +44,7 @@ func WrapWithCorrelationID(next http.Handler) http.Handler {
 		w.Header().Set("X-Correlation-ID", correlationID)
 
 		// Add correlation ID to request context using the correct key for logger
-		ctx := context.WithValue(r.Context(), log.LoggerKeyTraceID, correlationID)
+		ctx := context.WithValue(r.Context(), log.ContextKeyTraceID, correlationID)
 
 		// Call next handler with updated context
 		next.ServeHTTP(w, r.WithContext(ctx))

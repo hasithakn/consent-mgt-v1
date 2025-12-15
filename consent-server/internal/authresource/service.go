@@ -66,7 +66,7 @@ func (s *authResourceService) CreateAuthResource(
 
 	// Validate inputs
 	if err := s.validateCreateRequest(consentID, orgID, request); err != nil {
-		logger.Warn("Auth resource create request validation failed", log.String("error", err.Error))
+		logger.Warn("Auth resource create request validation failed", log.String("error", err.Error()))
 		return nil, err
 	}
 
@@ -232,7 +232,7 @@ func (s *authResourceService) GetAuthResource(
 
 	// Validate inputs
 	if err := s.validateAuthIDAndOrgID(authID, orgID); err != nil {
-		logger.Warn("Validation failed for get auth resource", log.String("error", err.Error))
+		logger.Warn("Validation failed for get auth resource", log.String("error", err.Error()))
 		return nil, err
 	}
 
@@ -278,7 +278,7 @@ func (s *authResourceService) GetAuthResourcesByConsentID(
 
 	// Validate inputs
 	if err := s.validateConsentIDAndOrgID(consentID, orgID); err != nil {
-		logger.Warn("Validation failed for get auth resources by consent", log.String("error", err.Error))
+		logger.Warn("Validation failed for get auth resources by consent", log.String("error", err.Error()))
 		return nil, err
 	}
 
@@ -330,7 +330,7 @@ func (s *authResourceService) GetAuthResourcesByUserID(
 		)
 	}
 	if err := s.validateOrgID(orgID); err != nil {
-		logger.Warn("Validation failed for get auth resources by user", log.String("error", err.Error))
+		logger.Warn("Validation failed for get auth resources by user", log.String("error", err.Error()))
 		return nil, err
 	}
 
@@ -378,7 +378,7 @@ func (s *authResourceService) UpdateAuthResource(
 	// Validate inputs
 	if err := s.validateAuthIDAndOrgID(authID, orgID); err != nil {
 		logger.Warn("Validation failed for update auth resource",
-			log.String("error", err.Error),
+			log.String("error", err.Error()),
 			log.String("auth_id", authID),
 		)
 		return nil, err
@@ -588,7 +588,7 @@ func (s *authResourceService) DeleteAuthResource(
 
 	// Validate inputs
 	if err := s.validateAuthIDAndOrgID(authID, orgID); err != nil {
-		logger.Warn("Validation failed for delete auth resource", log.String("error", err.Error))
+		logger.Warn("Validation failed for delete auth resource", log.String("error", err.Error()))
 		return err
 	}
 
@@ -740,7 +740,7 @@ func (s *authResourceService) DeleteAuthResourcesByConsentID(
 
 	// Validate inputs
 	if err := s.validateConsentIDAndOrgID(consentID, orgID); err != nil {
-		logger.Warn("Validation failed for delete auth resources by consent", log.String("error", err.Error))
+		logger.Warn("Validation failed for delete auth resources by consent", log.String("error", err.Error()))
 		return err
 	}
 
@@ -784,7 +784,7 @@ func (s *authResourceService) UpdateAllStatusByConsentID(
 
 	// Validate inputs
 	if err := s.validateConsentIDAndOrgID(consentID, orgID); err != nil {
-		logger.Warn("Validation failed for update auth statuses", log.String("error", err.Error))
+		logger.Warn("Validation failed for update auth statuses", log.String("error", err.Error()))
 		return err
 	}
 	if status == "" {

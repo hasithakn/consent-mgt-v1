@@ -126,7 +126,7 @@ func (l *Logger) WithTraceID(traceID string) *Logger {
 // WithContext creates a new logger instance with fields extracted from the context.
 // Currently extracts the trace ID (correlation ID) if present in the context.
 func (l *Logger) WithContext(ctx context.Context) *Logger {
-	traceID := ctx.Value(LoggerKeyTraceID)
+	traceID := ctx.Value(ContextKeyTraceID)
 	if traceID != nil {
 		if tid, ok := traceID.(string); ok {
 			return l.WithTraceID(tid)

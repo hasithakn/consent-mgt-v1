@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	"github.com/wso2/consent-management-api/internal/system/log"
 )
 
 // Config holds all configuration for the application
@@ -183,6 +184,9 @@ var globalConfig *Config
 
 // Load reads configuration from file and environment variables
 func Load(configPath string) (*Config, error) {
+	logger := log.GetLogger()
+	logger.Info("Loading configuration", log.String("config_path", configPath))
+
 	v := viper.New()
 
 	// Set config file path
@@ -206,21 +210,31 @@ func Load(configPath string) (*Config, error) {
 
 	// Read the config file
 	if err := v.ReadInConfig(); err != nil {
+		logger.Error("Failed to read config file", log.Error(err))
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
+
+	logger.Info("Config file loaded", log.String("file", v.ConfigFileUsed()))
 
 	// Unmarshal config
 	var config Config
 	if err := v.Unmarshal(&config); err != nil {
+		logger.Error("Failed to unmarshal config", log.Error(err))
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	// Validate config
 	if err := validateConfig(&config); err != nil {
+		logger.Error("Config validation failed", log.Error(err))
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
 	globalConfig = &config
+	logger.Info("Configuration loaded and validated successfully",
+		log.String("server_port", fmt.Sprintf("%d", config.Server.Port)),
+		log.String("db_host", config.Database.Consent.Hostname),
+		log.Bool("extension_enabled", config.ServiceExtension.Enabled),
+	)
 	return &config, nil
 }
 

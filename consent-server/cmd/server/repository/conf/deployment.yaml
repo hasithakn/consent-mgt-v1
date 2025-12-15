@@ -65,7 +65,7 @@ security:
     # Default credentials for development (should be changed in production)
     users:
       - username: admin
-        password: admin123
+        password: admin
 
 cors:
   allowed_origins:

@@ -94,18 +94,9 @@ func ValidateConsentGetRequest(consentID, orgID string) error {
 func EvaluateConsentStatusFromAuthStatuses(authStatuses []string) string {
 	consentConfig := config.Get().Consent
 
-	// Debug logging
-	fmt.Printf("[DEBUG] EvaluateConsentStatusFromAuthStatuses called with %d statuses: %v\n", len(authStatuses), authStatuses)
-	fmt.Printf("[DEBUG] Config - Approved: %s, Rejected: %s, Created: %s\n",
-		consentConfig.GetApprovedAuthStatus(),
-		consentConfig.GetRejectedAuthStatus(),
-		consentConfig.GetCreatedAuthStatus())
-
 	if len(authStatuses) == 0 {
 		// No auth resources - default to created status
-		result := string(consentConfig.GetCreatedConsentStatus())
-		fmt.Printf("[DEBUG] No auth statuses, returning: %s\n", result)
-		return result
+		return string(consentConfig.GetCreatedConsentStatus())
 	}
 
 	// Evaluate ALL auth statuses with priority logic
@@ -113,7 +104,7 @@ func EvaluateConsentStatusFromAuthStatuses(authStatuses []string) string {
 	hasCreated := false
 	allApproved := true
 
-	for i, authStatus := range authStatuses {
+	for _, authStatus := range authStatuses {
 		// Map auth status to consent status first (case-insensitive comparison)
 		authStatusUpper := strings.ToUpper(authStatus)
 		var mappedConsentStatus string
@@ -133,8 +124,6 @@ func EvaluateConsentStatusFromAuthStatuses(authStatuses []string) string {
 			mappedConsentStatus = string(consentConfig.GetCreatedConsentStatus())
 		}
 
-		fmt.Printf("[DEBUG] Auth status[%d]: '%s' → mapped to consent status: '%s'\n", i, authStatus, mappedConsentStatus)
-
 		// Now check the mapped consent status
 		if mappedConsentStatus == string(consentConfig.GetRejectedConsentStatus()) {
 			hasRejected = true
@@ -148,20 +137,15 @@ func EvaluateConsentStatusFromAuthStatuses(authStatuses []string) string {
 	}
 
 	// Priority: rejected > created > approved (active)
-	var result string
 	if hasRejected {
-		result = string(consentConfig.GetRejectedConsentStatus())
+		return string(consentConfig.GetRejectedConsentStatus())
 	} else if hasCreated {
-		result = string(consentConfig.GetCreatedConsentStatus())
+		return string(consentConfig.GetCreatedConsentStatus())
 	} else if allApproved {
-		result = string(consentConfig.GetActiveConsentStatus())
+		return string(consentConfig.GetActiveConsentStatus())
 	} else {
-		result = string(consentConfig.GetCreatedConsentStatus())
+		return string(consentConfig.GetCreatedConsentStatus())
 	}
-
-	fmt.Printf("[DEBUG] Final result - hasRejected=%v, hasCreated=%v, allApproved=%v → returning: %s\n",
-		hasRejected, hasCreated, allApproved, result)
-	return result
 }
 
 // IsExpired checks if a given validity time has expired

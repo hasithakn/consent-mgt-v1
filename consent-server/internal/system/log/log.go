@@ -72,7 +72,7 @@ func SetLogLevel(logLevel string) error {
 		Level: level,
 	}
 
-	logHandler := slog.NewJSONHandler(os.Stdout, handlerOptions)
+	logHandler := slog.NewTextHandler(os.Stdout, handlerOptions)
 	if logHandler == nil {
 		return errors.New("failed to create log handler")
 	}
@@ -98,7 +98,7 @@ func initLogger() error {
 		Level: level,
 	}
 
-	logHandler := slog.NewJSONHandler(os.Stdout, handlerOptions)
+	logHandler := slog.NewTextHandler(os.Stdout, handlerOptions)
 	if logHandler == nil {
 		return errors.New("failed to create log handler")
 	}

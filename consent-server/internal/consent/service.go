@@ -897,25 +897,29 @@ func (consentService *consentService) ValidateConsent(ctx context.Context, req m
 		response.ErrorCode = 404
 		response.ErrorMessage = "not_found"
 		response.ErrorDescription = "Consent not found"
-	}
-
-	// Check if consent is expired and update status accordingly
-	expiredStatusName := string(config.Get().Consent.GetExpiredConsentStatus())
-	if consent.ValidityTime != nil && validator.IsConsentExpired(*consent.ValidityTime) {
-		// Update consent status to expired if not already expired
-		if consent.CurrentStatus != expiredStatusName {
-			if err := consentService.expireConsent(ctx, consent, orgID); err != nil {
-				// Log error but continue with validation
-				// The consent object is already updated in-memory by expireConsent
-			} else {
-				consent, err = consentStore.GetByID(ctx, req.ConsentID, orgID)
+	} else {
+		// Check if consent is expired and update status accordingly (only if consent exists)
+		expiredStatusName := string(config.Get().Consent.GetExpiredConsentStatus())
+		if consent.ValidityTime != nil && validator.IsConsentExpired(*consent.ValidityTime) {
+			// Update consent status to expired if not already expired
+			if consent.CurrentStatus != expiredStatusName {
+				if err := consentService.expireConsent(ctx, consent, orgID); err != nil {
+					// Log error but continue with validation
+					// The consent object is already updated in-memory by expireConsent
+				} else {
+					// Re-fetch consent after expiring to get latest state
+					if updatedConsent, fetchErr := consentStore.GetByID(ctx, req.ConsentID, orgID); fetchErr == nil && updatedConsent != nil {
+						consent = updatedConsent
+					}
+					// If re-fetch fails, continue with in-memory consent object
+				}
 			}
 		}
 	}
 
 	// Check consent status - only active consents are valid
 	activeStatusName := string(config.Get().Consent.GetActiveConsentStatus())
-	if consent.CurrentStatus != activeStatusName && response.ErrorCode == 0 {
+	if consent != nil && consent.CurrentStatus != activeStatusName && response.ErrorCode == 0 {
 		response.ErrorCode = 401
 		response.ErrorMessage = "invalid_consent_status"
 		response.ErrorDescription = fmt.Sprintf("Consent status is '%s', expected '%s'", consent.CurrentStatus, activeStatusName)
@@ -926,26 +930,28 @@ func (consentService *consentService) ValidateConsent(ctx context.Context, req m
 		response.IsValid = true
 	}
 
-	// Retrieve related data for consent information
-	authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
-	purposeStore := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore)
+	// Retrieve related data for consent information (only if consent exists)
+	if consent != nil {
+		authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
+		purposeStore := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore)
 
-	attributes, _ := consentStore.GetAttributesByConsentID(ctx, consent.ConsentID, orgID)
-	authResources, _ := authResourceStore.GetByConsentID(ctx, consent.ConsentID, orgID)
-	purposeMappings, _ := purposeStore.GetMappingsByConsentID(ctx, consent.ConsentID, orgID)
+		attributes, _ := consentStore.GetAttributesByConsentID(ctx, consent.ConsentID, orgID)
+		authResources, _ := authResourceStore.GetByConsentID(ctx, consent.ConsentID, orgID)
+		purposeMappings, _ := purposeStore.GetMappingsByConsentID(ctx, consent.ConsentID, orgID)
 
-	// Convert attributes slice to map
-	attributesMap := make(map[string]string)
-	for _, a := range attributes {
-		attributesMap[a.AttKey] = a.AttValue
+		// Convert attributes slice to map
+		attributesMap := make(map[string]string)
+		for _, a := range attributes {
+			attributesMap[a.AttKey] = a.AttValue
+		}
+
+		// Build complete consent response
+		consentResponse := buildConsentResponse(consent, attributesMap, authResources, purposeMappings)
+
+		// Convert to API response and then to ValidateConsentAPIResponse (which excludes modifiedResponse)
+		apiResponse := consentService.EnrichedConsentAPIResponseWithPurposeDetails(ctx, consentResponse, orgID)
+		response.ConsentInformation = apiResponse.ToValidateConsentAPIResponse()
 	}
-
-	// Build complete consent response
-	consentResponse := buildConsentResponse(consent, attributesMap, authResources, purposeMappings)
-
-	// Convert to API response and then to ValidateConsentAPIResponse (which excludes modifiedResponse)
-	apiResponse := consentService.EnrichedConsentAPIResponseWithPurposeDetails(ctx, consentResponse, orgID)
-	response.ConsentInformation = apiResponse.ToValidateConsentAPIResponse()
 
 	return response, nil
 }

@@ -60,6 +60,11 @@ var (
 		ID:    "UPDATE_ALL_STATUS_BY_CONSENT_ID",
 		Query: "UPDATE CONSENT_AUTH_RESOURCE SET AUTH_STATUS = ?, UPDATED_TIME = ? WHERE CONSENT_ID = ? AND ORG_ID = ?",
 	}
+
+	QueryGetAuthResourcesByConsentIDs = dbmodel.DBQuery{
+		ID:    "GET_AUTH_RESOURCES_BY_CONSENT_IDS",
+		Query: "", // Built dynamically
+	}
 )
 
 // authResourceStore defines the interface for auth resource data operations
@@ -68,6 +73,7 @@ type AuthResourceStore interface {
 	// Read operations - use dbClient directly
 	GetByID(ctx context.Context, authID, orgID string) (*model.AuthResource, error)
 	GetByConsentID(ctx context.Context, consentID, orgID string) ([]model.AuthResource, error)
+	GetByConsentIDs(ctx context.Context, consentIDs []string, orgID string) ([]model.AuthResource, error)
 	Exists(ctx context.Context, authID, orgID string) (bool, error)
 	GetByUserID(ctx context.Context, userID, orgID string) ([]model.AuthResource, error)
 
@@ -198,6 +204,42 @@ func (s *store) GetByUserID(ctx context.Context, userID, orgID string) ([]model.
 func (s *store) UpdateAllStatusByConsentID(tx dbmodel.TxInterface, consentID, orgID, status string, updatedTime int64) error {
 	_, err := tx.Exec(QueryUpdateAllStatusByConsentID.Query, status, updatedTime, consentID, orgID)
 	return err
+}
+
+// GetByConsentIDs retrieves auth resources for multiple consents
+func (s *store) GetByConsentIDs(ctx context.Context, consentIDs []string, orgID string) ([]model.AuthResource, error) {
+	if len(consentIDs) == 0 {
+		return []model.AuthResource{}, nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := ""
+	args := make([]interface{}, 0, len(consentIDs)+1)
+	for i, id := range consentIDs {
+		if i > 0 {
+			placeholders += ", "
+		}
+		placeholders += "?"
+		args = append(args, id)
+	}
+	args = append(args, orgID)
+
+	// Build dynamic query
+	query := dbmodel.DBQuery{
+		ID:    QueryGetAuthResourcesByConsentIDs.ID,
+		Query: fmt.Sprintf("SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS, UPDATED_TIME, RESOURCES, ORG_ID FROM CONSENT_AUTH_RESOURCE WHERE CONSENT_ID IN (%s) AND ORG_ID = ?", placeholders),
+	}
+
+	results, err := s.dbClient.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	authResources := make([]model.AuthResource, 0, len(results))
+	for _, row := range results {
+		authResources = append(authResources, *mapToAuthResource(row))
+	}
+	return authResources, nil
 }
 
 // mapToAuthResource converts a database row map to AuthResource

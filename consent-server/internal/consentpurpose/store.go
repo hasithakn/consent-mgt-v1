@@ -106,6 +106,11 @@ var (
 		ID:    "DELETE_MAPPINGS_BY_CONSENT_ID",
 		Query: "DELETE FROM CONSENT_PURPOSE_MAPPING WHERE CONSENT_ID = ? AND ORG_ID = ?",
 	}
+
+	QueryGetMappingsByConsentIDs = dbmodel.DBQuery{
+		ID:    "GET_MAPPINGS_BY_CONSENT_IDS",
+		Query: "", // Built dynamically
+	}
 )
 
 // consentPurposeStore defines the interface for consent purpose data operations
@@ -119,6 +124,7 @@ type ConsentPurposeStore interface {
 	GetAttributesByPurposeID(ctx context.Context, purposeID, orgID string) ([]model.ConsentPurposeAttribute, error)
 	GetPurposesByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentPurpose, error)
 	GetMappingsByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentPurposeMapping, error)
+	GetMappingsByConsentIDs(ctx context.Context, consentIDs []string, orgID string) ([]model.ConsentPurposeMapping, error)
 	GetIDsByNames(ctx context.Context, names []string, orgID string) (map[string]string, error)
 
 	// Write operations - transactional with tx parameter
@@ -428,6 +434,49 @@ func (s *store) GetPurposesByConsentID(ctx context.Context, consentID, orgID str
 // GetMappingsByConsentID retrieves all purpose mappings for a consent with their values
 func (s *store) GetMappingsByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentPurposeMapping, error) {
 	rows, err := s.dbClient.Query(QueryGetMappingsByConsentID, consentID, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	mappings := make([]model.ConsentPurposeMapping, 0, len(rows))
+	for _, row := range rows {
+		mapping := mapToConsentPurposeMapping(row)
+		if mapping != nil {
+			mappings = append(mappings, *mapping)
+		}
+	}
+
+	return mappings, nil
+}
+
+// GetMappingsByConsentIDs retrieves purpose mappings for multiple consents with their values
+func (s *store) GetMappingsByConsentIDs(ctx context.Context, consentIDs []string, orgID string) ([]model.ConsentPurposeMapping, error) {
+	if len(consentIDs) == 0 {
+		return []model.ConsentPurposeMapping{}, nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := ""
+	args := make([]interface{}, 0, len(consentIDs)+1)
+	for i, id := range consentIDs {
+		if i > 0 {
+			placeholders += ", "
+		}
+		placeholders += "?"
+		args = append(args, id)
+	}
+	args = append(args, orgID)
+
+	// Build dynamic query
+	query := dbmodel.DBQuery{
+		ID: QueryGetMappingsByConsentIDs.ID,
+		Query: fmt.Sprintf(`SELECT cpm.CONSENT_ID, cpm.PURPOSE_ID, cpm.ORG_ID, cpm.VALUE, cpm.IS_USER_APPROVED, cpm.IS_MANDATORY, cp.NAME
+				FROM CONSENT_PURPOSE_MAPPING cpm
+				INNER JOIN CONSENT_PURPOSE cp ON cpm.PURPOSE_ID = cp.ID
+				WHERE cpm.CONSENT_ID IN (%s) AND cpm.ORG_ID = ?`, placeholders),
+	}
+
+	rows, err := s.dbClient.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

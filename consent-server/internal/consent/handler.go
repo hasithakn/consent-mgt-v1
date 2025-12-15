@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/wso2/consent-management-api/internal/consent/model"
 	"github.com/wso2/consent-management-api/internal/system/constants"
@@ -89,34 +90,81 @@ func (h *consentHandler) listConsents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse pagination parameters
 	limit := 10
 	offset := 0
 
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l
 		}
 	}
 
 	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		if o, err := strconv.Atoi(offsetStr); err == nil {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
 			offset = o
 		}
 	}
 
-	consents, total, serviceErr := h.service.ListConsents(ctx, orgID, limit, offset)
+	// Build search filters
+	filters := model.ConsentSearchFilters{
+		OrgID:  orgID,
+		Limit:  limit,
+		Offset: offset,
+	}
+
+	// Parse consentTypes (comma-separated)
+	if consentTypesStr := r.URL.Query().Get("consentTypes"); consentTypesStr != "" {
+		filters.ConsentTypes = strings.Split(consentTypesStr, ",")
+		// Trim whitespace
+		for i := range filters.ConsentTypes {
+			filters.ConsentTypes[i] = strings.TrimSpace(filters.ConsentTypes[i])
+		}
+	}
+
+	// Parse consentStatuses (comma-separated)
+	if statusesStr := r.URL.Query().Get("consentStatuses"); statusesStr != "" {
+		filters.ConsentStatuses = strings.Split(statusesStr, ",")
+		for i := range filters.ConsentStatuses {
+			filters.ConsentStatuses[i] = strings.TrimSpace(filters.ConsentStatuses[i])
+		}
+	}
+
+	// Parse clientIds (comma-separated)
+	if clientIDsStr := r.URL.Query().Get("clientIds"); clientIDsStr != "" {
+		filters.ClientIDs = strings.Split(clientIDsStr, ",")
+		for i := range filters.ClientIDs {
+			filters.ClientIDs[i] = strings.TrimSpace(filters.ClientIDs[i])
+		}
+	}
+
+	// Parse userIds (comma-separated)
+	if userIDsStr := r.URL.Query().Get("userIds"); userIDsStr != "" {
+		filters.UserIDs = strings.Split(userIDsStr, ",")
+		for i := range filters.UserIDs {
+			filters.UserIDs[i] = strings.TrimSpace(filters.UserIDs[i])
+		}
+	}
+
+	// Parse fromTime (Unix timestamp in milliseconds)
+	if fromTimeStr := r.URL.Query().Get("fromTime"); fromTimeStr != "" {
+		if ft, err := strconv.ParseInt(fromTimeStr, 10, 64); err == nil {
+			filters.FromTime = &ft
+		}
+	}
+
+	// Parse toTime (Unix timestamp in milliseconds)
+	if toTimeStr := r.URL.Query().Get("toTime"); toTimeStr != "" {
+		if tt, err := strconv.ParseInt(toTimeStr, 10, 64); err == nil {
+			filters.ToTime = &tt
+		}
+	}
+
+	// Use detailed search to include nested data
+	response, serviceErr := h.service.SearchConsentsDetailed(ctx, filters)
 	if serviceErr != nil {
 		utils.SendError(w, serviceErr)
 		return
-	}
-
-	response := model.ConsentSearchResponse{
-		Data: consents,
-		Metadata: model.ConsentSearchMetadata{
-			Total:  total,
-			Limit:  limit,
-			Offset: offset,
-		},
 	}
 
 	w.Header().Set(constants.HeaderContentType, "application/json")

@@ -23,6 +23,8 @@ type ConsentService interface {
 	CreateConsent(ctx context.Context, req model.ConsentAPIRequest, clientID, orgID string) (*model.ConsentResponse, *serviceerror.ServiceError)
 	GetConsent(ctx context.Context, consentID, orgID string) (*model.ConsentResponse, *serviceerror.ServiceError)
 	ListConsents(ctx context.Context, orgID string, limit, offset int) ([]model.ConsentResponse, int, *serviceerror.ServiceError)
+	SearchConsents(ctx context.Context, filters model.ConsentSearchFilters) ([]model.ConsentResponse, int, *serviceerror.ServiceError)
+	SearchConsentsDetailed(ctx context.Context, filters model.ConsentSearchFilters) (*model.ConsentDetailSearchResponse, *serviceerror.ServiceError)
 	UpdateConsent(ctx context.Context, req model.ConsentAPIUpdateRequest, orgID, consentID string) (*model.ConsentResponse, *serviceerror.ServiceError)
 	RevokeConsent(ctx context.Context, consentID, orgID string, req model.ConsentRevokeRequest) (*model.ConsentRevokeResponse, *serviceerror.ServiceError)
 	ValidateConsent(ctx context.Context, req model.ValidateRequest, orgID string) (*model.ValidateResponse, *serviceerror.ServiceError)
@@ -326,6 +328,201 @@ func (consentService *consentService) ListConsents(ctx context.Context, orgID st
 	}
 
 	return responses, total, nil
+}
+
+// SearchConsents retrieves consents based on search filters with pagination
+func (consentService *consentService) SearchConsents(ctx context.Context, filters model.ConsentSearchFilters) ([]model.ConsentResponse, int, *serviceerror.ServiceError) {
+	// Validate pagination
+	if filters.Limit <= 0 {
+		filters.Limit = 10
+	}
+	if filters.Offset < 0 {
+		filters.Offset = 0
+	}
+
+	store := consentService.stores.Consent.(ConsentStore)
+	consents, total, err := store.Search(ctx, filters)
+	if err != nil {
+		return nil, 0, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+	}
+
+	// Convert to responses
+	responses := make([]model.ConsentResponse, 0, len(consents))
+	for _, c := range consents {
+		responses = append(responses, model.ConsentResponse{
+			ConsentID:                  c.ConsentID,
+			CreatedTime:                c.CreatedTime,
+			UpdatedTime:                c.UpdatedTime,
+			ClientID:                   c.ClientID,
+			ConsentType:                c.ConsentType,
+			CurrentStatus:              c.CurrentStatus,
+			ConsentFrequency:           c.ConsentFrequency,
+			ValidityTime:               c.ValidityTime,
+			RecurringIndicator:         c.RecurringIndicator,
+			DataAccessValidityDuration: c.DataAccessValidityDuration,
+			OrgID:                      c.OrgID,
+		})
+	}
+
+	return responses, total, nil
+}
+
+// SearchConsentsDetailed retrieves consents with nested authorization resources, purposes, and attributes
+func (consentService *consentService) SearchConsentsDetailed(ctx context.Context, filters model.ConsentSearchFilters) (*model.ConsentDetailSearchResponse, *serviceerror.ServiceError) {
+	// Validate pagination
+	if filters.Limit <= 0 {
+		filters.Limit = 10
+	}
+	if filters.Offset < 0 {
+		filters.Offset = 0
+	}
+
+	// Step 1: Search consents
+	consentStore := consentService.stores.Consent.(ConsentStore)
+	consents, total, err := consentStore.Search(ctx, filters)
+	if err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+	}
+
+	if len(consents) == 0 {
+		return &model.ConsentDetailSearchResponse{
+			Data:     []model.ConsentDetailResponse{},
+			Metadata: model.ConsentSearchMetadata{Limit: filters.Limit, Offset: filters.Offset, Count: 0},
+		}, nil
+	}
+
+	// Step 2: Extract consent IDs
+	consentIDs := make([]string, len(consents))
+	for i, c := range consents {
+		consentIDs[i] = c.ConsentID
+	}
+
+	// Step 3: Batch fetch related data in parallel
+	authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
+	purposeStore := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore)
+
+	authResources, err := authResourceStore.GetByConsentIDs(ctx, consentIDs, filters.OrgID)
+	if err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+	}
+
+	purposeMappings, err := purposeStore.GetMappingsByConsentIDs(ctx, consentIDs, filters.OrgID)
+	if err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+	}
+
+	attributesByConsent, err := consentStore.GetAttributesByConsentIDs(ctx, consentIDs, filters.OrgID)
+	if err != nil {
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+	}
+
+	// Step 4: Group by consent ID
+	authsByConsent := make(map[string][]authmodel.AuthResource)
+	for _, auth := range authResources {
+		authsByConsent[auth.ConsentID] = append(authsByConsent[auth.ConsentID], auth)
+	}
+
+	purposesByConsent := make(map[string][]purposemodel.ConsentPurposeMapping)
+	for _, mapping := range purposeMappings {
+		purposesByConsent[mapping.ConsentID] = append(purposesByConsent[mapping.ConsentID], mapping)
+	}
+
+	// Step 5: Assemble detailed responses
+	detailedResponses := make([]model.ConsentDetailResponse, 0, len(consents))
+	for _, consent := range consents {
+		// Build authorizations - initialize as empty slice
+		authorizations := make([]model.AuthorizationDetail, 0)
+		for _, auth := range authsByConsent[consent.ConsentID] {
+			var resources interface{}
+			if auth.Resources != nil && *auth.Resources != "" {
+				_ = json.Unmarshal([]byte(*auth.Resources), &resources)
+			}
+
+			userID := ""
+			if auth.UserID != nil {
+				userID = *auth.UserID
+			}
+
+			authorizations = append(authorizations, model.AuthorizationDetail{
+				ID:          auth.AuthID,
+				UserID:      userID,
+				Type:        auth.AuthType,
+				Status:      auth.AuthStatus,
+				UpdatedTime: auth.UpdatedTime,
+				Resources:   resources,
+			})
+		}
+
+		// Build consent purposes - initialize as empty slice
+		consentPurposes := make([]model.ConsentPurposeItem, 0)
+		for _, mapping := range purposesByConsent[consent.ConsentID] {
+			var value interface{}
+			// mapping.Value is already interface{}, check if it's string and unmarshal
+			if mapping.Value != nil {
+				if strVal, ok := mapping.Value.(string); ok && strVal != "" {
+					_ = json.Unmarshal([]byte(strVal), &value)
+				} else {
+					value = mapping.Value
+				}
+			}
+
+			// Convert bool to *bool for optional fields
+			isUserApproved := mapping.IsUserApproved
+			isMandatory := mapping.IsMandatory
+
+			consentPurposes = append(consentPurposes, model.ConsentPurposeItem{
+				Name:           mapping.Name,
+				Value:          value,
+				IsUserApproved: &isUserApproved,
+				IsMandatory:    &isMandatory,
+			})
+		}
+
+		// Get attributes (already grouped by consent ID)
+		attributes := attributesByConsent[consent.ConsentID]
+		if attributes == nil {
+			attributes = make(map[string]string)
+		}
+
+		// Dereference pointer fields for response
+		frequency := 0
+		if consent.ConsentFrequency != nil {
+			frequency = *consent.ConsentFrequency
+		}
+		validityTime := int64(0)
+		if consent.ValidityTime != nil {
+			validityTime = *consent.ValidityTime
+		}
+		recurringIndicator := false
+		if consent.RecurringIndicator != nil {
+			recurringIndicator = *consent.RecurringIndicator
+		}
+		dataAccessValidityDuration := int64(0)
+		if consent.DataAccessValidityDuration != nil {
+			dataAccessValidityDuration = *consent.DataAccessValidityDuration
+		}
+
+		detailedResponses = append(detailedResponses, model.ConsentDetailResponse{
+			ID:                         consent.ConsentID,
+			ConsentPurposes:            consentPurposes,
+			CreatedTime:                consent.CreatedTime,
+			UpdatedTime:                consent.UpdatedTime,
+			ClientID:                   consent.ClientID,
+			Type:                       consent.ConsentType,
+			Status:                     consent.CurrentStatus,
+			Frequency:                  frequency,
+			ValidityTime:               validityTime,
+			RecurringIndicator:         recurringIndicator,
+			DataAccessValidityDuration: dataAccessValidityDuration,
+			Attributes:                 attributes,
+			Authorizations:             authorizations,
+		})
+	}
+
+	return &model.ConsentDetailSearchResponse{
+		Data:     detailedResponses,
+		Metadata: model.ConsentSearchMetadata{Limit: filters.Limit, Offset: filters.Offset, Count: total},
+	}, nil
 }
 
 // UpdateConsent updates an existing consent

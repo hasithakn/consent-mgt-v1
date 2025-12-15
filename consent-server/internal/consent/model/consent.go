@@ -246,6 +246,53 @@ type ConsentSearchMetadata struct {
 	Total  int `json:"total"`
 	Limit  int `json:"limit"`
 	Offset int `json:"offset"`
+	Count  int `json:"count"` // Number of results in current page
+}
+
+// ConsentSearchFilters represents search criteria for consents
+type ConsentSearchFilters struct {
+	ConsentTypes    []string // e.g., ["accounts", "payments"]
+	ConsentStatuses []string // e.g., ["active", "revoked"]
+	ClientIDs       []string // TPP client IDs
+	UserIDs         []string // End-user IDs
+	FromTime        *int64   // Unix timestamp - start of time window
+	ToTime          *int64   // Unix timestamp - end of time window
+	Limit           int
+	Offset          int
+	OrgID           string
+}
+
+// ConsentDetailResponse represents a detailed consent with related data
+type ConsentDetailResponse struct {
+	ID                         string                `json:"id"`
+	ConsentPurposes            []ConsentPurposeItem  `json:"consentPurpose"`
+	CreatedTime                int64                 `json:"createdTime"`
+	UpdatedTime                int64                 `json:"updatedTime"`
+	ClientID                   string                `json:"clientId"`
+	Type                       string                `json:"type"`
+	Status                     string                `json:"status"`
+	Frequency                  int                   `json:"frequency"`
+	ValidityTime               int64                 `json:"validityTime"`
+	RecurringIndicator         bool                  `json:"recurringIndicator"`
+	DataAccessValidityDuration int64                 `json:"dataAccessValidityDuration"`
+	Attributes                 map[string]string     `json:"attributes"`
+	Authorizations             []AuthorizationDetail `json:"authorizations"`
+}
+
+// AuthorizationDetail represents authorization resource details
+type AuthorizationDetail struct {
+	ID          string      `json:"id"`
+	UserID      string      `json:"userId"`
+	Type        string      `json:"type"`
+	Status      string      `json:"status"`
+	UpdatedTime int64       `json:"updatedTime"`
+	Resources   interface{} `json:"resources,omitempty"`
+}
+
+// ConsentDetailSearchResponse wraps detailed consent search results
+type ConsentDetailSearchResponse struct {
+	Data     []ConsentDetailResponse `json:"data"`
+	Metadata ConsentSearchMetadata   `json:"metadata"`
 }
 
 // ConsentRevokeRequest represents the request to revoke a consent

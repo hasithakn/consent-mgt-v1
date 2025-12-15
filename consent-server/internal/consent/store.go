@@ -3,6 +3,7 @@ package consent
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/wso2/consent-management-api/internal/consent/model"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
@@ -87,6 +88,16 @@ var (
 		ID:    "GET_STATUS_AUDIT_BY_CONSENT_ID",
 		Query: "SELECT STATUS_AUDIT_ID, CONSENT_ID, CURRENT_STATUS, ACTION_TIME, REASON, ACTION_BY, PREVIOUS_STATUS, ORG_ID FROM CONSENT_STATUS_AUDIT WHERE CONSENT_ID = ? AND ORG_ID = ? ORDER BY ACTION_TIME DESC",
 	}
+
+	QueryGetAttributesByConsentIDs = dbmodel.DBQuery{
+		ID:    "GET_ATTRIBUTES_BY_CONSENT_IDS",
+		Query: "", // Built dynamically
+	}
+
+	QuerySearchConsents = dbmodel.DBQuery{
+		ID:    "SEARCH_CONSENTS",
+		Query: "", // Built dynamically
+	}
 )
 
 // consentStore defines the interface for consent data operations
@@ -95,8 +106,10 @@ type ConsentStore interface {
 	// Read operations - use dbClient directly
 	GetByID(ctx context.Context, consentID, orgID string) (*model.Consent, error)
 	List(ctx context.Context, orgID string, limit, offset int) ([]model.Consent, int, error)
+	Search(ctx context.Context, filters model.ConsentSearchFilters) ([]model.Consent, int, error)
 	GetByClientID(ctx context.Context, clientID, orgID string) ([]model.Consent, error)
 	GetAttributesByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentAttribute, error)
+	GetAttributesByConsentIDs(ctx context.Context, consentIDs []string, orgID string) (map[string]map[string]string, error)
 	GetStatusAuditByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentStatusAudit, error)
 	FindConsentIDsByAttributeKey(ctx context.Context, key, orgID string) ([]string, error)
 	FindConsentIDsByAttribute(ctx context.Context, key, value, orgID string) ([]string, error)
@@ -160,6 +173,119 @@ func (s *store) List(ctx context.Context, orgID string, limit, offset int) ([]mo
 	}
 
 	rows, err := s.dbClient.Query(QueryListConsents, orgID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	consents := make([]model.Consent, 0, len(rows))
+	for _, row := range rows {
+		consent := mapToConsent(row)
+		if consent != nil {
+			consents = append(consents, *consent)
+		}
+	}
+
+	return consents, totalCount, nil
+}
+
+// Search retrieves consents based on filters with pagination
+func (s *store) Search(ctx context.Context, filters model.ConsentSearchFilters) ([]model.Consent, int, error) {
+	// Build WHERE clause dynamically
+	whereConditions := []string{"CONSENT.ORG_ID = ?"}
+	args := []interface{}{filters.OrgID}
+	countArgs := []interface{}{filters.OrgID}
+
+	// Add consentTypes filter (IN clause)
+	if len(filters.ConsentTypes) > 0 {
+		placeholders := make([]string, len(filters.ConsentTypes))
+		for i, ct := range filters.ConsentTypes {
+			placeholders[i] = "?"
+			args = append(args, ct)
+			countArgs = append(countArgs, ct)
+		}
+		whereConditions = append(whereConditions, fmt.Sprintf("CONSENT.CONSENT_TYPE IN (%s)", strings.Join(placeholders, ",")))
+	}
+
+	// Add consentStatuses filter (IN clause) - convert to uppercase
+	if len(filters.ConsentStatuses) > 0 {
+		placeholders := make([]string, len(filters.ConsentStatuses))
+		for i, status := range filters.ConsentStatuses {
+			placeholders[i] = "?"
+			// Convert to uppercase to match DB values (ACTIVE, REJECTED, etc.)
+			args = append(args, strings.ToUpper(status))
+			countArgs = append(countArgs, strings.ToUpper(status))
+		}
+		whereConditions = append(whereConditions, fmt.Sprintf("CONSENT.CURRENT_STATUS IN (%s)", strings.Join(placeholders, ",")))
+	}
+
+	// Add clientIds filter (IN clause)
+	if len(filters.ClientIDs) > 0 {
+		placeholders := make([]string, len(filters.ClientIDs))
+		for i, clientID := range filters.ClientIDs {
+			placeholders[i] = "?"
+			args = append(args, clientID)
+			countArgs = append(countArgs, clientID)
+		}
+		whereConditions = append(whereConditions, fmt.Sprintf("CONSENT.CLIENT_ID IN (%s)", strings.Join(placeholders, ",")))
+	}
+
+	// Add userIds filter (via JOIN with CONSENT_AUTH_RESOURCE)
+	joinClause := ""
+	if len(filters.UserIDs) > 0 {
+		placeholders := make([]string, len(filters.UserIDs))
+		for i, userID := range filters.UserIDs {
+			placeholders[i] = "?"
+			args = append(args, userID)
+			countArgs = append(countArgs, userID)
+		}
+		joinClause = " INNER JOIN CONSENT_AUTH_RESOURCE car ON CONSENT.CONSENT_ID = car.CONSENT_ID AND CONSENT.ORG_ID = car.ORG_ID"
+		whereConditions = append(whereConditions, fmt.Sprintf("car.USER_ID IN (%s)", strings.Join(placeholders, ",")))
+	}
+
+	// Add time range filters (timestamps in milliseconds)
+	if filters.FromTime != nil {
+		whereConditions = append(whereConditions, "CONSENT.CREATED_TIME >= ?")
+		args = append(args, *filters.FromTime)
+		countArgs = append(countArgs, *filters.FromTime)
+	}
+
+	if filters.ToTime != nil {
+		whereConditions = append(whereConditions, "CONSENT.CREATED_TIME <= ?")
+		args = append(args, *filters.ToTime)
+		countArgs = append(countArgs, *filters.ToTime)
+	}
+
+	whereClause := strings.Join(whereConditions, " AND ")
+
+	// Build COUNT query
+	countQuery := fmt.Sprintf("SELECT COUNT(DISTINCT CONSENT.CONSENT_ID) as count FROM CONSENT%s WHERE %s",
+		joinClause, whereClause)
+
+	// Execute count query
+	countRows, err := s.dbClient.Query(dbmodel.DBQuery{ID: "COUNT_SEARCH_RESULTS", Query: countQuery}, countArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	totalCount := 0
+	if len(countRows) > 0 {
+		if count, ok := countRows[0]["count"].(int64); ok {
+			totalCount = int(count)
+		}
+	}
+
+	// Build SELECT query with DISTINCT to handle JOIN duplicates
+	selectQuery := fmt.Sprintf(
+		"SELECT DISTINCT CONSENT.CONSENT_ID, CONSENT.CREATED_TIME, CONSENT.UPDATED_TIME, CONSENT.CLIENT_ID, CONSENT.CONSENT_TYPE, CONSENT.CURRENT_STATUS, CONSENT.CONSENT_FREQUENCY, CONSENT.VALIDITY_TIME, CONSENT.RECURRING_INDICATOR, CONSENT.DATA_ACCESS_VALIDITY_DURATION, CONSENT.ORG_ID FROM CONSENT%s WHERE %s ORDER BY CONSENT.CREATED_TIME DESC LIMIT ? OFFSET ?",
+		joinClause,
+		whereClause,
+	)
+
+	// Add pagination parameters
+	args = append(args, filters.Limit, filters.Offset)
+
+	// Execute search query
+	rows, err := s.dbClient.Query(dbmodel.DBQuery{ID: "SEARCH_CONSENTS", Query: selectQuery}, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -255,6 +381,50 @@ func (s *store) GetAttributesByConsentID(ctx context.Context, consentID, orgID s
 	}
 
 	return attributes, nil
+}
+
+// GetAttributesByConsentIDs retrieves attributes for multiple consents, grouped by consent ID
+func (s *store) GetAttributesByConsentIDs(ctx context.Context, consentIDs []string, orgID string) (map[string]map[string]string, error) {
+	if len(consentIDs) == 0 {
+		return make(map[string]map[string]string), nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := ""
+	args := make([]interface{}, 0, len(consentIDs)+1)
+	for i, id := range consentIDs {
+		if i > 0 {
+			placeholders += ", "
+		}
+		placeholders += "?"
+		args = append(args, id)
+	}
+	args = append(args, orgID)
+
+	// Build dynamic query
+	query := dbmodel.DBQuery{
+		ID:    QueryGetAttributesByConsentIDs.ID,
+		Query: fmt.Sprintf("SELECT CONSENT_ID, ATT_KEY, ATT_VALUE, ORG_ID FROM CONSENT_ATTRIBUTE WHERE CONSENT_ID IN (%s) AND ORG_ID = ?", placeholders),
+	}
+
+	rows, err := s.dbClient.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Group attributes by consent ID
+	result := make(map[string]map[string]string)
+	for _, row := range rows {
+		attr := mapToConsentAttribute(row)
+		if attr != nil {
+			if result[attr.ConsentID] == nil {
+				result[attr.ConsentID] = make(map[string]string)
+			}
+			result[attr.ConsentID][attr.AttKey] = attr.AttValue
+		}
+	}
+
+	return result, nil
 }
 
 // DeleteAttributesByConsentID deletes all attributes for a consent within a transaction

@@ -18,15 +18,18 @@
 
 package log
 
-// contextKey is a custom type for context keys to avoid collisions.
-type contextKey string
+// ContextKey is a custom type for context keys to avoid collisions.
+// Using an unexported struct makes it truly unique and prevents collisions.
+type ContextKey struct{ name string }
+
+var (
+	// ContextKeyTraceID is the context key for storing the trace ID.
+	ContextKeyTraceID = ContextKey{"trace_id"}
+)
 
 const (
 	// LoggerKeyComponentName is the key used to identify the component name in the logger.
 	LoggerKeyComponentName = "component"
 	// LoggerKeyTraceID is the key used to identify the trace ID (correlation ID) in the logger.
 	LoggerKeyTraceID = "correlation-id"
-
-	// ContextKeyTraceID is the context key for storing the trace ID.
-	ContextKeyTraceID contextKey = "trace_id"
 )

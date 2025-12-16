@@ -51,13 +51,31 @@ func WriteJSONError(w http.ResponseWriter, code, description string, statusCode 
 }
 
 // SendError writes a ServiceError as an HTTP response with appropriate status code and trace ID.
-// This function extracts the trace ID from the request context and includes it in the error response.
+// This function extracts the trace ID from the request context, logs the error, and includes it in the error response.
 func SendError(w http.ResponseWriter, r *http.Request, err *serviceerror.ServiceError) {
 	// Determine HTTP status code based on error type and code
 	statusCode := mapErrorToStatusCode(err)
 
 	// Extract trace ID from request context
 	traceID := extractTraceID(r)
+
+	// Log the error with context
+	logger := log.GetLogger().WithContext(r.Context())
+	if err.Type == serviceerror.ServerErrorType {
+		logger.Error("Server error occurred",
+			log.String("code", err.Code),
+			log.String("message", err.Message),
+			log.String("description", err.Description),
+			log.Int("http_status", statusCode),
+		)
+	} else {
+		logger.Warn("Client error occurred",
+			log.String("code", err.Code),
+			log.String("message", err.Message),
+			log.String("description", err.Description),
+			log.Int("http_status", statusCode),
+		)
+	}
 
 	// Create error response with new format
 	errorResponse := apierror.NewErrorResponse(

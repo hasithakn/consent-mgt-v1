@@ -78,36 +78,9 @@ mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS consent_mgt;"
 
 # Import schemas
 mysql -u root -p consent_mgt < consent-server/dbscripts/db_schema_mysql.sql
-mysql -u root -p consent_mgt < consent-server/dbscripts/db_schema_config_mysql.sql
 ```
 
-### 2. Configure Application
-
-Create configuration file at `consent-server/bin/repository/conf/deployment.yaml`:
-
-```yaml
-server:
-  port: 9090
-  host: "0.0.0.0"
-
-database:
-  host: "localhost"
-  port: 3306
-  username: "root"
-  password: "your_password"
-  database: "consent_mgt"
-  max_open_connections: 25
-  max_idle_connections: 10
-  connection_max_lifetime_minutes: 5
-
-consent:
-  status:
-    active: "ACTIVE"
-    revoked: "REVOKED"
-    expired: "EXPIRED"
-```
-
-### 3. Build and Run
+### 2. Build
 
 **Using build.sh (Recommended)**
 
@@ -122,7 +95,28 @@ consent:
 # - consent-server/bin/dbscripts/ (database scripts)
 ```
 
-**Using start.sh**
+### 3. Configure Application
+
+Update configuration file at `consent-server/bin/repository/conf/deployment.yaml`:
+
+```yaml
+server:
+  port: 3000
+  host: "0.0.0.0"
+
+database:
+  host: "localhost"
+  port: 3306
+  username: "root"
+  password: "your_password"
+  database: "consent_mgt"
+  max_open_connections: 25
+  max_idle_connections: 10
+  connection_max_lifetime_minutes: 5
+```
+
+
+### 2. Run
 
 ```bash
 # Run in normal mode
@@ -136,35 +130,13 @@ cd bin
 ./start.sh --debug --debug-port 3000
 ```
 
-Server starts at `http://localhost:9090`
+Server starts at `http://localhost:3000`
 
-Health check: `curl http://localhost:9090/health`
+Health check: `curl http://localhost:3000/health`
 
 ## API Endpoints
 
-### Consent Management
-- `POST /api/v1/consents` - Create a new consent
-- `GET /api/v1/consents/{consentId}` - Retrieve consent details
-- `GET /api/v1/consents` - List consents (paginated)
-- `PUT /api/v1/consents/{consentId}` - Update consent
-- `PUT /api/v1/consents/{consentId}/revoke` - Revoke consent
-- `POST /api/v1/consents/validate` - Validate consent
-- `GET /api/v1/consents/attributes` - Search consents by attributes
-
-### Consent Purpose Management
-- `POST /api/v1/consent-purposes` - Create consent purpose
-- `POST /api/v1/consent-purposes/batch` - Batch create purposes
-- `GET /api/v1/consent-purposes/{purposeId}` - Get purpose details
-- `GET /api/v1/consent-purposes` - List purposes (paginated)
-- `PUT /api/v1/consent-purposes/{purposeId}` - Update purpose
-- `DELETE /api/v1/consent-purposes/{purposeId}` - Delete purpose
-
-### Authorization Resources
-- `POST /api/v1/auth-resources` - Create auth resource
-- `GET /api/v1/auth-resources/{authId}` - Get auth resource
-- `GET /api/v1/auth-resources` - List auth resources
-- `PUT /api/v1/auth-resources/{authId}` - Update auth resource
-- `DELETE /api/v1/auth-resources/{authId}` - Delete auth resource
+[API schema](api/consent-management-API.yaml)
 
 All requests require headers:
 - `org-id`: Organization identifier
@@ -201,70 +173,3 @@ go test ./api/consent-purpose/... -v
 # Run with coverage
 go test ./... -v -cover
 ```
-
-## Architecture
-
-### Layered Architecture
-- **Handler Layer**: HTTP request/response handling, validation
-- **Service Layer**: Business logic, transaction orchestration
-- **Store Layer**: Data access, database operations
-- **Model Layer**: Domain models, DTOs, request/response structures
-
-### Key Design Patterns
-- **Store Registry**: Centralized store management with dependency injection
-- **Thunder Pattern**: Transaction management with functional composition
-- **Clean Architecture**: Separation of concerns with clear boundaries
-
-## Configuration
-
-The application uses YAML configuration with the following structure:
-
-```yaml
-server:
-  port: 9090              # HTTP server port
-  host: "0.0.0.0"        # Bind address
-
-database:
-  host: "localhost"
-  port: 3306
-  username: "root"
-  password: "password"
-  database: "consent_mgt"
-  max_open_connections: 25
-  max_idle_connections: 10
-  connection_max_lifetime_minutes: 5
-
-consent:
-  status:
-    active: "ACTIVE"
-    revoked: "REVOKED"
-    expired: "EXPIRED"
-```
-
-Configuration file location: `bin/repository/conf/deployment.yaml`
-
-## Scripts
-
-### build.sh
-Builds the application and creates a deployable package structure:
-- Compiles Go binary for target OS/architecture
-- Copies configuration files to `bin/repository/conf/`
-- Copies API specifications to `bin/api/`
-- Copies database scripts to `bin/dbscripts/`
-
-Options:
-```bash
-./build.sh               # Build for current platform
-./build.sh darwin amd64  # Build for specific OS/arch
-```
-
-### start.sh
-Starts the consent management server with optional debug mode:
-
-```bash
-./start.sh               # Normal mode
-./start.sh --debug       # Debug mode (port 2345)
-./start.sh --debug --debug-port 3000  # Custom debug port
-```
-
-Debug mode enables remote debugging using Delve debugger.

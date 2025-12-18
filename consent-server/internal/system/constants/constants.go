@@ -5,7 +5,7 @@ const (
 	HeaderContentType       = "Content-Type"
 	CorrelationIDHeaderName = "X-Correlation-ID"
 	HeaderOrgID             = "org-id"
-	HeaderTPPClientID       = "client-id"
+	HeaderTPPClientID       = "TPP-client-id"
 
 	// Content Types
 	ContentTypeJSON = "application/json"

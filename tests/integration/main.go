@@ -58,6 +58,7 @@ func runTests() error {
 	// Run all test packages
 	packages := []string{
 		"./consentpurpose",
+		"./consent",
 	}
 
 	for _, pkg := range packages {

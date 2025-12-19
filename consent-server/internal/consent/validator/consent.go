@@ -16,6 +16,9 @@ func ValidateConsentCreateRequest(req model.ConsentAPIRequest, clientID, orgID s
 	if req.Type == "" {
 		return fmt.Errorf("type is required")
 	}
+	if len(req.Type) > 64 {
+		return fmt.Errorf("type cannot exceed 64 characters")
+	}
 	if clientID == "" {
 		return fmt.Errorf("clientID is required")
 	}

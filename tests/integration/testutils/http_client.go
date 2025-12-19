@@ -27,6 +27,11 @@ const (
 	TestServerURL = "http://localhost:9000"
 	TestOrgID     = "test-org-001"
 	TestClientID  = "test-client-001"
+
+	// HTTP Header names
+	HeaderOrgID       = "org-id"
+	HeaderClientID    = "TPP-client-id"
+	HeaderContentType = "Content-Type"
 )
 
 // GetHTTPClient returns a configured HTTP client for test requests

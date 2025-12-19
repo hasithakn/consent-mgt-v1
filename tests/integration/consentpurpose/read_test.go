@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/wso2/consent-management-api/tests/integration/testutils"
 )
 
 // ========================================
@@ -222,8 +223,8 @@ func (ts *PurposeAPITestSuite) TestGetPurposeByID_ErrorCases() {
 			req, _ := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/consent-purposes/%s", baseURL, tc.purposeID), nil)
 
 			if tc.setOrgHeader {
-				req.Header.Set("org-id", testOrgID)
-				req.Header.Set("TPP-client-id", testClientID)
+				req.Header.Set(testutils.HeaderOrgID, testOrgID)
+				req.Header.Set(testutils.HeaderClientID, testClientID)
 			}
 
 			client := &http.Client{}
@@ -316,8 +317,8 @@ func (ts *PurposeAPITestSuite) TestListPurposes_WithLimit_ReturnsPaginatedResult
 
 	// Request with limit=2
 	req, _ := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/consent-purposes?limit=2", baseURL), nil)
-	req.Header.Set("org-id", testOrgID)
-	req.Header.Set("TPP-client-id", testClientID)
+	req.Header.Set(testutils.HeaderOrgID, testOrgID)
+	req.Header.Set(testutils.HeaderClientID, testClientID)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -356,8 +357,8 @@ func (ts *PurposeAPITestSuite) TestListPurposes_WithLimitAndOffset_ReturnsCorrec
 
 	// Request with limit=1&offset=1 (second item)
 	req, _ := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/consent-purposes?limit=1&offset=1", baseURL), nil)
-	req.Header.Set("org-id", testOrgID)
-	req.Header.Set("TPP-client-id", testClientID)
+	req.Header.Set(testutils.HeaderOrgID, testOrgID)
+	req.Header.Set(testutils.HeaderClientID, testClientID)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)

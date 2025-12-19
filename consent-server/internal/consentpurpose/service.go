@@ -498,6 +498,12 @@ func (s *consentPurposeService) validateCreateRequest(req model.CreateRequest) *
 	if req.Name == "" {
 		return serviceerror.CustomServiceError(serviceerror.ValidationError, "purpose name is required")
 	}
+	if len(req.Name) > 255 {
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, "purpose name must not exceed 255 characters")
+	}
+	if len(req.Description) > 1024 {
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, "purpose description must not exceed 1024 characters")
+	}
 	if req.Type == "" {
 		return serviceerror.CustomServiceError(serviceerror.ValidationError, "purpose type is required")
 	}
@@ -520,6 +526,12 @@ func (s *consentPurposeService) validateCreateRequest(req model.CreateRequest) *
 func (s *consentPurposeService) validateUpdateRequest(req model.UpdateRequest) *serviceerror.ServiceError {
 	if req.Name == "" {
 		return serviceerror.CustomServiceError(serviceerror.ValidationError, "purpose name is required")
+	}
+	if len(req.Name) > 255 {
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, "purpose name must not exceed 255 characters")
+	}
+	if req.Description != nil && len(*req.Description) > 1024 {
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, "purpose description must not exceed 1024 characters")
 	}
 	if req.Type == "" {
 		return serviceerror.CustomServiceError(serviceerror.ValidationError, "purpose type is required")

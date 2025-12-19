@@ -24,6 +24,14 @@ type ConsentPurposeCreateRequest struct {
 	Attributes  map[string]string `json:"attributes,omitempty"`
 }
 
+// Update request model - PUT /consent-purposes/{id}
+type ConsentPurposeUpdateRequest struct {
+	Name        string            `json:"name"`
+	Description string            `json:"description,omitempty"`
+	Type        string            `json:"type"`
+	Attributes  map[string]string `json:"attributes,omitempty"`
+}
+
 // Response models
 type PurposeResponse struct {
 	ID          string            `json:"id"`

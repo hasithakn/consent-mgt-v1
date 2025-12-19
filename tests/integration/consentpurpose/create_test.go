@@ -24,6 +24,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/wso2/consent-management-api/tests/integration/testutils"
 )
 
 // TestCreatePurpose_StringType_WithResourcePath creates a string type purpose with resourcePath attribute
@@ -359,9 +361,9 @@ func (ts *PurposeAPITestSuite) TestCreatePurpose_ErrorCases() {
 				},
 			},
 			setHeaders:      true,
-			expectedStatus:  http.StatusInternalServerError,
-			expectedCode:    "CSE-5001",
-			messageContains: "Data too long for column 'NAME'",
+			expectedStatus:  http.StatusBadRequest,
+			expectedCode:    "CSE-4001",
+			messageContains: "must not exceed 255 characters",
 		},
 		{
 			name: "DuplicateNameInBatch_ReturnsConflict",
@@ -494,9 +496,9 @@ func (ts *PurposeAPITestSuite) TestCreatePurpose_ErrorCases() {
 				},
 			},
 			setHeaders:      true,
-			expectedStatus:  http.StatusInternalServerError,
-			expectedCode:    "CSE-5001",
-			messageContains: "Data too long for column 'DESCRIPTION'",
+			expectedStatus:  http.StatusBadRequest,
+			expectedCode:    "CSE-4001",
+			messageContains: "must not exceed 1024 characters",
 		},
 	}
 
@@ -521,7 +523,7 @@ func (ts *PurposeAPITestSuite) TestCreatePurpose_ErrorCases() {
 
 				req, err := http.NewRequest(http.MethodPost, testServerURL+"/consent-purposes", bytes.NewBuffer(jsonData))
 				ts.Require().NoError(err)
-				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set(testutils.HeaderContentType, "application/json")
 				// Deliberately not setting org-id and client-id headers
 
 				client := &http.Client{}

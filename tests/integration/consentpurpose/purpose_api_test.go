@@ -99,9 +99,9 @@ func (ts *PurposeAPITestSuite) createPurpose(payload interface{}) (*http.Respons
 
 	httpReq, _ := http.NewRequest("POST", testServerURL+"/api/v1/consent-purposes",
 		bytes.NewBuffer(reqBody))
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("org-id", testOrgID)
-	httpReq.Header.Set("TPP-client-id", testutils.TestClientID)
+	httpReq.Header.Set(testutils.HeaderContentType, "application/json")
+	httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
+	httpReq.Header.Set(testutils.HeaderClientID, testutils.TestClientID)
 
 	client := testutils.GetHTTPClient()
 	resp, err := client.Do(httpReq)
@@ -117,8 +117,36 @@ func (ts *PurposeAPITestSuite) createPurpose(payload interface{}) (*http.Respons
 func (ts *PurposeAPITestSuite) getPurpose(purposeID string) (*http.Response, []byte) {
 	url := fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID)
 	httpReq, _ := http.NewRequest("GET", url, nil)
-	httpReq.Header.Set("org-id", testOrgID)
-	httpReq.Header.Set("TPP-client-id", testutils.TestClientID)
+	httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
+	httpReq.Header.Set(testutils.HeaderClientID, testutils.TestClientID)
+
+	client := testutils.GetHTTPClient()
+	resp, err := client.Do(httpReq)
+	ts.Require().NoError(err)
+
+	body, err := io.ReadAll(resp.Body)
+	ts.Require().NoError(err)
+
+	return resp, body
+}
+
+// updatePurpose updates a purpose by ID and returns response and body
+func (ts *PurposeAPITestSuite) updatePurpose(purposeID string, payload interface{}) (*http.Response, []byte) {
+	var reqBody []byte
+	var err error
+
+	if str, ok := payload.(string); ok {
+		reqBody = []byte(str)
+	} else {
+		reqBody, err = json.Marshal(payload)
+		ts.Require().NoError(err)
+	}
+
+	url := fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID)
+	httpReq, _ := http.NewRequest("PUT", url, bytes.NewBuffer(reqBody))
+	httpReq.Header.Set(testutils.HeaderContentType, "application/json")
+	httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
+	httpReq.Header.Set(testutils.HeaderClientID, testutils.TestClientID)
 
 	client := testutils.GetHTTPClient()
 	resp, err := client.Do(httpReq)
@@ -135,8 +163,8 @@ func (ts *PurposeAPITestSuite) deletePurpose(purposeID string) {
 	httpReq, _ := http.NewRequest("DELETE",
 		fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID),
 		nil)
-	httpReq.Header.Set("org-id", testOrgID)
-	httpReq.Header.Set("TPP-client-id", testutils.TestClientID)
+	httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
+	httpReq.Header.Set(testutils.HeaderClientID, testutils.TestClientID)
 
 	client := testutils.GetHTTPClient()
 	resp, err := client.Do(httpReq)
@@ -158,12 +186,13 @@ func (ts *PurposeAPITestSuite) trackPurpose(purposeID string) {
 }
 
 // deletePurposeWithCheck deletes a purpose and returns success status
+// Returns true only for successful deletion (204/200), false for 404 or other errors
 func (ts *PurposeAPITestSuite) deletePurposeWithCheck(purposeID string) bool {
 	httpReq, _ := http.NewRequest("DELETE",
 		fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID),
 		nil)
-	httpReq.Header.Set("org-id", testOrgID)
-	httpReq.Header.Set("TPP-client-id", testutils.TestClientID)
+	httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
+	httpReq.Header.Set(testutils.HeaderClientID, testutils.TestClientID)
 
 	client := testutils.GetHTTPClient()
 	resp, err := client.Do(httpReq)
@@ -173,11 +202,11 @@ func (ts *PurposeAPITestSuite) deletePurposeWithCheck(purposeID string) bool {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
-		body, _ := io.ReadAll(resp.Body)
-		fmt.Printf("Warning: failed to delete purpose %s: %d - %s\n", purposeID, resp.StatusCode, string(body))
-		return false
+	// Return true only for successful deletion (204 or 200)
+	// Return false for 404 (not found) or any other status
+	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusOK {
+		return true
 	}
 
-	return true
+	return false
 }

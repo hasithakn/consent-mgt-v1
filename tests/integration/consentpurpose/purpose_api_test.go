@@ -1,0 +1,183 @@
+/*
+ * Copyright (c) 2025, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package consentpurpose
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+	"github.com/wso2/consent-management-api/tests/integration/testutils"
+)
+
+const (
+	testServerURL = testutils.TestServerURL
+	baseURL       = testutils.TestServerURL
+	testOrgID     = "test-org-purpose"
+	testClientID  = "test-client-purpose"
+)
+
+type PurposeAPITestSuite struct {
+	suite.Suite
+	createdPurposeIDs []string // Track created purposes for cleanup
+}
+
+// SetupSuite runs once before all tests
+func (ts *PurposeAPITestSuite) SetupSuite() {
+	ts.createdPurposeIDs = make([]string, 0)
+	fmt.Println("=== ConsentPurpose Test Suite Starting ===")
+	// Note: Pre-cleanup has been removed as it runs before server is ready
+	// If you need to clean leftover data, run tests twice or manually delete test_* purposes
+}
+
+// TearDownSuite runs once after all tests to cleanup
+func (ts *PurposeAPITestSuite) TearDownSuite() {
+	if len(ts.createdPurposeIDs) == 0 {
+		fmt.Println("=== No purposes to clean up ===")
+		return
+	}
+
+	fmt.Printf("=== Cleaning up %d created purposes ===\n", len(ts.createdPurposeIDs))
+	successCount := 0
+	failCount := 0
+
+	for _, id := range ts.createdPurposeIDs {
+		if ts.deletePurposeWithCheck(id) {
+			successCount++
+		} else {
+			failCount++
+		}
+	}
+
+	fmt.Printf("=== Cleanup complete: %d deleted, %d failed ===\n", successCount, failCount)
+	fmt.Println("=== ConsentPurpose Test Suite Complete ===")
+}
+
+// TearDownTest runs after each test to ensure cleanup
+func (ts *PurposeAPITestSuite) TearDownTest() {
+	// Additional per-test cleanup if needed
+}
+
+func TestPurposeAPITestSuite(t *testing.T) {
+	suite.Run(t, new(PurposeAPITestSuite))
+}
+
+// Helper functions
+
+// createPurpose creates purpose(s) and returns the response and body for flexible assertions
+func (ts *PurposeAPITestSuite) createPurpose(payload interface{}) (*http.Response, []byte) {
+	var reqBody []byte
+	var err error
+
+	// Handle both []ConsentPurposeCreateRequest and string (for malformed JSON tests)
+	if str, ok := payload.(string); ok {
+		reqBody = []byte(str)
+	} else {
+		reqBody, err = json.Marshal(payload)
+		ts.Require().NoError(err)
+	}
+
+	httpReq, _ := http.NewRequest("POST", testServerURL+"/api/v1/consent-purposes",
+		bytes.NewBuffer(reqBody))
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("org-id", testOrgID)
+	httpReq.Header.Set("TPP-client-id", testutils.TestClientID)
+
+	client := testutils.GetHTTPClient()
+	resp, err := client.Do(httpReq)
+	ts.Require().NoError(err)
+
+	body, err := io.ReadAll(resp.Body)
+	ts.Require().NoError(err)
+
+	return resp, body
+}
+
+// getPurpose retrieves a purpose by ID and returns response and body
+func (ts *PurposeAPITestSuite) getPurpose(purposeID string) (*http.Response, []byte) {
+	url := fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID)
+	httpReq, _ := http.NewRequest("GET", url, nil)
+	httpReq.Header.Set("org-id", testOrgID)
+	httpReq.Header.Set("TPP-client-id", testutils.TestClientID)
+
+	client := testutils.GetHTTPClient()
+	resp, err := client.Do(httpReq)
+	ts.Require().NoError(err)
+
+	body, err := io.ReadAll(resp.Body)
+	ts.Require().NoError(err)
+
+	return resp, body
+}
+
+// deletePurpose deletes a purpose by ID
+func (ts *PurposeAPITestSuite) deletePurpose(purposeID string) {
+	httpReq, _ := http.NewRequest("DELETE",
+		fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID),
+		nil)
+	httpReq.Header.Set("org-id", testOrgID)
+	httpReq.Header.Set("TPP-client-id", testutils.TestClientID)
+
+	client := testutils.GetHTTPClient()
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		ts.T().Logf("Warning: failed to delete purpose %s: %v", purposeID, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		ts.T().Logf("Warning: failed to delete purpose %s: %d - %s", purposeID, resp.StatusCode, string(body))
+	}
+}
+
+// trackPurpose registers a purpose ID for cleanup in TearDownSuite
+func (ts *PurposeAPITestSuite) trackPurpose(purposeID string) {
+	ts.createdPurposeIDs = append(ts.createdPurposeIDs, purposeID)
+}
+
+// deletePurposeWithCheck deletes a purpose and returns success status
+func (ts *PurposeAPITestSuite) deletePurposeWithCheck(purposeID string) bool {
+	httpReq, _ := http.NewRequest("DELETE",
+		fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID),
+		nil)
+	httpReq.Header.Set("org-id", testOrgID)
+	httpReq.Header.Set("TPP-client-id", testutils.TestClientID)
+
+	client := testutils.GetHTTPClient()
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		fmt.Printf("Warning: failed to delete purpose %s: %v\n", purposeID, err)
+		return false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		body, _ := io.ReadAll(resp.Body)
+		fmt.Printf("Warning: failed to delete purpose %s: %d - %s\n", purposeID, resp.StatusCode, string(body))
+		return false
+	}
+
+	return true
+}

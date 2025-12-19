@@ -257,11 +257,26 @@ function test_unit() {
 function test_integration() {
     echo "================================================================"
     echo "Running integration tests..."
+    
+    # Build the server first if binary doesn't exist
+    if [ ! -f "$OUTPUT_DIR/$BINARY_NAME" ]; then
+        echo "Binary not found. Building first..."
+        build_binary
+    fi
+    
+    # Run integration test suite
+    echo "Starting integration test suite..."
     cd tests/integration || exit 1
-    # Run tests excluding the broken auth_resource_api_test.go
-    # The auth resource tests need to be updated to match the current models
-    go test ./api/consent/... ./api/consent-purpose/... -v
+    go run main.go -test consentpurpose
+    TEST_EXIT_CODE=$?
     cd "$SCRIPT_DIR" || exit 1
+    
+    if [ $TEST_EXIT_CODE -ne 0 ]; then
+        echo "✗ Integration tests failed"
+        exit 1
+    fi
+    
+    echo "✓ Integration tests passed"
     echo "================================================================"
 }
 
@@ -282,7 +297,7 @@ function show_help() {
     echo "  package          - Build and create distribution package (zip)"
     echo "  run              - Build and run the server"
     echo "  test_unit        - Run unit tests"
-    echo "  test_integration - Run integration tests"
+    echo "  test_integration - Run integration tests (requires server to be built first)"
     echo "  test             - Run all tests"
     echo "  help             - Show this help message"
     echo ""
@@ -298,6 +313,10 @@ function show_help() {
     echo "  ./build.sh build darwin arm64       # Build for macOS ARM64"
     echo "  ./build.sh package                  # Create distribution package"
     echo "  ./build.sh run                      # Build and run server"
+    echo "  ./build.sh test_integration         # Run integration test suite"
+    echo ""
+    echo "Note: Integration tests require the server to be built first."
+    echo "      The tests will use the binary from ./bin/consent-server"
     echo ""
 }
 

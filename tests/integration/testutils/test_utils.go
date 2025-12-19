@@ -10,23 +10,24 @@ import (
 )
 
 const (
-	ServerBinary = "../../consent-server/bin/consent-server"
+	ServerBinary = "../../bin/consent-server"
 	ServerPort   = "9000"
 )
 
 var serverCmd *exec.Cmd
 
-// BuildServer compiles the consent-server binary
+// BuildServer checks if the consent-server binary exists
+// The binary should be built using ./build.sh build from the project root
 func BuildServer() error {
-	fmt.Println("Building consent server...")
-	cmd := exec.Command("go", "build",
-		"-o", "bin/consent-server",
-		"./cmd/server")
-	cmd.Dir = "../../consent-server"
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	fmt.Println("Checking for consent server binary...")
 
-	return cmd.Run()
+	// Check if binary exists
+	if _, err := os.Stat(ServerBinary); os.IsNotExist(err) {
+		return fmt.Errorf("server binary not found at %s. Please run './build.sh build' from project root", ServerBinary)
+	}
+
+	fmt.Println("✓ Found server binary at", ServerBinary)
+	return nil
 }
 
 // SetupDatabase runs database migration scripts

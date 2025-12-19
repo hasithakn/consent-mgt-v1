@@ -10,13 +10,12 @@ import (
 )
 
 func main() {
-	// Step 1: Build the consent server
+	// Step 1: Check for pre-built server binary
 	err := testutils.BuildServer()
 	if err != nil {
-		fmt.Printf("Failed to build server: %v\n", err)
+		fmt.Printf("Failed to find server binary: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("✓ Server built successfully")
 
 	// Step 2: Setup test database
 	err = testutils.SetupDatabase()

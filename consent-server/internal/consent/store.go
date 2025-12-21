@@ -8,6 +8,7 @@ import (
 	"github.com/wso2/consent-management-api/internal/consent/model"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
+	"github.com/wso2/consent-management-api/internal/system/stores/interfaces"
 )
 
 // DBQuery objects for consent operations
@@ -100,37 +101,13 @@ var (
 	}
 )
 
-// consentStore defines the interface for consent data operations
-// ConsentStore defines the interface for consent data access operations
-type ConsentStore interface {
-	// Read operations - use dbClient directly
-	GetByID(ctx context.Context, consentID, orgID string) (*model.Consent, error)
-	List(ctx context.Context, orgID string, limit, offset int) ([]model.Consent, int, error)
-	Search(ctx context.Context, filters model.ConsentSearchFilters) ([]model.Consent, int, error)
-	GetByClientID(ctx context.Context, clientID, orgID string) ([]model.Consent, error)
-	GetAttributesByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentAttribute, error)
-	GetAttributesByConsentIDs(ctx context.Context, consentIDs []string, orgID string) (map[string]map[string]string, error)
-	GetStatusAuditByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentStatusAudit, error)
-	FindConsentIDsByAttributeKey(ctx context.Context, key, orgID string) ([]string, error)
-	FindConsentIDsByAttribute(ctx context.Context, key, value, orgID string) ([]string, error)
-
-	// Write operations - transactional with tx parameter
-	Create(tx dbmodel.TxInterface, consent *model.Consent) error
-	Update(tx dbmodel.TxInterface, consent *model.Consent) error
-	UpdateStatus(tx dbmodel.TxInterface, consentID, orgID, status string, updatedTime int64) error
-	Delete(tx dbmodel.TxInterface, consentID, orgID string) error
-	CreateAttributes(tx dbmodel.TxInterface, attributes []model.ConsentAttribute) error
-	DeleteAttributesByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
-	CreateStatusAudit(tx dbmodel.TxInterface, audit *model.ConsentStatusAudit) error
-}
-
-// store implements the ConsentStore interface
+// store implements the interfaces.ConsentStore interface
 type store struct {
 	dbClient provider.DBClientInterface
 }
 
 // NewConsentStore creates a new consent store
-func NewConsentStore(dbClient provider.DBClientInterface) ConsentStore {
+func NewConsentStore(dbClient provider.DBClientInterface) interfaces.ConsentStore {
 	return &store{
 		dbClient: dbClient,
 	}

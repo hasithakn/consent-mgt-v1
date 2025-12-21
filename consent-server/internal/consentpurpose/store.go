@@ -7,6 +7,7 @@ import (
 	"github.com/wso2/consent-management-api/internal/consentpurpose/model"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
+	"github.com/wso2/consent-management-api/internal/system/stores/interfaces"
 )
 
 // DBQuery objects for all consent purpose operations
@@ -113,37 +114,13 @@ var (
 	}
 )
 
-// consentPurposeStore defines the interface for consent purpose data operations
-// ConsentPurposeStore defines the interface for consent purpose data access operations
-type ConsentPurposeStore interface {
-	// Read operations - use dbClient directly
-	GetByID(ctx context.Context, purposeID, orgID string) (*model.ConsentPurpose, error)
-	GetByName(ctx context.Context, name, orgID string) (*model.ConsentPurpose, error)
-	List(ctx context.Context, orgID string, limit, offset int, name string) ([]model.ConsentPurpose, int, error)
-	CheckNameExists(ctx context.Context, name, orgID string) (bool, error)
-	GetAttributesByPurposeID(ctx context.Context, purposeID, orgID string) ([]model.ConsentPurposeAttribute, error)
-	GetPurposesByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentPurpose, error)
-	GetMappingsByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentPurposeMapping, error)
-	GetMappingsByConsentIDs(ctx context.Context, consentIDs []string, orgID string) ([]model.ConsentPurposeMapping, error)
-	GetIDsByNames(ctx context.Context, names []string, orgID string) (map[string]string, error)
-
-	// Write operations - transactional with tx parameter
-	Create(tx dbmodel.TxInterface, purpose *model.ConsentPurpose) error
-	Update(tx dbmodel.TxInterface, purpose *model.ConsentPurpose) error
-	Delete(tx dbmodel.TxInterface, purposeID, orgID string) error
-	CreateAttributes(tx dbmodel.TxInterface, attributes []model.ConsentPurposeAttribute) error
-	DeleteAttributesByPurposeID(tx dbmodel.TxInterface, purposeID, orgID string) error
-	LinkPurposeToConsent(tx dbmodel.TxInterface, consentID, purposeID, orgID string, value *string, isUserApproved, isMandatory bool) error
-	DeleteMappingsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
-}
-
-// store implements the ConsentPurposeStore interface
+// store implements the interfaces.ConsentPurposeStore interface
 type store struct {
 	dbClient provider.DBClientInterface
 }
 
 // NewConsentPurposeStore creates a new consent purpose store
-func NewConsentPurposeStore(dbClient provider.DBClientInterface) ConsentPurposeStore {
+func NewConsentPurposeStore(dbClient provider.DBClientInterface) interfaces.ConsentPurposeStore {
 	return &store{
 		dbClient: dbClient,
 	}

@@ -4,26 +4,25 @@ import (
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
 	"github.com/wso2/consent-management-api/internal/system/log"
+	"github.com/wso2/consent-management-api/internal/system/stores/interfaces"
 )
 
 // StoreRegistry holds references to all stores in the application
-// Each store is held as interface{} to avoid circular dependencies
-// Services type-assert to their needed store interfaces
 type StoreRegistry struct {
 	dbClient provider.DBClientInterface
 
-	// Store instances - services will type-assert these to their specific interfaces
-	Consent        interface{} // consent.consentStore
-	AuthResource   interface{} // authresource.authResourceStore
-	ConsentPurpose interface{} // consentpurpose.consentPurposeStore
+	// Store instances with typed interfaces
+	Consent        interfaces.ConsentStore
+	AuthResource   interfaces.AuthResourceStore
+	ConsentPurpose interfaces.ConsentPurposeStore
 }
 
 // NewStoreRegistry creates a new store registry with all initialized stores
 func NewStoreRegistry(
 	dbClient provider.DBClientInterface,
-	consentStore interface{},
-	authResourceStore interface{},
-	consentPurposeStore interface{},
+	consentStore interfaces.ConsentStore,
+	authResourceStore interfaces.AuthResourceStore,
+	consentPurposeStore interfaces.ConsentPurposeStore,
 ) *StoreRegistry {
 	return &StoreRegistry{
 		dbClient:       dbClient,

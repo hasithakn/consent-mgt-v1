@@ -7,6 +7,7 @@ import (
 	"github.com/wso2/consent-management-api/internal/authresource/model"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
+	"github.com/wso2/consent-management-api/internal/system/stores/interfaces"
 )
 
 // DBQuery objects for all auth resource operations
@@ -67,32 +68,13 @@ var (
 	}
 )
 
-// authResourceStore defines the interface for auth resource data operations
-// AuthResourceStore defines the interface for auth resource data access operations
-type AuthResourceStore interface {
-	// Read operations - use dbClient directly
-	GetByID(ctx context.Context, authID, orgID string) (*model.AuthResource, error)
-	GetByConsentID(ctx context.Context, consentID, orgID string) ([]model.AuthResource, error)
-	GetByConsentIDs(ctx context.Context, consentIDs []string, orgID string) ([]model.AuthResource, error)
-	Exists(ctx context.Context, authID, orgID string) (bool, error)
-	GetByUserID(ctx context.Context, userID, orgID string) ([]model.AuthResource, error)
-
-	// Write operations - transactional with tx parameter
-	Create(tx dbmodel.TxInterface, authResource *model.AuthResource) error
-	Update(tx dbmodel.TxInterface, authResource *model.AuthResource) error
-	UpdateStatus(tx dbmodel.TxInterface, authID, orgID, status string, updatedTime int64) error
-	Delete(tx dbmodel.TxInterface, authID, orgID string) error
-	DeleteByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
-	UpdateAllStatusByConsentID(tx dbmodel.TxInterface, consentID, orgID, status string, updatedTime int64) error
-}
-
-// store implements AuthResourceStore using Thunder pattern
+// store implements interfaces.AuthResourceStore
 type store struct {
 	dbClient provider.DBClientInterface
 }
 
 // NewAuthResourceStore creates a new auth resource store
-func NewAuthResourceStore(dbClient provider.DBClientInterface) AuthResourceStore {
+func NewAuthResourceStore(dbClient provider.DBClientInterface) interfaces.AuthResourceStore {
 	return &store{
 		dbClient: dbClient,
 	}

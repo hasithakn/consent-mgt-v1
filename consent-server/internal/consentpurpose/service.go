@@ -52,7 +52,7 @@ func (s *consentPurposeService) CreatePurpose(ctx context.Context, req model.Cre
 	}
 
 	// Check if purpose name already exists
-	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+	store := s.stores.ConsentPurpose
 	exists, dbErr := store.CheckNameExists(ctx, req.Name, orgID)
 	if dbErr != nil {
 		logger.Error("Failed to check purpose name existence", log.Error(dbErr), log.String("name", req.Name))
@@ -128,7 +128,7 @@ func (s *consentPurposeService) CreatePurposesInBatch(ctx context.Context, reque
 		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "at least one purpose must be provided")
 	}
 
-	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+	store := s.stores.ConsentPurpose
 
 	// Pre-validate all requests and check for duplicate names within the batch
 	namesSeen := make(map[string]bool)
@@ -218,7 +218,7 @@ func (s *consentPurposeService) GetPurpose(ctx context.Context, purposeID, orgID
 		log.String("org_id", orgID),
 	)
 
-	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+	store := s.stores.ConsentPurpose
 	purpose, err := store.GetByID(ctx, purposeID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve purpose",
@@ -275,7 +275,7 @@ func (s *consentPurposeService) ListPurposes(ctx context.Context, orgID string, 
 		offset = 0
 	}
 
-	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+	store := s.stores.ConsentPurpose
 	purposes, total, err := store.List(ctx, orgID, limit, offset, name)
 	if err != nil {
 		logger.Error("Failed to list purposes",
@@ -327,7 +327,7 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 	}
 
 	// Check if purpose exists
-	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+	store := s.stores.ConsentPurpose
 	existing, err := store.GetByID(ctx, purposeID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve existing purpose",
@@ -409,7 +409,7 @@ func (s *consentPurposeService) DeletePurpose(ctx context.Context, purposeID, or
 	)
 
 	// Check if purpose exists
-	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+	store := s.stores.ConsentPurpose
 	existing, err := store.GetByID(ctx, purposeID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve purpose for deletion",
@@ -462,7 +462,7 @@ func (s *consentPurposeService) ValidatePurposeNames(ctx context.Context, orgID 
 		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "at least one purpose name must be provided")
 	}
 
-	store := s.stores.ConsentPurpose.(ConsentPurposeStore)
+	store := s.stores.ConsentPurpose
 
 	// Get purposes that exist
 	purposeIDMap, err := store.GetIDsByNames(ctx, purposeNames, orgID)

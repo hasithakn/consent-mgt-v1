@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/wso2/consent-management-api/internal/authresource"
 	authmodel "github.com/wso2/consent-management-api/internal/authresource/model"
 	"github.com/wso2/consent-management-api/internal/consent/model"
 	"github.com/wso2/consent-management-api/internal/consent/validator"
-	"github.com/wso2/consent-management-api/internal/consentpurpose"
 	purposemodel "github.com/wso2/consent-management-api/internal/consentpurpose/model"
 	"github.com/wso2/consent-management-api/internal/system/config"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
@@ -112,8 +110,8 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 	}
 
 	// Get stores from registry
-	consentStore := consentService.stores.Consent.(ConsentStore)
-	authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
+	consentStore := consentService.stores.Consent
+	authResourceStore := consentService.stores.AuthResource
 
 	// Build list of transactional operations
 	queries := []func(tx dbmodel.TxInterface) error{
@@ -205,7 +203,7 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 	// Link consent purposes if provided
 	if len(createReq.ConsentPurpose) > 0 {
 		logger.Debug("Linking consent purposes", log.Int("purpose_count", len(createReq.ConsentPurpose)))
-		purposeStore := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore)
+		purposeStore := consentService.stores.ConsentPurpose
 
 		// Extract purpose names
 		purposeNames := make([]string, len(createReq.ConsentPurpose))
@@ -284,8 +282,8 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 	// Retrieve related data after creation
 	logger.Debug("Retrieving related data for response")
 	authResources, _ := authResourceStore.GetByConsentID(ctx, consentID, orgID)
-	purposeMappings, _ := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore).GetMappingsByConsentID(ctx, consentID, orgID)
-	attributes, _ := consentService.stores.Consent.(ConsentStore).GetAttributesByConsentID(ctx, consentID, orgID)
+	purposeMappings, _ := consentService.stores.ConsentPurpose.GetMappingsByConsentID(ctx, consentID, orgID)
+	attributes, _ := consentService.stores.Consent.GetAttributesByConsentID(ctx, consentID, orgID)
 
 	// Convert attributes slice to map[string]string
 	attributesMap := make(map[string]string)
@@ -315,9 +313,9 @@ func (consentService *consentService) GetConsent(ctx context.Context, consentID,
 	)
 
 	// Get stores
-	consentStore := consentService.stores.Consent.(ConsentStore)
-	authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
-	purposeStore := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore)
+	consentStore := consentService.stores.Consent
+	authResourceStore := consentService.stores.AuthResource
+	purposeStore := consentService.stores.ConsentPurpose
 
 	// Get consent
 	consent, err := consentStore.GetByID(ctx, consentID, orgID)
@@ -374,7 +372,7 @@ func (consentService *consentService) ListConsents(ctx context.Context, orgID st
 		offset = 0
 	}
 
-	store := consentService.stores.Consent.(ConsentStore)
+	store := consentService.stores.Consent
 	consents, total, err := store.List(ctx, orgID, limit, offset)
 	if err != nil {
 		logger.Error("Failed to list consents",
@@ -428,7 +426,7 @@ func (consentService *consentService) SearchConsents(ctx context.Context, filter
 		filters.Offset = 0
 	}
 
-	store := consentService.stores.Consent.(ConsentStore)
+	store := consentService.stores.Consent
 	consents, total, err := store.Search(ctx, filters)
 	if err != nil {
 		logger.Error("Failed to search consents",
@@ -482,7 +480,7 @@ func (consentService *consentService) SearchConsentsDetailed(ctx context.Context
 	}
 
 	// Step 1: Search consents
-	consentStore := consentService.stores.Consent.(ConsentStore)
+	consentStore := consentService.stores.Consent
 	consents, total, err := consentStore.Search(ctx, filters)
 	if err != nil {
 		logger.Error("Failed to search consents", log.Error(err))
@@ -508,8 +506,8 @@ func (consentService *consentService) SearchConsentsDetailed(ctx context.Context
 	}
 
 	// Step 3: Batch fetch related data in parallel
-	authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
-	purposeStore := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore)
+	authResourceStore := consentService.stores.AuthResource
+	purposeStore := consentService.stores.ConsentPurpose
 
 	authResources, err := authResourceStore.GetByConsentIDs(ctx, consentIDs, filters.OrgID)
 	if err != nil {
@@ -655,9 +653,9 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 		log.String("org_id", orgID))
 
 	// Get stores
-	authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
-	consentStore := consentService.stores.Consent.(ConsentStore)
-	purposeStore := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore)
+	authResourceStore := consentService.stores.AuthResource
+	consentStore := consentService.stores.Consent
+	purposeStore := consentService.stores.ConsentPurpose
 
 	// Validate request
 	if err := utils.ValidateOrgID(orgID); err != nil {
@@ -969,7 +967,7 @@ func (consentService *consentService) RevokeConsent(ctx context.Context, consent
 	revokedStatusName := config.Get().Consent.GetRevokedConsentStatus()
 
 	// Check if consent exists
-	store := consentService.stores.Consent.(ConsentStore)
+	store := consentService.stores.Consent
 	existing, err := store.GetByID(ctx, consentID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve consent", log.Error(err), log.String("consent_id", consentID))
@@ -1005,7 +1003,7 @@ func (consentService *consentService) RevokeConsent(ctx context.Context, consent
 	}
 
 	// Get auth resource store for cascading status update
-	authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
+	authResourceStore := consentService.stores.AuthResource
 
 	// Execute transaction - update consent status, all auth resource statuses, and create audit
 	logger.Debug("Executing revocation transaction")
@@ -1064,7 +1062,7 @@ func (consentService *consentService) ValidateConsent(ctx context.Context, req m
 	logger.Debug("Request validation successful")
 
 	// Get consent
-	consentStore := consentService.stores.Consent.(ConsentStore)
+	consentStore := consentService.stores.Consent
 	consent, err := consentStore.GetByID(ctx, req.ConsentID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve consent", log.Error(err), log.String("consent_id", req.ConsentID))
@@ -1123,8 +1121,8 @@ func (consentService *consentService) ValidateConsent(ctx context.Context, req m
 
 	// Retrieve related data for consent information (only if consent exists)
 	if consent != nil {
-		authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
-		purposeStore := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore)
+		authResourceStore := consentService.stores.AuthResource
+		purposeStore := consentService.stores.ConsentPurpose
 
 		attributes, _ := consentStore.GetAttributesByConsentID(ctx, consent.ConsentID, orgID)
 		authResources, _ := authResourceStore.GetByConsentID(ctx, consent.ConsentID, orgID)
@@ -1174,8 +1172,8 @@ func (consentService *consentService) expireConsent(ctx context.Context, consent
 	}
 
 	// Get stores for cascading status update
-	consentStore := consentService.stores.Consent.(ConsentStore)
-	authResourceStore := consentService.stores.AuthResource.(authresource.AuthResourceStore)
+	consentStore := consentService.stores.Consent
+	authResourceStore := consentService.stores.AuthResource
 
 	// Execute transaction - update consent status, all auth resource statuses, and create audit
 	err := consentService.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
@@ -1214,7 +1212,7 @@ func (consentService *consentService) EnrichedConsentAPIResponseWithPurposeDetai
 		log.String("consent_id", consent.ConsentID),
 		log.String("org_id", orgID))
 
-	purposeStore := consentService.stores.ConsentPurpose.(consentpurpose.ConsentPurposeStore)
+	purposeStore := consentService.stores.ConsentPurpose
 
 	if consent == nil {
 		logger.Debug("Consent is nil, returning nil")
@@ -1323,7 +1321,7 @@ func (consentService *consentService) SearchConsentsByAttribute(ctx context.Cont
 		log.String("value", value),
 		log.String("org_id", orgID))
 
-	consentStore := consentService.stores.Consent.(ConsentStore)
+	consentStore := consentService.stores.Consent
 
 	var consentIDs []string
 	var err error

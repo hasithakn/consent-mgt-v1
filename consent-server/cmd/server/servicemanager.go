@@ -12,7 +12,6 @@ import (
 )
 
 // registerServices registers all consent management services with the provided HTTP multiplexer.
-// This follows Thunder's service manager pattern for clean separation of concerns.
 func registerServices(
 	mux *http.ServeMux,
 	dbClient provider.DBClientInterface,
@@ -38,7 +37,7 @@ func registerServices(
 	consent.Initialize(mux, storeRegistry)
 	logger.Info("Consent module initialized")
 
-	// TODO : is it clean to have health check endpoint here?, check how thunder does it.
+	// TODO : refacter health check endpoint here.
 	// Register health check endpoint
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

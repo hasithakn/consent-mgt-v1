@@ -33,7 +33,6 @@ func NewStoreRegistry(
 }
 
 // ExecuteTransaction executes multiple store operations in a single transaction
-// This follows Thunder's functional composition pattern
 func (r *StoreRegistry) ExecuteTransaction(queries []func(tx dbmodel.TxInterface) error) error {
 	logger := log.GetLogger()
 	logger.Debug("Starting transaction", log.Int("query_count", len(queries)))

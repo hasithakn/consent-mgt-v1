@@ -280,20 +280,3 @@ func mapToAuthResource(row map[string]interface{}) *model.AuthResource {
 
 	return authResource
 }
-
-// executeTransaction is a helper for functional transaction composition
-func executeTransaction(dbClient provider.DBClientInterface, queries []func(tx dbmodel.TxInterface) error) error {
-	tx, err := dbClient.BeginTx()
-	if err != nil {
-		return err
-	}
-
-	for _, query := range queries {
-		if err := query(tx); err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
-
-	return tx.Commit()
-}

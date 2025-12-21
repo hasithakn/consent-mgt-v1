@@ -347,3 +347,197 @@ func (ts *ConsentAPITestSuite) TestValidateConsent_MalformedJSON_ReturnsBadReque
 
 	ts.Equal(http.StatusBadRequest, resp.StatusCode)
 }
+
+// TestValidateConsent_FullConsentInformation_ReturnsCompleteData validates that validate endpoint returns full consent details
+func (ts *ConsentAPITestSuite) TestValidateConsent_FullConsentInformation_ReturnsCompleteData() {
+	// Create consent with comprehensive data
+	// Use far future timestamp to avoid expiry
+	validityTime := int64(9999999999999) // Far future
+	frequency := 5
+	recurringIndicator := true
+
+	createPayload := ConsentCreateRequest{
+		Type:               "accounts",
+		ValidityTime:       validityTime,
+		Frequency:          frequency,
+		RecurringIndicator: recurringIndicator,
+		ConsentPurpose: []ConsentPurposeItem{
+			{
+				Name:           "marketing-purpose",
+				Value:          "Marketing consent value",
+				IsUserApproved: true,
+				IsMandatory:    true,
+			},
+			{
+				Name:           "analytics-purpose",
+				Value:          "Analytics consent value",
+				IsUserApproved: true,
+				IsMandatory:    false,
+			},
+		},
+		Attributes: map[string]string{
+			"customerId":  "CUST-12345",
+			"accountId":   "ACC-67890",
+			"environment": "production",
+		},
+		Authorizations: []AuthorizationRequest{
+			{
+				UserID:      "user1",
+				Type:        "authorization",
+				Status:      "APPROVED",
+				Resources:   []string{"123456", "789012"},
+				Permissions: []string{"read", "write"},
+			},
+			{
+				UserID:    "user2",
+				Type:      "authorization",
+				Status:    "APPROVED",
+				Resources: []string{"345678"},
+			},
+		},
+	}
+
+	createResp, createBody := ts.createConsent(createPayload)
+	defer createResp.Body.Close()
+	ts.Require().Equal(http.StatusCreated, createResp.StatusCode)
+
+	var created ConsentResponse
+	ts.NoError(json.Unmarshal(createBody, &created))
+	ts.trackConsent(created.ID)
+
+	// Get consent via GET endpoint for comparison
+	getResp, getBody := ts.getConsent(created.ID)
+	defer getResp.Body.Close()
+	ts.Require().Equal(http.StatusOK, getResp.StatusCode)
+
+	var getResponse ConsentResponse
+	ts.NoError(json.Unmarshal(getBody, &getResponse))
+
+	// Validate the consent
+	validatePayload := ConsentValidateRequest{
+		ConsentID: created.ID,
+		UserID:    "user1",
+		ClientID:  testClientID,
+	}
+
+	validateResp, validateBody := ts.validateConsent(validatePayload)
+	defer validateResp.Body.Close()
+	ts.Equal(http.StatusOK, validateResp.StatusCode)
+
+	var validateResponse ConsentValidateResponse
+	ts.NoError(json.Unmarshal(validateBody, &validateResponse))
+
+	// Verify validation succeeded
+	ts.True(validateResponse.IsValid, "Validation should succeed")
+	ts.Require().NotNil(validateResponse.ConsentInformation, "ConsentInformation should be present")
+
+	consentInfo := validateResponse.ConsentInformation
+
+	// ========== COMPREHENSIVE FIELD VALIDATION ==========
+
+	// 1. Core required fields
+	ts.Equal(getResponse.ID, consentInfo.ID, "ID must match")
+	ts.Equal(getResponse.Type, consentInfo.Type, "Type must match")
+	ts.Equal("ACTIVE", consentInfo.Status, "Status should be ACTIVE")
+	ts.Equal(getResponse.ClientID, consentInfo.ClientID, "ClientID must match")
+
+	// 2. Timestamps - validate endpoint may update timestamps, so just verify they exist
+	ts.NotZero(consentInfo.CreatedTime, "CreatedTime must be present")
+	ts.NotZero(consentInfo.UpdatedTime, "UpdatedTime must be present")
+
+	// 3. Optional fields that were provided
+	ts.Require().NotNil(consentInfo.ValidityTime, "ValidityTime should be present")
+	ts.Require().NotNil(getResponse.ValidityTime, "GET response ValidityTime should be present")
+	ts.Equal(*getResponse.ValidityTime, *consentInfo.ValidityTime, "ValidityTime must match")
+
+	ts.Require().NotNil(consentInfo.Frequency, "Frequency should be present")
+	ts.Require().NotNil(getResponse.Frequency, "GET response Frequency should be present")
+	ts.Equal(*getResponse.Frequency, *consentInfo.Frequency, "Frequency must match")
+
+	ts.Require().NotNil(consentInfo.RecurringIndicator, "RecurringIndicator should be present")
+	ts.Require().NotNil(getResponse.RecurringIndicator, "GET response RecurringIndicator should be present")
+	ts.Equal(*getResponse.RecurringIndicator, *consentInfo.RecurringIndicator, "RecurringIndicator must match")
+
+	// 4. Attributes - verify all attributes match
+	ts.Require().Len(consentInfo.Attributes, len(getResponse.Attributes), "Attributes count must match")
+	ts.Equal(3, len(consentInfo.Attributes), "Should have 3 attributes")
+	for key, expectedValue := range getResponse.Attributes {
+		actualValue, exists := consentInfo.Attributes[key]
+		ts.True(exists, "Attribute '%s' should exist in validate response", key)
+		ts.Equal(expectedValue, actualValue, "Attribute '%s' value must match", key)
+	}
+
+	// 5. Consent Purposes - comprehensive validation
+	ts.Require().Len(consentInfo.ConsentPurpose, len(getResponse.ConsentPurpose), "ConsentPurpose count must match")
+	ts.Equal(2, len(consentInfo.ConsentPurpose), "Should have 2 consent purposes")
+
+	// Create map for easier comparison
+	validatePurposeMap := make(map[string]ConsentPurposeItem)
+	for _, cp := range consentInfo.ConsentPurpose {
+		validatePurposeMap[cp.Name] = cp
+	}
+
+	getPurposeMap := make(map[string]ConsentPurposeItem)
+	for _, cp := range getResponse.ConsentPurpose {
+		getPurposeMap[cp.Name] = cp
+	}
+
+	for purposeName, getCP := range getPurposeMap {
+		validateCP, exists := validatePurposeMap[purposeName]
+		ts.True(exists, "Purpose '%s' should exist in validate response", purposeName)
+
+		ts.Equal(getCP.Name, validateCP.Name, "Purpose name must match")
+		ts.Equal(getCP.IsUserApproved, validateCP.IsUserApproved, "Purpose IsUserApproved must match for %s", purposeName)
+		ts.Equal(getCP.IsMandatory, validateCP.IsMandatory, "Purpose IsMandatory must match for %s", purposeName)
+
+		// Verify value matches if present
+		if getCP.Value != nil {
+			ts.NotNil(validateCP.Value, "Purpose value should be present for %s", purposeName)
+			ts.Equal(getCP.Value, validateCP.Value, "Purpose value must match for %s", purposeName)
+		}
+	}
+
+	// 6. Authorizations - comprehensive validation
+	ts.Require().Len(consentInfo.Authorizations, len(getResponse.Authorizations), "Authorizations count must match")
+	ts.Equal(2, len(consentInfo.Authorizations), "Should have 2 authorizations")
+
+	// Create map for easier comparison
+	validateAuthMap := make(map[string]AuthorizationResponse)
+	for _, auth := range consentInfo.Authorizations {
+		validateAuthMap[auth.ID] = auth
+	}
+
+	getAuthMap := make(map[string]AuthorizationResponse)
+	for _, auth := range getResponse.Authorizations {
+		getAuthMap[auth.ID] = auth
+	}
+
+	for authID, getAuth := range getAuthMap {
+		validateAuth, exists := validateAuthMap[authID]
+		ts.True(exists, "Authorization '%s' should exist in validate response", authID)
+
+		ts.Equal(getAuth.ID, validateAuth.ID, "Auth ID must match")
+		ts.Equal(getAuth.Type, validateAuth.Type, "Auth type must match")
+		// Auth status may be updated by validate endpoint, so just verify it exists
+		ts.NotEmpty(validateAuth.Status, "Auth status should be present")
+
+		// UserID comparison
+		if getAuth.UserID != nil {
+			ts.Require().NotNil(validateAuth.UserID, "Auth UserID should be present")
+			ts.Equal(*getAuth.UserID, *validateAuth.UserID, "Auth UserID must match")
+		}
+
+		// UpdatedTime may change during validation, just verify it exists
+		ts.NotZero(validateAuth.UpdatedTime, "Auth UpdatedTime should be present")
+
+		// Verify resources if present
+		if getAuth.Resources != nil {
+			ts.NotNil(validateAuth.Resources, "Auth resources should be present for %s", authID)
+		}
+	}
+}
+
+// Helper function for creating bool pointers
+func boolPtr(b bool) *bool {
+	return &b
+}

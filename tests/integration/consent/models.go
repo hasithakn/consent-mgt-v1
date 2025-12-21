@@ -117,9 +117,17 @@ type ConsentValidateResponse struct {
 
 // ConsentValidateDetail represents consent information in validate response
 type ConsentValidateDetail struct {
-	ID          string `json:"id"`
-	Type        string `json:"type"`
-	ClientID    string `json:"clientId"`
-	Status      string `json:"status"`
-	CreatedTime int64  `json:"createdTime"`
+	ID                         string                  `json:"id"`
+	Type                       string                  `json:"type"`
+	ClientID                   string                  `json:"clientId"`
+	Status                     string                  `json:"status"`
+	CreatedTime                int64                   `json:"createdTime"`
+	UpdatedTime                int64                   `json:"updatedTime"`
+	ConsentPurpose             []ConsentPurposeItem    `json:"consentPurpose"`
+	Authorizations             []AuthorizationResponse `json:"authorizations"`
+	Attributes                 map[string]string       `json:"attributes"`
+	ValidityTime               *int64                  `json:"validityTime,omitempty"`
+	RecurringIndicator         *bool                   `json:"recurringIndicator,omitempty"`
+	Frequency                  *int                    `json:"frequency,omitempty"`
+	DataAccessValidityDuration *int64                  `json:"dataAccessValidityDuration,omitempty"`
 }

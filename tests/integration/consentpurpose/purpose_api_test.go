@@ -45,7 +45,7 @@ type PurposeAPITestSuite struct {
 // SetupSuite runs once before all tests
 func (ts *PurposeAPITestSuite) SetupSuite() {
 	ts.createdPurposeIDs = make([]string, 0)
-	fmt.Println("=== ConsentPurpose Test Suite Starting ===")
+	ts.T().Logf("=== ConsentPurpose Test Suite Starting ===")
 	// Note: Pre-cleanup has been removed as it runs before server is ready
 	// If you need to clean leftover data, run tests twice or manually delete test_* purposes
 }
@@ -53,11 +53,11 @@ func (ts *PurposeAPITestSuite) SetupSuite() {
 // TearDownSuite runs once after all tests to cleanup
 func (ts *PurposeAPITestSuite) TearDownSuite() {
 	if len(ts.createdPurposeIDs) == 0 {
-		fmt.Println("=== No purposes to clean up ===")
+		ts.T().Logf("=== No purposes to clean up ===")
 		return
 	}
 
-	fmt.Printf("=== Cleaning up %d created purposes ===\n", len(ts.createdPurposeIDs))
+	ts.T().Logf("=== Cleaning up %d created purposes ===", len(ts.createdPurposeIDs))
 	successCount := 0
 	failCount := 0
 
@@ -69,8 +69,8 @@ func (ts *PurposeAPITestSuite) TearDownSuite() {
 		}
 	}
 
-	fmt.Printf("=== Cleanup complete: %d deleted, %d failed ===\n", successCount, failCount)
-	fmt.Println("=== ConsentPurpose Test Suite Complete ===")
+	ts.T().Logf("=== Cleanup complete: %d deleted, %d failed ===", successCount, failCount)
+	ts.T().Logf("=== ConsentPurpose Test Suite Complete ===")
 }
 
 // TearDownTest runs after each test to ensure cleanup
@@ -197,7 +197,7 @@ func (ts *PurposeAPITestSuite) deletePurposeWithCheck(purposeID string) bool {
 	client := testutils.GetHTTPClient()
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		fmt.Printf("Warning: failed to delete purpose %s: %v\n", purposeID, err)
+		ts.T().Logf("Warning: failed to delete purpose %s: %v", purposeID, err)
 		return false
 	}
 	defer resp.Body.Close()

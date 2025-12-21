@@ -166,15 +166,16 @@ func (req *AuthorizationAPIUpdateRequest) ToAuthResourceUpdateRequest() *authmod
 
 // ConsentAPIUpdateRequest represents the API payload for updating a consent (external format)
 // Note: Status is not included in the request - it will be derived from authorization states
+// Note: ConsentPurpose, Attributes, and Authorizations don't have omitempty to allow empty arrays/maps for removal
 type ConsentAPIUpdateRequest struct {
 	Type                       string                    `json:"type,omitempty"`
 	ValidityTime               *int64                    `json:"validityTime,omitempty"`
 	RecurringIndicator         *bool                     `json:"recurringIndicator,omitempty"`
 	Frequency                  *int                      `json:"frequency,omitempty"`
 	DataAccessValidityDuration *int64                    `json:"dataAccessValidityDuration,omitempty"`
-	ConsentPurpose             []ConsentPurposeItem      `json:"consentPurpose,omitempty"`
-	Attributes                 map[string]string         `json:"attributes,omitempty"`
-	Authorizations             []AuthorizationAPIRequest `json:"authorizations"` // Remove omitempty to allow explicit empty array
+	ConsentPurpose             []ConsentPurposeItem      `json:"consentPurpose"`
+	Attributes                 map[string]string         `json:"attributes"`
+	Authorizations             []AuthorizationAPIRequest `json:"authorizations"`
 }
 
 // ConsentCreateRequest represents the internal request payload for creating a consent

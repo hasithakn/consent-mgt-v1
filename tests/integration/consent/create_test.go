@@ -622,3 +622,28 @@ func (ts *ConsentAPITestSuite) TestCreateConsent_AuthMissingType_Returns400() {
 
 	ts.Equal(http.StatusBadRequest, resp.StatusCode, "Authorization missing type should return 400")
 }
+
+// TestCreateConsent_AllFieldsEmpty_Succeeds verifies creating consent with all optional fields empty
+func (ts *ConsentAPITestSuite) TestCreateConsent_AllFieldsEmpty_Succeeds() {
+	payload := ConsentCreateRequest{
+		Type:           "accounts",
+		ConsentPurpose: []ConsentPurposeItem{},
+		Authorizations: []AuthorizationRequest{},
+		Attributes:     map[string]string{},
+	}
+
+	resp, body := ts.createConsent(payload)
+	defer resp.Body.Close()
+
+	ts.Equal(http.StatusCreated, resp.StatusCode, "Creating consent with all empty fields should succeed")
+
+	var consentResp ConsentResponse
+	ts.NoError(json.Unmarshal(body, &consentResp))
+	ts.NotEmpty(consentResp.ID)
+	ts.Equal("accounts", consentResp.Type)
+	ts.Empty(consentResp.ConsentPurpose, "Should have no purposes")
+	ts.Empty(consentResp.Authorizations, "Should have no authorizations")
+	ts.Empty(consentResp.Attributes, "Should have no attributes")
+
+	ts.trackConsent(consentResp.ID)
+}

@@ -54,10 +54,11 @@ func ValidateConsentCreateRequest(req model.ConsentAPIRequest, clientID, orgID s
 
 // ValidateConsentUpdateRequest validates consent update request (keeping for future use)
 func ValidateConsentUpdateRequest(req model.ConsentAPIUpdateRequest) error {
-	// At least one field must be provided
+	// At least one field must be provided (check if nil, not if empty)
+	// Empty arrays are valid - they indicate removal of all items
 	if req.Type == "" && req.Frequency == nil &&
 		req.ValidityTime == nil && req.RecurringIndicator == nil &&
-		req.Attributes == nil && len(req.Authorizations) == 0 {
+		req.Attributes == nil && req.Authorizations == nil && req.ConsentPurpose == nil {
 		return fmt.Errorf("at least one field must be provided for update")
 	}
 

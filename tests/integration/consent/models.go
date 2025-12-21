@@ -32,17 +32,18 @@ type ConsentCreateRequest struct {
 // ConsentUpdateRequest represents the payload for updating a consent
 type ConsentUpdateRequest struct {
 	Type               string                 `json:"type,omitempty"`
-	ConsentPurpose     []ConsentPurposeItem   `json:"consentPurpose,omitempty"`
-	Authorizations     []AuthorizationRequest `json:"authorizations,omitempty"`
-	Attributes         map[string]string      `json:"attributes,omitempty"`
-	ValidityTime       int64                  `json:"validityTime,omitempty"`
+	ConsentPurpose     []ConsentPurposeItem   `json:"consentPurpose"` // Remove omitempty to allow empty arrays for removal
+	Authorizations     []AuthorizationRequest `json:"authorizations"` // Remove omitempty to allow empty arrays for removal
+	Attributes         map[string]string      `json:"attributes"`     // Remove omitempty to allow empty maps for removal
+	ValidityTime       *int64                 `json:"validityTime,omitempty"`
 	RecurringIndicator *bool                  `json:"recurringIndicator,omitempty"`
 	Frequency          *int                   `json:"frequency,omitempty"`
 }
 
 // ConsentRevokeRequest represents the payload for revoking a consent
 type ConsentRevokeRequest struct {
-	Reason string `json:"reason,omitempty"`
+	Reason   string `json:"reason,omitempty"`
+	ActionBy string `json:"actionBy"`
 }
 
 // AuthorizationResponse represents authorization data in consent response
@@ -87,4 +88,38 @@ type ErrorResponse struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 	Details string `json:"details,omitempty"`
+}
+
+// ConsentValidateRequest represents the payload for validating a consent
+type ConsentValidateRequest struct {
+	Headers         map[string]interface{} `json:"headers,omitempty"`
+	Payload         map[string]interface{} `json:"payload,omitempty"`
+	ElectedResource string                 `json:"electedResource,omitempty"`
+	ConsentID       string                 `json:"consentId"`
+	UserID          string                 `json:"userId,omitempty"`
+	ClientID        string                 `json:"clientId,omitempty"`
+	ResourceParams  *struct {
+		Resource   string `json:"resource,omitempty"`
+		HTTPMethod string `json:"httpMethod,omitempty"`
+		Context    string `json:"context,omitempty"`
+	} `json:"resourceParams,omitempty"`
+}
+
+// ConsentValidateResponse represents the API response for consent validation
+type ConsentValidateResponse struct {
+	IsValid            bool                   `json:"isValid"`
+	ModifiedPayload    interface{}            `json:"modifiedPayload,omitempty"`
+	ErrorCode          int                    `json:"errorCode,omitempty"`
+	ErrorMessage       string                 `json:"errorMessage,omitempty"`
+	ErrorDescription   string                 `json:"errorDescription,omitempty"`
+	ConsentInformation *ConsentValidateDetail `json:"consentInformation,omitempty"`
+}
+
+// ConsentValidateDetail represents consent information in validate response
+type ConsentValidateDetail struct {
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	ClientID    string `json:"clientId"`
+	Status      string `json:"status"`
+	CreatedTime int64  `json:"createdTime"`
 }

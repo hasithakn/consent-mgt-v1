@@ -709,16 +709,18 @@ paths:
                   recurringIndicator: true
                   frequency: 10
                   dataAccessValidityDuration: 86400
-                  consentPurpose:
-                    - name: "first_name"
-                      value: {}
-                      isUserApproved: true
-                      isMandatory: true
-                      type: "attribute"
-                      description: "Allows access to the user's first name"
-                      attributes:
-                        jsonPath: "$.personal.firstName"
-                        resourcePath: "/user/{nic}"
+                  purposeGroups:
+                    - purposeGroupName: "marketing_communication_preferences"
+                      purposes:
+                        - purposeName: "first_name"
+                          value: {}
+                          isUserApproved: true
+                          isMandatory: true
+                          type: "attribute"
+                          description: "Allows access to the user's first name"
+                          attributes:
+                            jsonPath: "$.personal.firstName"
+                            resourcePath: "/user/{nic}"
                   attributes:
                     department: "sales"
                     region: "APAC"
@@ -3111,12 +3113,16 @@ components:
           nullable: true
           description: Duration in seconds for which data access is valid after each authorization. Omitted from response when null.
           example: 86400
-        consentPurpose:
+        purposeGroups:
           type: array
           description: |
-            List of consent purposes with their approval state, mandatory flag, and **enriched details from purpose definitions**.
+            List of purpose groups containing consent purposes with their approval state, mandatory flag, and **enriched details from purpose definitions**.
+            Each purpose group contains:
+            - purposeGroupName: Name of the purpose group
+            - purposes: Array of purposes in this group
+            
             Each purpose includes:
-            - name: Purpose identifier
+            - purposeName: Purpose identifier
             - value: User-provided value for this purpose (if any)
             - isUserApproved: Whether the user has approved this purpose (boolean, default false)
             - isMandatory: Whether this purpose is mandatory (boolean, default true)
@@ -3124,27 +3130,37 @@ components:
             - description: Purpose description from definition
             - attributes: Purpose attributes from definition (e.g., validationSchema, resourcePath, jsonPath)
           items:
-            allOf:
-              - $ref: "#/components/schemas/ConsentPurposeItem"
-              - type: object
-                properties:
-                  type:
-                    type: string
-                    enum: [string, json-schema, attribute]
-                    description: Purpose type from the consent purpose definition
-                    example: "attribute"
-                  description:
-                    type: string
-                    description: Purpose description from the consent purpose definition
-                    example: "Allows access to the user's first name"
-                  attributes:
-                    type: object
-                    additionalProperties:
-                      type: string
-                    description: Purpose attributes from the consent purpose definition
-                    example:
-                      jsonPath: "$.personal.firstName"
-                      resourcePath: "/user/{nic}"
+            type: object
+            properties:
+              purposeGroupName:
+                type: string
+                description: Name of the purpose group
+                example: "marketing_communication_preferences"
+              purposes:
+                type: array
+                description: List of purposes in this group with enriched details
+                items:
+                  allOf:
+                    - $ref: "#/components/schemas/ConsentPurposeApprovalItem"
+                    - type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [string, json-schema, attribute]
+                          description: Purpose type from the consent purpose definition
+                          example: "attribute"
+                        description:
+                          type: string
+                          description: Purpose description from the consent purpose definition
+                          example: "Allows access to the user's first name"
+                        attributes:
+                          type: object
+                          additionalProperties:
+                            type: string
+                          description: Purpose attributes from the consent purpose definition
+                          example:
+                            jsonPath: "$.personal.firstName"
+                            resourcePath: "/user/{nic}"
         attributes:
           type: object
           additionalProperties:
@@ -3189,7 +3205,7 @@ components:
         - status
         - createdTime
         - updatedTime
-        - consentPurpose
+        - purposeGroups
     ConsentIdsResponse:
       type: object
       description: Response payload containing consent IDs matching the attribute search criteria.

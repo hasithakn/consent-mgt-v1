@@ -11,6 +11,18 @@ info:
     **Consent Purpose Management**: Manages consent purposes as reference data that can be used to 
     categorize and define the intended use of consents (e.g., "Account Information Access", 
     "Payment Initiation", "Marketing", etc.).
+    
+    **Key Concepts:**
+    
+    - **Consent Purpose**: A reference data entity that defines a specific purpose for which consent 
+      is requested (e.g., "user_email", "user_mobile", "account_access"). Each purpose has a unique 
+      name and can be configured with attributes, validation rules, and type handlers.
+    
+    - **Consent Purpose Group**: A logical grouping of related consent purposes. Purpose groups help 
+      organize multiple purposes together for streamlined consent collection. For example, a 
+      "marketing_communication_preferences" group might contain purposes like "email_marketing" and 
+      "sms_marketing". When creating consents, purposes are organized within these groups, and each 
+      purpose within a group has an approval state and optional value.
   contact:
     name: WSO2
     url: 'https://wso2.com/solutions/financial-services/'
@@ -32,18 +44,25 @@ tags:
     description: Provides RESTful endpoints to handle the full lifecycle of consent resources and their associated authorizations. Supports operations such as initiation, retrieval, update, and revocation.
   - name: Consent Purpose
     description: Manage consent purposes (reference data for categorizing consents). Purposes can be created, retrieved, updated, deleted, and validated.
+  - name: Purpose Group
+    description: Manage consent purpose groups. Purpose groups allow organizing related consent purposes together with mandatory/optional flags for streamlined consent collection.
 paths:
   /consents:
     post:
       summary: Initiate a new consent resource
       description: |
-        This endpoint is used to initiate a new consent resource.  
-
-        In order to handle custom requirements, The endpoint invokes the following **extension points**:
-        - **/pre-process-consent-creation**: to verify inputs according to the regulation requirements and obtain the mapping of consent data to store.
-        - **/enrich-consent-creation-response**: to handle response construction, additional validations, and any custom processing after consent creation.
+        This endpoint is used to initiate a new consent resource.
         
-        Upon success, the system creates a **consent resource** with: A unique `consentId`  
+        Upon success, the system creates a **consent resource** with: A unique `consentId`
+        
+        **Purpose Group Validation:**
+        - Cannot create consent with purpose groups that contain duplicate consent purposes. Each purpose 
+          can only appear once across all purpose groups in the request.
+        
+        **Response Behavior:**
+        - The consent creation response payload includes all purposes within each purpose group.
+        - If the request contains only a subset of purposes for a group, any unmentioned purposes from 
+          that group are automatically resolved and returned with `isUserApproved: false`.
       operationId: consents-POST
       tags:
         - Consent
@@ -68,22 +87,27 @@ paths:
             schema:
               $ref: "#/components/schemas/ConsentCreatePayload"
             example:
-              type: "accounts"
-              validityTime: 0
-              recurringIndicator: false
-              dataAccessValidityDuration: 86400
+              type: "marketing"
+              validityTime: 1766383796
+              recurringIndicator: true
+              dataAccessValidityDuration: 0
               frequency: 0
-              consentPurpose:
-                - name: "first_name"
-                  value: {}
-                  isUserApproved: true
-                  isMandatory: true
+              purposeGroups:
+                - purposeGroupName: "marketing_communication_preferences"
+                  purposes:
+                    - purposeName: "user_email"
+                      isUserApproved: true
+                      value: {}
+                    - purposeName: "user_mobile"
+                      isUserApproved: true
+                      value: {}
               attributes:
-                department: "sales"
+                department: "marketing"
               authorizations:
                 - userId: "user1@example.com"
                   type: "authorisation"
                   status: "APPROVED"
+                  updatedTime: 1702800000
                   resources:
                     accountIds: ["acc-123", "acc-456"]
       responses:
@@ -217,12 +241,6 @@ paths:
           description: "The unique identifier for the organization."
           schema:
             type: string
-        - in: header
-          name: client-id
-          required: true
-          description: "The client ID of the application making the request."
-          schema:
-            type: string
         - name: key
           in: query
           required: true
@@ -265,9 +283,6 @@ paths:
         Fetches the complete details of a specific consent resource using
         its unique `consentID`. This is used to check the status and details of a consent.
 
-        In order to handle requirements, The endpoint invokes following **extension point**:
-        - **/pre-process-consent-retrieval**: handle pre-consent retrieval validations and to return a custom response payload.
-
       operationId: consents-GET
       tags:
         - Consent
@@ -276,12 +291,6 @@ paths:
           name: org-id
           required: true
           description: "The unique identifier for the organization (e.g., the bank) that this consent belongs to."
-          schema:
-            type: string
-        - in: header
-          name: TPP-client-id
-          required: true
-          description: "The client ID of the Third-Party Provider (TPP) application that owns the consent."
           schema:
             type: string
         - in: path
@@ -317,11 +326,16 @@ paths:
       summary: Update a consent resource by its ID
       description: |
         Endpoint to perform a full update on a consent resource, including its authorization resources and attributes, in a single operation.
-
-        In order to handle custom requirements, The endpoint invokes the following **extension points**:
         
-        - **/pre-process-consent-update**: to verify inputs according to the regulation requirements and obtain the mapping of consent data to store.
-        - **/enrich-consent-update-response**: to handle response construction, additional validations, and any custom processing after consent update.
+        **Purpose Group Validation:**
+        - Cannot update consent with purpose groups that contain duplicate consent purposes. Each purpose 
+          can only appear once across all purpose groups in the request.
+        
+        **Response Behavior:**
+        - The consent update response payload includes all purposes within each purpose group.
+        - If the request contains only a subset of purposes for a group, any unmentioned purposes from 
+          that group are automatically resolved and returned with `isUserApproved: false`.
+
       operationId: consents-PUT
       parameters:
         - in: header
@@ -354,11 +368,15 @@ paths:
               recurringIndicator: false
               dataAccessValidityDuration: 86400
               frequency: 0
-              consentPurpose:
-                - name: "first_name"
-                  value: {}
-                  isUserApproved: true
-                  isMandatory: true
+              purposeGroups:
+                - purposeGroupName: "profile_access"
+                  purposes:
+                    - purposeName: "first_name"
+                      isUserApproved: true
+                      value: {}
+                    - purposeName: "last_name"
+                      isUserApproved: true
+                      value: {}
               attributes:
                 department: "sales"
                 region: "APAC"
@@ -366,6 +384,7 @@ paths:
                 - userId: "user1@example.com"
                   type: "authorisation"
                   status: "APPROVED"
+                  updatedTime: 1702800000
                   resources:
                     accountIds: ["acc-123", "acc-456"]
         required: true
@@ -396,8 +415,6 @@ paths:
       description: |
        Allows to revoke a consent. This action typically updates the consent status to a **revoke** type of status.
        
-       In order to handle pre-consent revocation validations, The endpoint invokes the following **extension point**:
-        - **/pre-process-consent-revoke**
       operationId: consents-revoke-POST
       tags:
         - Consent
@@ -412,12 +429,6 @@ paths:
           in: path
           description: The unique identifier of the consent to update.
           required: true
-          schema:
-            type: string
-        - in: header
-          name: TPP-client-id
-          required: true
-          description: "The client ID of the Third-Party Provider (TPP) application that is requesting the consent."
           schema:
             type: string
       requestBody:
@@ -668,12 +679,6 @@ paths:
           description: "The unique identifier for the organization."
           schema:
             type: string
-        - in: header
-          name: client-id
-          required: true
-          description: "The client ID of the application making the validation request."
-          schema:
-            type: string
       requestBody:
         description: The validation request containing consent details and the action being validated.
         required: true
@@ -718,13 +723,35 @@ paths:
                     department: "sales"
                     region: "APAC"
                   authorizations:
-                    - authId: "AUTH-123e4567-e89b-12d3-a456-426614174000"
+                    - id: "auth-xyz789"
                       userId: "user1@example.com"
-                      type: "authorization"
+                      type: "authorisation"
                       status: "APPROVED"
+                      updatedTime: 1702800000
                       resources:
                         accountIds: ["acc-123", "acc-456"]
-                      updatedTime: 1702800000
+        "400":
+          description: Bad Request - Invalid request body or missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "BAD_REQUEST"
+                message: "Invalid request"
+                description: "Missing required field: consentId"
+                traceId: "20260107T123456Z-abc123"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "INTERNAL_ERROR"
+                message: "Server error"
+                description: "An unexpected error occurred"
+                traceId: "20260107T123456Z-abc123"
       security:
         - basicAuth: []
   /consent-purposes:
@@ -764,13 +791,6 @@ paths:
           schema:
             type: string
             example: "ORG-123"
-        - in: header
-          name: client-id
-          required: false
-          description: The client ID of the application making the request (for audit purposes)
-          schema:
-            type: string
-            example: "CLIENT-456"
       requestBody:
         description: Array of consent purposes to create
         required: true
@@ -891,56 +911,68 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ConsentErrorCommon"
               examples:
                 emptyArray:
                   summary: Empty array provided
                   value:
                     code: "BAD_REQUEST"
                     message: "Empty request"
-                    details: "At least one purpose must be provided"
+                    description: "At least one purpose must be provided"
+                    traceId: "20260107T123456Z-abc123"
                 missingName:
                   summary: Missing required name field
                   value:
                     code: "BAD_REQUEST"
                     message: "Invalid request body"
-                    details: "Key: 'ConsentPurposeCreateRequest.Name' Error:Field validation for 'Name' failed on the 'required' tag"
+                    description: "Name field is required"
+                    traceId: "20260107T123456Z-abc123"
                 invalidType:
                   summary: Invalid type value
                   value:
-                    error: "attribute_validation_failed"
-                    message: "invalid purpose type 'invalid-type': must be one of [string, json-schema, attribute]"
-                    type: "attribute_validation_error"
+                    code: "BAD_REQUEST"
+                    message: "Invalid purpose type"
+                    description: "Type must be one of: string, json-schema, attribute"
+                    traceId: "20260107T123456Z-abc123"
                 jsonSchemaMissingValidationSchema:
                   summary: JSON Schema type missing validationSchema attribute
                   value:
-                    error: "Validation failed"
-                    message: "attribute validation failed: validationSchema is required for json-schema type"
-                    type: "attribute_validation_error"
+                    code: "BAD_REQUEST"
+                    message: "Validation failed"
+                    description: "validationSchema is required for json-schema type"
+                    traceId: "20260107T123456Z-abc123"
                 attributeMissingResourcePath:
                   summary: Attribute type missing resourcePath
                   value:
-                    error: "Validation failed"
-                    message: "attribute validation failed: resourcePath is required for attribute type"
-                    type: "attribute_validation_error"
+                    code: "BAD_REQUEST"
+                    message: "Validation failed"
+                    description: "resourcePath is required for attribute type"
+                    traceId: "20260107T123456Z-abc123"
                 attributeMissingJsonPath:
                   summary: Attribute type missing jsonPath
                   value:
-                    error: "Validation failed"
-                    message: "attribute validation failed: jsonPath is required for attribute type"
-                    type: "attribute_validation_error"
+                    code: "BAD_REQUEST"
+                    message: "Validation failed"
+                    description: "jsonPath is required for attribute type"
+                    traceId: "20260107T123456Z-abc123"
                 duplicateName:
                   summary: Purpose name already exists
                   value:
-                    code: "BAD_REQUEST"
-                    message: "Invalid request"
-                    details: "purpose name 'readAccountBasic' already exists for this organization"
+                    code: "CONFLICT"
+                    message: "Purpose already exists"
+                    description: "Purpose name already exists in organization"
+                    traceId: "20260107T123456Z-abc123"
         "500":
           description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "INTERNAL_ERROR"
+                message: "Server error"
+                description: "An unexpected error occurred"
+                traceId: "20260107T123456Z-abc123"
       security:
         - basicAuth: []
     get:
@@ -1027,7 +1059,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "INTERNAL_ERROR"
+                message: "Internal server error"
+                description: "An unexpected error occurred"
+                traceId: "20260107T123456Z-abc123"
       security:
         - basicAuth: []
   /consent-purposes/validate:
@@ -1113,32 +1150,40 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ConsentErrorCommon"
               examples:
                 emptyRequest:
                   summary: Empty request array
                   value:
                     code: "BAD_REQUEST"
                     message: "Invalid request"
-                    details: "at least one purpose name must be provided"
+                    description: "At least one purpose name must be provided"
+                    traceId: "20260107T123456Z-abc123"
                 noValidPurposes:
                   summary: No valid purposes found
                   value:
                     code: "BAD_REQUEST"
                     message: "Invalid request"
-                    details: "no valid purposes found"
+                    description: "No valid purposes found"
+                    traceId: "20260107T123456Z-abc124"
                 missingOrgId:
                   summary: Missing org-id header
                   value:
                     code: "BAD_REQUEST"
                     message: "Invalid request"
-                    details: "org-id header is required"
+                    description: "Organization ID header is required"
+                    traceId: "20260107T123456Z-abc125"
         "500":
           description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "INTERNAL_ERROR"
+                message: "Server error"
+                description: "An unexpected error occurred"
+                traceId: "20260107T123456Z-abc123"
       security:
         - basicAuth: []
   /consent-purposes/{purposeId}:
@@ -1183,17 +1228,23 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ConsentErrorCommon"
               example:
                 code: "NOT_FOUND"
-                message: "Consent purpose not found"
-                details: ""
+                message: "Purpose not found"
+                description: "Consent purpose does not exist"
+                traceId: "20260107T123456Z-abc123"
         "500":
           description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "INTERNAL_ERROR"
+                message: "Server error"
+                description: "An unexpected error occurred"
+                traceId: "20260107T123456Z-abc123"
       security:
         - basicAuth: []
     put:
@@ -1319,50 +1370,65 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ConsentErrorCommon"
               examples:
                 missingName:
                   summary: Missing required field (name)
                   value:
-                    code: "INVALID_REQUEST"
+                    code: "BAD_REQUEST"
                     message: "Invalid request"
-                    details: "purpose name is required"
+                    description: "Purpose name is required"
+                    traceId: "20260107T123456Z-abc123"
                 invalidType:
                   summary: Invalid type value
                   value:
-                    error: "attribute_validation_failed"
-                    message: "invalid purpose type 'unknown': must be one of [string, json-schema, attribute]"
-                    type: "attribute_validation_error"
+                    code: "BAD_REQUEST"
+                    message: "Invalid purpose type"
+                    description: "Type must be one of: string, json-schema, attribute"
+                    traceId: "20260107T123456Z-abc123"
                 jsonSchemaMissingValidationSchema:
                   summary: JSON Schema type missing validationSchema
                   value:
-                    error: "Validation failed"
-                    message: "attribute validation failed: validationSchema is required for json-schema type"
-                    type: "attribute_validation_error"
+                    code: "BAD_REQUEST"
+                    message: "Validation failed"
+                    description: "validationSchema is required for json-schema type"
+                    traceId: "20260107T123456Z-abc123"
                 attributeMissingResourcePath:
                   summary: Attribute type missing resourcePath
                   value:
-                    error: "Validation failed"
-                    message: "attribute validation failed: resourcePath is required for attribute type"
-                    type: "attribute_validation_error"
+                    code: "BAD_REQUEST"
+                    message: "Validation failed"
+                    description: "resourcePath is required for attribute type"
+                    traceId: "20260107T123456Z-abc123"
                 duplicateName:
                   summary: Name already exists in organization
                   value:
-                    code: "INVALID_REQUEST"
-                    message: "Invalid request"
-                    details: "purpose name 'readAccountBasic' already exists for this organization"
+                    code: "CONFLICT"
+                    message: "Purpose already exists"
+                    description: "Purpose name already exists in organization"
+                    traceId: "20260107T123456Z-abc123"
         "404":
           description: Consent purpose not found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "NOT_FOUND"
+                message: "Purpose not found"
+                description: "Consent purpose does not exist"
+                traceId: "20260107T123456Z-abc123"
         "500":
           description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "INTERNAL_ERROR"
+                message: "Server error"
+                description: "An unexpected error occurred"
+                traceId: "20260107T123456Z-abc123"
       security:
         - basicAuth: []
     delete:
@@ -1399,17 +1465,699 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "NOT_FOUND"
+                message: "Purpose not found"
+                description: "Consent purpose does not exist"
+                traceId: "20260107T123456Z-abc123"
         "500":
           description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "INTERNAL_ERROR"
+                message: "Server error"
+                description: "An unexpected error occurred"
+                traceId: "20260107T123456Z-abc123"
+      security:
+        - basicAuth: []
+  /consent-purpose-groups:
+    post:
+      summary: Create a consent purpose group
+      description: |
+        Creates a new consent purpose group that organizes related consent purposes together.
+        Purpose groups enable streamlined consent collection by defining which purposes are 
+        mandatory and which are optional within a logical grouping.
+        
+        **Validation Rules:**
+        - Group name is required and must be unique within the organization.
+        - Group name must not exceed 255 characters.
+        - Description is optional but must not exceed 1024 characters if provided.
+        - At least one purpose must be provided in the purposes array.
+        - All purpose names in the group must reference existing valid consent purposes.
+        - Duplicate purpose names within the same group are not allowed.
+        
+        **Mandatory Flag:**
+        The `isMandatory` flag on each purpose indicates whether that purpose must be 
+        approved for the consent to be valid. This provides fine-grained control over 
+        which purposes are essential vs. optional within the group.
+      operationId: createPurposeGroup
+      tags:
+        - Purpose Group
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization that owns this purpose group
+          schema:
+            type: string
+            example: "ORG-123"
+        - in: header
+          name: TPP-client-id
+          required: true
+          description: The client ID of the Third-Party Provider (TPP) application making the request.
+          schema:
+            type: string
+            example: "CLIENT-456"
+      requestBody:
+        description: Purpose group definition
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PurposeGroupCreateRequest"
+            examples:
+              marketingGroup:
+                summary: Marketing communication preferences group
+                value:
+                  name: "marketing_communication_preferences"
+                  description: "User preferences related to marketing communications"
+                  purposes:
+                    - purposeName: "user_email"
+                      isMandatory: true
+                    - purposeName: "user_phone"
+                      isMandatory: false
+                    - purposeName: "user_address"
+                      isMandatory: false
+              accountAccessGroup:
+                summary: Account access permissions group
+                value:
+                  name: "account_access_permissions"
+                  description: "Permissions for accessing different types of account information"
+                  purposes:
+                    - purposeName: "account_basic_info"
+                      isMandatory: true
+                    - purposeName: "account_transaction_history"
+                      isMandatory: false
+                    - purposeName: "account_balance"
+                      isMandatory: true
+      responses:
+        "201":
+          description: Successfully created purpose group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurposeGroupResponse"
+              examples:
+                marketingGroup:
+                  summary: Marketing group created
+                  value:
+                    id: "GROUP-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    name: "marketing_communication_preferences"
+                    description: "User preferences related to marketing communications"
+                    clientId: "CLIENT-456"
+                    purposes:
+                      - purposeName: "user_email"
+                        isMandatory: true
+                      - purposeName: "user_phone"
+                        isMandatory: false
+                      - purposeName: "user_address"
+                        isMandatory: false
+                    createdTime: 1704153600
+                    updatedTime: 1704153600
+        "400":
+          description: Bad Request - Invalid input or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              examples:
+                missingName:
+                  summary: Missing required name field
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request body"
+                    description: "Name field is required"
+                    traceId: "20260107T123456Z-abc123"
+                duplicateName:
+                  summary: Group name already exists
+                  value:
+                    code: "CONFLICT"
+                    message: "Group already exists"
+                    description: "Purpose group name already exists"
+                    traceId: "20260107T123456Z-abc123"
+                emptyPurposes:
+                  summary: No purposes provided
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request"
+                    description: "At least one purpose must be provided"
+                    traceId: "20260107T123456Z-abc123"
+                purposeNotFound:
+                  summary: Referenced purpose doesn't exist
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid purpose reference"
+                    description: "Purpose does not exist in organization"
+                    traceId: "20260107T123456Z-abc123"
+                duplicatePurposeInGroup:
+                  summary: Duplicate purpose in group
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid request"
+                    description: "Duplicate purpose in group"
+                    traceId: "20260107T123456Z-abc123"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "INTERNAL_ERROR"
+                message: "Server error"
+                description: "An unexpected error occurred"
+                traceId: "20260107T123456Z-abc123"
+      security:
+        - basicAuth: []
+    get:
+      summary: List all purpose groups
+      description: |
+        Retrieves a paginated list of all consent purpose groups for the specified organization.
+        
+        **Filtering Options:**
+        - **name**: Filter by exact group name match
+        - **purposeNames**: Comma-separated purpose names - returns groups containing ALL specified purposes
+        
+        **Search Logic for purposeNames:**
+        When multiple purpose names are provided (e.g., "user_email,user_phone"), the API returns only
+        groups that include ALL of the specified purposes (AND operation). This helps find groups that
+        satisfy a specific set of consent requirements.
+        
+        Results are sorted by creation time (newest first) and support pagination via limit/offset.
+      operationId: listPurposeGroups
+      tags:
+        - Purpose Group
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-123"
+        - name: clientIds
+          in: query
+          required: false
+          description: Comma-separated list of client IDs to filter purpose groups by
+          schema:
+            type: string
+          example: "CLIENT-123,CLIENT-456"
+        - name: name
+          in: query
+          required: false
+          description: Filter by group name
+          schema:
+            type: string
+          example: "marketing_communication_preferences"
+        - name: purposeNames
+          in: query
+          required: false
+          description: |
+            Comma-separated list of purpose names to filter by.
+            Returns groups that contain ALL the specified purposes (AND logic).
+            Example: "user_email,user_phone" will return groups containing both purposes.
+          schema:
+            type: string
+          example: "user_email,user_phone"
+        - name: limit
+          in: query
+          description: Maximum number of results to return (default 10, max 100)
+          schema:
+            type: integer
+            format: int32
+            default: 10
+            minimum: 1
+            maximum: 100
+          example: 10
+        - name: offset
+          in: query
+          description: Number of results to skip (for pagination)
+          schema:
+            type: integer
+            format: int32
+            default: 0
+            minimum: 0
+          example: 0
+        - name: count
+          in: query
+          description: If true, returns only the total count without the data array
+          schema:
+            type: boolean
+            default: false
+          example: false
+      responses:
+        "200":
+          description: Successfully retrieved purpose groups
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurposeGroupListResponse"
+              examples:
+                withGroups:
+                  summary: Multiple purpose groups returned
+                  value:
+                    data:
+                      - id: "GROUP-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                        name: "marketing_communication_preferences"
+                        description: "User preferences related to marketing communications"
+                        clientId: "CLIENT-456"
+                        purposes:
+                          - purposeName: "user_email"
+                            isMandatory: true
+                          - purposeName: "user_phone"
+                            isMandatory: false
+                        createdTime: 1704153600
+                        updatedTime: 1704153600
+                      - id: "GROUP-b2c3d4e5-f6a7-8901-bcde-f12345678901"
+                        name: "account_access_permissions"
+                        description: "Permissions for accessing account information"
+                        clientId: "CLIENT-789"
+                        purposes:
+                          - purposeName: "account_basic_info"
+                            isMandatory: true
+                          - purposeName: "account_balance"
+                            isMandatory: true
+                        createdTime: 1704067200
+                        updatedTime: 1704067200
+                    metadata:
+                      total: 2
+                      offset: 0
+                      count: 2
+                      limit: 10
+                emptyResult:
+                  summary: No groups found
+                  value:
+                    data: []
+                    metadata:
+                      total: 0
+                      offset: 0
+                      count: 0
+                      limit: 10
+                filteredByPurposes:
+                  summary: Filtered by purpose names
+                  value:
+                    data:
+                      - id: "GROUP-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                        name: "marketing_communication_preferences"
+                        description: "User preferences related to marketing communications"
+                        clientId: "CLIENT-456"
+                        purposes:
+                          - purposeName: "user_email"
+                            isMandatory: true
+                          - purposeName: "user_phone"
+                            isMandatory: false
+                          - purposeName: "user_address"
+                            isMandatory: false
+                        createdTime: 1704153600
+                        updatedTime: 1704153600
+                    metadata:
+                      total: 1
+                      offset: 0
+                      count: 1
+                      limit: 10
+        "400":
+          description: Bad Request - Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+      security:
+        - basicAuth: []
+  /consent-purpose-groups/{groupId}:
+    get:
+      summary: Get a specific purpose group by ID
+      description: |
+        Retrieves a single consent purpose group by its unique identifier.
+        
+        Returns complete group details including all associated purposes with their 
+        mandatory flags.
+      operationId: getPurposeGroupById
+      tags:
+        - Purpose Group
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-123"
+        - name: groupId
+          in: path
+          required: true
+          description: The unique identifier of the purpose group
+          schema:
+            type: string
+          example: "GROUP-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      responses:
+        "200":
+          description: Successfully retrieved purpose group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurposeGroupResponse"
+              example:
+                id: "GROUP-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                name: "marketing_communication_preferences"
+                description: "User preferences related to marketing communications"
+                clientId: "CLIENT-456"
+                purposes:
+                  - purposeName: "user_email"
+                    isMandatory: true
+                  - purposeName: "user_phone"
+                    isMandatory: false
+                  - purposeName: "user_address"
+                    isMandatory: false
+                createdTime: 1704153600
+                updatedTime: 1704153600
+        "404":
+          description: Purpose group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "NOT_FOUND"
+                message: "Group not found"
+                description: "Purpose group does not exist"
+                traceId: "20260107T123456Z-abc123"
+        "400":
+          description: Bad Request - Invalid group ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "BAD_REQUEST"
+                message: "Invalid request"
+                description: "Invalid group ID format"
+                traceId: "20260107T123456Z-abc123"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "INTERNAL_ERROR"
+                message: "Server error"
+                description: "An unexpected error occurred"
+                traceId: "20260107T123456Z-abc123"
+      security:
+        - basicAuth: []
+    put:
+      summary: Update a purpose group
+      description: |
+        Updates an existing consent purpose group. This is a full replacement operation - 
+        all fields must be provided in the request.
+        
+        **Purpose Name Validation:**
+        All purpose names referenced in the updated `purposes` array must already exist 
+        in the organization's consent purposes.
+        
+        **Validation Rules:**
+        - All fields from create request are required (full replacement)
+        - Group name must be unique within organization (can keep same name)
+        - All purpose names must reference existing consent purposes
+        - At least one purpose must be provided
+        - Duplicate purpose names within the group are not allowed
+        
+        **Note:** This operation replaces the entire purposes list - any purposes not 
+        included in the update will be removed from the group.
+      operationId: updatePurposeGroup
+      tags:
+        - Purpose Group
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-123"
+        - in: header
+          name: TPP-client-id
+          required: true
+          description: The client ID of the Third-Party Provider (TPP) application making the request
+          schema:
+            type: string
+            example: "CLIENT-456"
+        - name: groupId
+          in: path
+          required: true
+          description: The unique identifier of the purpose group to update
+          schema:
+            type: string
+          example: "GROUP-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      requestBody:
+        description: Updated purpose group definition
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PurposeGroupUpdateRequest"
+            examples:
+              updateDescription:
+                summary: Update group description and purposes
+                value:
+                  name: "marketing_communication_preferences"
+                  description: "Updated preferences for all marketing communications"
+                  purposes:
+                    - purposeName: "user_email"
+                      isMandatory: true
+                      value: {}
+                    - purposeName: "user_phone"
+                      isMandatory: true
+                      value: {}
+                    - purposeName: "user_sms"
+                      isMandatory: false
+                      value: {}
+              addPurpose:
+                summary: Add new purpose to group
+                value:
+                  name: "marketing_communication_preferences"
+                  description: "User preferences related to marketing communications"
+                  purposes:
+                    - purposeName: "user_email"
+                      isMandatory: true
+                    - purposeName: "user_phone"
+                      isMandatory: false
+                    - purposeName: "user_address"
+                      isMandatory: false
+                    - purposeName: "user_push_notifications"
+                      isMandatory: false
+      responses:
+        "200":
+          description: Successfully updated purpose group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurposeGroupResponse"
+              example:
+                id: "GROUP-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                name: "marketing_communication_preferences"
+                description: "Updated preferences for all marketing communications"
+                clientId: "CLIENT-456"
+                purposes:
+                  - purposeName: "user_email"
+                    isMandatory: true
+                  - purposeName: "user_phone"
+                    isMandatory: true
+                  - purposeName: "user_sms"
+                    isMandatory: false
+                createdTime: 1704153600
+                updatedTime: 1704240000
+        "400":
+          description: Bad Request - Invalid input or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              examples:
+                purposeNotFound:
+                  summary: Referenced purpose doesn't exist
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Invalid purpose reference"
+                    description: "Purpose does not exist in organization"
+                    traceId: "20260107T123456Z-abc123"
+                duplicateName:
+                  summary: Name conflicts with another group
+                  value:
+                    code: "CONFLICT"
+                    message: "Group name conflict"
+                    description: "Purpose group name already exists"
+                    traceId: "20260107T123456Z-abc123"
+        "404":
+          description: Purpose group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "NOT_FOUND"
+                message: "Group not found"
+                description: "Purpose group does not exist"
+                traceId: "20260107T123456Z-abc123"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "INTERNAL_ERROR"
+                message: "Server error"
+                description: "An unexpected error occurred"
+                traceId: "20260107T123456Z-abc123"
+      security:
+        - basicAuth: []
+    delete:
+      summary: Delete a purpose group
+      description: |
+        Deletes a consent purpose group. The group must exist and belong to the specified organization.
+        
+        **Cascade Behavior:**
+        Deleting a purpose group only removes the group definition itself. It does NOT delete 
+        the individual consent purposes that were part of the group - those remain available 
+        for use in other groups or directly in consents.
+        
+        **Note:** If the group is currently referenced in any consent templates or policies, 
+        those references may need to be updated separately.
+      operationId: deletePurposeGroup
+      tags:
+        - Purpose Group
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-123"
+        - name: groupId
+          in: path
+          required: true
+          description: The unique identifier of the purpose group to delete
+          schema:
+            type: string
+          example: "GROUP-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      responses:
+        "204":
+          description: Successfully deleted purpose group (no content returned)
+        "404":
+          description: Purpose group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "NOT_FOUND"
+                message: "Group not found"
+                description: "Purpose group does not exist"
+                traceId: "20260107T123456Z-abc123"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "INTERNAL_ERROR"
+                message: "Server error"
+                description: "An unexpected error occurred"
+                traceId: "20260107T123456Z-abc123"
       security:
         - basicAuth: []
 components:
   schemas:
+    ConsentPurposeGroupItem:
+      type: object
+      description: |
+        Represents a purpose group within a consent, containing multiple related purposes
+        with their approval states.
+        
+        **Purpose Group Validation:**
+        The `purposeGroupName` must reference an existing purpose group in the organization.
+        All purpose names within the `purposes` array must exist and be part of the referenced group.
+        
+        **Usage:**
+        Used in consent create/update requests and responses to organize purposes into
+        logical groupings (e.g., "marketing_communication_preferences").
+      required:
+        - purposeGroupName
+        - purposes
+      properties:
+        purposeGroupName:
+          type: string
+          description: |
+            The name of an existing purpose group to include in this consent.
+            Must match the name of a purpose group that has been previously created in the organization.
+          example: "marketing_communication_preferences"
+        purposes:
+          type: array
+          minItems: 1
+          description: |
+            Array of purposes within this group with their approval states.
+            Each purpose must be defined in the referenced purpose group.
+          items:
+            $ref: "#/components/schemas/ConsentPurposeApprovalItem"
+    ConsentPurposeApprovalItem:
+      type: object
+      description: |
+        Represents a single purpose approval within a consent.
+        Contains the purpose name and whether the user has approved it.
+        
+        **Note:** The mandatory flag is defined at the purpose group level,
+        not at the individual consent level.
+      required:
+        - purposeName
+        - isUserApproved
+      properties:
+        purposeName:
+          type: string
+          description: |
+            The name of the consent purpose.
+            Must match an existing purpose name and must be part of the parent purpose group.
+          example: "user_email"
+        isUserApproved:
+          type: boolean
+          description: |
+            Indicates whether the user has approved this specific purpose for this consent.
+            
+            - `true`: User has granted consent for this purpose
+            - `false`: User has declined consent for this purpose
+            
+            **Validation:** If the purpose is marked as mandatory in the purpose group definition,
+            this field should typically be true for the consent to be valid.
+          example: true
+        value:
+          description: |
+            Optional purpose-specific value - flexible type that can be:
+            - string: Simple text value
+            - object: Structured data
+            - array: List of values
+            
+            This field is OPTIONAL and can be used to store additional context or data
+            specific to this purpose within the consent. Some purposes may require a value,
+            while others may not.
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          example:
+            scope: "read"
+            permissions: ["email", "profile"]
     ConsentPurposeItem:
       type: object
       description: |
@@ -1556,41 +2304,41 @@ components:
         - `EXPIRED`: Consent has expired
       required:
         - type
-        - consentPurpose
+        - purposeGroups
       properties:
         type:
-          description: The type of consent (e.g., 'accounts', 'payments').
+          description: The type of consent (e.g., 'accounts', 'payments', 'marketing').
           type: string
-          example: "accounts"
+          example: "marketing"
         validityTime:
           description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
           type: integer
           format: int64
-          example: 0
+          example: 1766383796
         recurringIndicator:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
           type: boolean
-          example: false
+          example: true
         dataAccessValidityDuration:
           description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
           type: integer
           format: int64
-          example: 86400
+          example: 0
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
           type: integer
           format: int32
           example: 0
-        consentPurpose:
+        purposeGroups:
           description: |
-            Array of consent purposes for this consent (REQUIRED).
+            Array of purpose groups for this consent (REQUIRED).
             
-            Each item must specify the purpose name, selection state, and optional value.
-            At least one purpose must be provided.
+            Each group contains multiple purposes with their approval states.
+            At least one purpose group must be provided.
           type: array
           minItems: 1
           items:
-            $ref: "#/components/schemas/ConsentPurposeItem"
+            $ref: "#/components/schemas/ConsentPurposeGroupItem"
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
@@ -1717,45 +2465,45 @@ components:
         - If all authorizations have status "approved" (or empty/default) → consent status = "active"
         - For custom authorization states → consent status is resolved via extension point (must return a known status)
         
-        **Consent Purpose:**
-        The consentPurpose field is REQUIRED and will completely replace existing purposes.
+        **Purpose Groups:**
+        The purposeGroups field is REQUIRED and will completely replace existing purposes.
         The API always clears existing purpose mappings and creates new ones from the request.
       required:
-        - consentPurpose
+        - purposeGroups
       properties:
         type:
-          description: The type of consent (e.g., 'accounts', 'payments').
+          description: The type of consent (e.g., 'accounts', 'payments', 'marketing').
           type: string
-          example: "accounts"
+          example: "marketing"
         validityTime:
           description: The duration for which the consent is valid, in seconds. '0' may indicate it does not expire automatically.
           type: integer
           format: int64
-          example: 0
+          example: 1766383796
         recurringIndicator:
           description: A boolean flag indicating if the consent is for a recurring payment or access.
           type: boolean
-          example: false
+          example: true
         dataAccessValidityDuration:
           description: The duration for which data access is valid, in seconds. Optional field that specifies how long the consent allows access to user data.
           type: integer
           format: int64
-          example: 86400
+          example: 0
         frequency:
           description: For recurring consents, this indicates the frequency (e.g., per day). '0' may indicate no limit.
           type: integer
           format: int32
           example: 0
-        consentPurpose:
+        purposeGroups:
           description: |
-            Array of consent purposes for this consent (REQUIRED).
+            Array of purpose groups for this consent (REQUIRED).
             
             This field completely replaces existing purposes. All existing purpose mappings
             will be cleared and new ones created from this array.
           type: array
           minItems: 1
           items:
-            $ref: "#/components/schemas/ConsentPurposeItem"
+            $ref: "#/components/schemas/ConsentPurposeGroupItem"
         attributes:
           description: A key-value map of additional, non-standard attributes associated with the consent.
           type: object
@@ -1774,22 +2522,26 @@ components:
       description: A generic success response for consent management operations that return consent details.
       example:
         id: "consent-abc123"
-        consentPurpose:
-          - name: "first_name"
-            value: {}
-            isUserApproved: true
-            isMandatory: true
+        purposeGroups:
+          - purposeGroupName: "marketing_communication_preferences"
+            purposes:
+              - purposeName: "user_email"
+                isUserApproved: true
+                value: {}
+              - purposeName: "user_mobile"
+                isUserApproved: true
+                value: {}
         createdTime: 1702800000
         updatedTime: 1702800000
         clientId: "tpp-client-123"
-        type: "accounts"
+        type: "marketing"
         status: "ACTIVE"
         frequency: 0
-        validityTime: 0
-        recurringIndicator: false
-        dataAccessValidityDuration: 86400
+        validityTime: 1766383796
+        recurringIndicator: true
+        dataAccessValidityDuration: 0
         attributes:
-          department: "sales"
+          department: "marketing"
         authorizations:
           - id: "auth-xyz789"
             userId: "user1@example.com"
@@ -1803,11 +2555,11 @@ components:
           description: Consent Id
           type: string
           example: "consent_id"
-        consentPurpose:
-          description: Array of consent purposes for this consent with their selection states and values.
+        purposeGroups:
+          description: Array of purpose groups for this consent with their purposes and approval states.
           type: array
           items:
-            $ref: "#/components/schemas/ConsentPurposeItem"
+            $ref: "#/components/schemas/ConsentPurposeGroupItem"
         createdTime:
           type: integer
           format: int64
@@ -1865,22 +2617,26 @@ components:
       description: The response body returned after successfully initiating a new consent.
       example:
         id: "consent-abc123"
-        consentPurpose:
-          - name: "first_name"
-            value: {}
-            isUserApproved: true
-            isMandatory: true
+        purposeGroups:
+          - purposeGroupName: "marketing_communication_preferences"
+            purposes:
+              - purposeName: "user_email"
+                isUserApproved: true
+                value: {}
+              - purposeName: "user_mobile"
+                isUserApproved: true
+                value: {}
         createdTime: 1702800000
         updatedTime: 1702800000
         clientId: "tpp-client-123"
-        type: "accounts"
+        type: "marketing"
         status: "ACTIVE"
         frequency: 0
-        validityTime: 0
-        recurringIndicator: false
-        dataAccessValidityDuration: 86400
+        validityTime: 1766383796
+        recurringIndicator: true
+        dataAccessValidityDuration: 0
         attributes:
-          department: "sales"
+          department: "marketing"
         authorizations:
           - id: "auth-xyz789"
             userId: "user1@example.com"
@@ -1975,22 +2731,26 @@ components:
       description: The response body returned after successfully initiating a new consent.
       example:
         id: "consent-abc123"
-        consentPurpose:
-          - name: "first_name"
-            value: {}
-            isUserApproved: true
-            isMandatory: true
+        purposeGroups:
+          - purposeGroupName: "marketing_communication_preferences"
+            purposes:
+              - purposeName: "user_email"
+                isUserApproved: true
+                value: {}
+              - purposeName: "user_mobile"
+                isUserApproved: true
+                value: {}
         createdTime: 1702800000
         updatedTime: 1702800000
         clientId: "tpp-client-123"
-        type: "accounts"
+        type: "marketing"
         status: "ACTIVE"
         frequency: 0
-        validityTime: 0
-        recurringIndicator: false
-        dataAccessValidityDuration: 86400
+        validityTime: 1766383796
+        recurringIndicator: true
+        dataAccessValidityDuration: 0
         attributes:
-          department: "sales"
+          department: "marketing"
         authorizations:
           - id: "auth-xyz789"
             userId: "user1@example.com"
@@ -2004,11 +2764,11 @@ components:
           description: Consent Id
           type: string
           example: "consent_id"
-        consentPurpose:
-          description: Array of consent purposes for this consent with their selection states and values.
+        purposeGroups:
+          description: Array of purpose groups for this consent with their purposes and approval states.
           type: array
           items:
-            $ref: "#/components/schemas/ConsentPurposeItem"
+            $ref: "#/components/schemas/ConsentPurposeGroupItem"
         createdTime:
           type: integer
           format: int64
@@ -2067,22 +2827,26 @@ components:
       description: A comprehensive object representing a single consent and all its associated data.
       example:
         id: "consent-abc123"
-        consentPurpose:
-          - name: "first_name"
-            value: {}
-            isUserApproved: true
-            isMandatory: true
+        purposeGroups:
+          - purposeGroupName: "marketing_communication_preferences"
+            purposes:
+              - purposeName: "user_email"
+                isUserApproved: true
+                value: {}
+              - purposeName: "user_mobile"
+                isUserApproved: true
+                value: {}
         createdTime: 1702800000
         updatedTime: 1702800000
         clientId: "tpp-client-123"
-        type: "accounts"
+        type: "marketing"
         status: "ACTIVE"
         frequency: 0
-        validityTime: 0
-        recurringIndicator: false
-        dataAccessValidityDuration: 86400
+        validityTime: 1766383796
+        recurringIndicator: true
+        dataAccessValidityDuration: 0
         attributes:
-          department: "sales"
+          department: "marketing"
         authorizations:
           - id: "auth-xyz789"
             userId: "user1@example.com"
@@ -2096,11 +2860,11 @@ components:
           description: Consent Id
           type: string
           example: "consent_id"
-        consentPurpose:
-          description: Array of consent purposes for this consent with their selection states and values.
+        purposeGroups:
+          description: Array of purpose groups for this consent with their purposes and approval states.
           type: array
           items:
-            $ref: "#/components/schemas/ConsentPurposeItem"
+            $ref: "#/components/schemas/ConsentPurposeGroupItem"
         createdTime:
           type: integer
           format: int64
@@ -2112,7 +2876,7 @@ components:
         clientId:
           type: string
         type:
-          description: The type of consent (e.g., 'accounts', 'payments').
+          description: The type of consent (e.g., 'accounts', 'payments', 'marketing').
           type: string
           example: "accounts"
         status:
@@ -2395,9 +3159,9 @@ components:
           items:
             type: object
             properties:
-              authId:
+              id:
                 type: string
-                example: "AUTH-123e4567-e89b-12d3-a456-426614174000"
+                example: "auth-xyz789"
               userId:
                 type: string
                 nullable: true
@@ -2596,6 +3360,180 @@ components:
       required:
         - data
         - metadata
+    PurposeGroupCreateRequest:
+      type: object
+      required:
+        - name
+        - purposes
+      description: |
+        Request object for creating a consent purpose group.
+        
+        **Purpose Validation:**
+        All purpose names in the `purposes` array must reference existing consent purposes 
+        in the organization. The API will validate each purpose name and fail the request 
+        if any purpose doesn't exist.
+        
+        **Uniqueness:**
+        Group names must be unique within the organization. Duplicate names will result 
+        in a 409 Conflict error.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          description: |
+            The name/identifier of the purpose group. Must be unique within the organization.
+            Use descriptive names that indicate the logical grouping (e.g., "marketing_preferences", 
+            "account_access_permissions").
+          example: "marketing_communication_preferences"
+        description:
+          type: string
+          maxLength: 1024
+          description: Optional description providing additional context about the purpose group
+          example: "User preferences related to marketing communications"
+        purposes:
+          type: array
+          minItems: 1
+          description: |
+            Array of purpose references with mandatory flags. Each purpose must already exist 
+            in the organization's consent purposes. At least one purpose is required.
+          items:
+            $ref: "#/components/schemas/PurposeGroupPurposeItem"
+          example:
+            - purposeName: "user_email"
+              isMandatory: true
+            - purposeName: "user_phone"
+              isMandatory: false
+    PurposeGroupUpdateRequest:
+      type: object
+      required:
+        - name
+        - purposes
+      description: |
+        Request object for updating a consent purpose group. This is a full replacement 
+        operation - all required fields must be provided.
+        
+        **Important:** The purposes array replaces the existing purposes completely. 
+        Any purposes not included in the update will be removed from the group.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          description: |
+            The name/identifier of the purpose group (can be changed or kept the same). 
+            Must remain unique within the organization.
+          example: "marketing_communication_preferences"
+        description:
+          type: string
+          maxLength: 1024
+          description: Optional description for the purpose group
+          example: "Updated preferences for all marketing communications"
+        purposes:
+          type: array
+          minItems: 1
+          description: |
+            Complete array of purpose references with mandatory flags. This replaces 
+            all existing purposes in the group. At least one purpose is required.
+          items:
+            $ref: "#/components/schemas/PurposeGroupPurposeItem"
+          example:
+            - purposeName: "user_email"
+              isMandatory: true
+            - purposeName: "user_phone"
+              isMandatory: true
+            - purposeName: "user_sms"
+              isMandatory: false
+    PurposeGroupPurposeItem:
+      type: object
+      required:
+        - purposeName
+        - isMandatory
+      description: |
+        Represents a single purpose within a purpose group, including whether it is 
+        mandatory for the consent to be valid.
+        
+        **Purpose Name Validation:**
+        The `purposeName` must reference an existing consent purpose in the organization. 
+        If the purpose doesn't exist, the API will return a 400 Bad Request error.
+      properties:
+        purposeName:
+          type: string
+          description: |
+            The name of an existing consent purpose to include in this group.
+            Must match the name of a purpose that has been previously created in the organization.
+          example: "user_email"
+        isMandatory:
+          type: boolean
+          description: |
+            Indicates whether this purpose must be approved for consents using this group.
+            
+            - `true`: This purpose is required - user must approve it
+            - `false`: This purpose is optional - user can choose to approve or decline
+            
+            This flag allows fine-grained control over which purposes are essential vs. 
+            optional within the logical grouping.
+          example: true
+    PurposeGroupResponse:
+      type: object
+      required:
+        - id
+        - name
+        - purposes
+        - createdTime
+        - updatedTime
+      description: Response object containing complete purpose group information
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the purpose group (UUID with GROUP- prefix)
+          example: "GROUP-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        name:
+          type: string
+          description: The name/identifier of the purpose group
+          example: "marketing_communication_preferences"
+        description:
+          type: string
+          description: Description of the purpose group (optional)
+          example: "User preferences related to marketing communications"
+        clientId:
+          type: string
+          description: The client ID of the Third-Party Provider (TPP) that created this purpose group
+          example: "CLIENT-456"
+        purposes:
+          type: array
+          description: Array of purposes included in this group with their mandatory flags
+          items:
+            $ref: "#/components/schemas/PurposeGroupPurposeItem"
+          example:
+            - purposeName: "user_email"
+              isMandatory: true
+            - purposeName: "user_phone"
+              isMandatory: false
+            - purposeName: "user_address"
+              isMandatory: false
+        createdTime:
+          type: integer
+          format: int64
+          description: Unix timestamp (seconds) when the purpose group was created
+          example: 1704153600
+        updatedTime:
+          type: integer
+          format: int64
+          description: Unix timestamp (seconds) when the purpose group was last updated
+          example: 1704153600
+    PurposeGroupListResponse:
+      type: object
+      required:
+        - data
+        - metadata
+      description: Response object for purpose group list/search operations
+      properties:
+        data:
+          type: array
+          description: Array of purpose groups matching the search criteria
+          items:
+            $ref: "#/components/schemas/PurposeGroupResponse"
+        metadata:
+          $ref: "#/components/schemas/ConsentSearchMetadata"
     ErrorResponse:
       type: object
       properties:

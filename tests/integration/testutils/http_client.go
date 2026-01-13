@@ -24,15 +24,20 @@ import (
 )
 
 const (
-	TestServerURL = "http://localhost:9000"
-	TestOrgID     = "test-org-001"
-	TestClientID  = "test-client-001"
+	TestOrgID    = "test-org-001"
+	TestClientID = "test-client-001"
 
 	// HTTP Header names
 	HeaderOrgID       = "org-id"
 	HeaderClientID    = "TPP-client-id"
 	HeaderContentType = "Content-Type"
 )
+
+// GetTestServerURL returns the test server URL based on config
+func GetTestServerURL() string {
+	port := GetServerPort()
+	return "http://localhost:" + port
+}
 
 // GetHTTPClient returns a configured HTTP client for test requests
 func GetHTTPClient() *http.Client {

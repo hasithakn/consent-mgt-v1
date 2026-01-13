@@ -30,11 +30,14 @@ import (
 	"github.com/wso2/consent-management-api/tests/integration/testutils"
 )
 
+var (
+	testServerURL = testutils.GetTestServerURL()
+	baseURL       = testutils.GetTestServerURL()
+)
+
 const (
-	testServerURL = testutils.TestServerURL
-	baseURL       = testutils.TestServerURL
-	testOrgID     = "test-org-purpose"
-	testClientID  = "test-client-purpose"
+	testOrgID    = "test-org-purpose"
+	testClientID = "test-client-purpose"
 )
 
 type PurposeAPITestSuite struct {

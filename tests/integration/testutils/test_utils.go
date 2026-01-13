@@ -7,14 +7,45 @@ import (
 	"os/exec"
 	"syscall"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
 	ServerBinary = "../../bin/consent-server"
-	ServerPort   = "9000"
+	ConfigPath   = "../repository/conf/deployment.yaml"
 )
 
 var serverCmd *exec.Cmd
+
+type ServerConfig struct {
+	Server struct {
+		Hostname string `yaml:"hostname"`
+		Port     int    `yaml:"port"`
+	} `yaml:"server"`
+}
+
+// GetServerPort reads the port from deployment.yaml
+func GetServerPort() string {
+	data, err := os.ReadFile(ConfigPath)
+	if err != nil {
+		// Fallback to default port if config file not found
+		fmt.Printf("Warning: Could not read config file: %v, using default port 3000\n", err)
+		return "3000"
+	}
+
+	var config ServerConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		fmt.Printf("Warning: Could not parse config file: %v, using default port 3000\n", err)
+		return "3000"
+	}
+
+	if config.Server.Port == 0 {
+		return "3000"
+	}
+
+	return fmt.Sprintf("%d", config.Server.Port)
+}
 
 // BuildServer checks if the consent-server binary exists
 // The binary should be built using ./build.sh build from the project root
@@ -46,8 +77,9 @@ func StartServer() error {
 	cmd.Stderr = os.Stderr
 
 	// Set environment variables for test mode
+	port := GetServerPort()
 	cmd.Env = append(os.Environ(),
-		"SERVER_PORT="+ServerPort,
+		"SERVER_PORT="+port,
 		"LOG_LEVEL=debug",
 	)
 
@@ -82,9 +114,10 @@ func StopServer() error {
 // WaitForServer waits for the server to be ready
 func WaitForServer() error {
 	fmt.Println("Waiting for server to be ready...")
+	port := GetServerPort()
 	maxRetries := 30
 	for i := 0; i < maxRetries; i++ {
-		resp, err := http.Get("http://localhost:" + ServerPort + "/health")
+		resp, err := http.Get("http://localhost:" + port + "/health")
 		if err == nil && resp.StatusCode == http.StatusOK {
 			resp.Body.Close()
 			fmt.Println("✓ Server is ready!")

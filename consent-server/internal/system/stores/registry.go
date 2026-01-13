@@ -12,9 +12,10 @@ type StoreRegistry struct {
 	dbClient provider.DBClientInterface
 
 	// Store instances with typed interfaces
-	Consent        interfaces.ConsentStore
-	AuthResource   interfaces.AuthResourceStore
-	ConsentPurpose interfaces.ConsentPurposeStore
+	Consent             interfaces.ConsentStore
+	AuthResource        interfaces.AuthResourceStore
+	ConsentPurpose      interfaces.ConsentPurposeStore
+	ConsentPurposeGroup interfaces.ConsentPurposeGroupStore
 }
 
 // NewStoreRegistry creates a new store registry with all initialized stores
@@ -23,12 +24,14 @@ func NewStoreRegistry(
 	consentStore interfaces.ConsentStore,
 	authResourceStore interfaces.AuthResourceStore,
 	consentPurposeStore interfaces.ConsentPurposeStore,
+	consentPurposeGroupStore interfaces.ConsentPurposeGroupStore,
 ) *StoreRegistry {
 	return &StoreRegistry{
-		dbClient:       dbClient,
-		Consent:        consentStore,
-		AuthResource:   authResourceStore,
-		ConsentPurpose: consentPurposeStore,
+		dbClient:            dbClient,
+		Consent:             consentStore,
+		AuthResource:        authResourceStore,
+		ConsentPurpose:      consentPurposeStore,
+		ConsentPurposeGroup: consentPurposeGroupStore,
 	}
 }
 

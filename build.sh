@@ -267,7 +267,7 @@ function test_integration() {
     # Run integration test suite
     echo "Starting integration test suite..."
     cd tests/integration || exit 1
-    go run main.go -test consentpurpose
+    go run main.go
     TEST_EXIT_CODE=$?
     cd "$SCRIPT_DIR" || exit 1
     

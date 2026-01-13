@@ -73,12 +73,14 @@ paths:
           description: "The unique identifier for the organization (e.g., the bank) that this consent belongs to."
           schema:
             type: string
+            example: "ORG-001"
         - in: header
           name: TPP-client-id
           required: true
           description: "The client ID of the Third-Party Provider (TPP) application that is requesting the consent."
           schema:
             type: string
+            example: "TPP-CLIENT-001"
       requestBody:
         description: The payload containing the consent data.
         required: true
@@ -146,7 +148,7 @@ paths:
           description: "Organisation ID."
           schema:
             type: string
-          example: "org1"
+            example: "ORG-001"
         - name: consentTypes
           in: query
           description: A comma-separated list of consent types to filter by (e.g., 'accounts,payments').
@@ -164,7 +166,7 @@ paths:
           description: A comma-separated list of TPP client IDs to filter by.
           schema:
             type: string
-          example: "tpp-client-123,tpp-client-456"
+          example: "TPP-CLIENT-001,TPP-CLIENT-002"
         - name: userIds
           in: query
           description: A comma-separated list of end-user IDs to filter by.
@@ -241,6 +243,7 @@ paths:
           description: "The unique identifier for the organization."
           schema:
             type: string
+            example: "ORG-001"
         - name: key
           in: query
           required: true
@@ -293,6 +296,7 @@ paths:
           description: "The unique identifier for the organization (e.g., the bank) that this consent belongs to."
           schema:
             type: string
+            example: "ORG-001"
         - in: path
           name: consentId
           required: true
@@ -344,12 +348,14 @@ paths:
           description: "Organisation ID."
           schema:
             type: string
+            example: "ORG-001"
         - in: header
           name: TPP-client-id
           required: true
           description: "The client ID of the Third-Party Provider (TPP) application that is requesting the consent."
           schema:
             type: string
+            example: "TPP-CLIENT-001"
         - name: consentId
           in: path
           description: The unique identifier of the consent to update.
@@ -425,6 +431,7 @@ paths:
           description: "The unique identifier for the organization (e.g., the bank) that this consent belongs to."
           schema:
             type: string
+            example: "ORG-001"
         - name: consentId
           in: path
           description: The unique identifier of the consent to update.
@@ -473,6 +480,7 @@ paths:
           description: "Organisation ID."
           schema:
             type: string
+            example: "ORG-001"
         - name: consentId
           in: path
           description: The unique identifier of the consent.
@@ -520,6 +528,7 @@ paths:
           description: "Organisation ID."
           schema:
             type: string
+            example: "ORG-001"
         - name: consentId
           in: path
           description: The unique identifier of the consent.
@@ -609,6 +618,7 @@ paths:
           description: "Organisation ID."
           schema:
             type: string
+            example: "ORG-001"
         - name: consentId
           in: path
           description: The unique identifier of the consent.
@@ -679,6 +689,7 @@ paths:
           description: "The unique identifier for the organization."
           schema:
             type: string
+            example: "ORG-001"
       requestBody:
         description: The validation request containing consent details and the action being validated.
         required: true
@@ -792,7 +803,7 @@ paths:
           description: The unique identifier for the organization that owns these purposes
           schema:
             type: string
-            example: "ORG-123"
+            example: "ORG-001"
       requestBody:
         description: Array of consent purposes to create
         required: true
@@ -994,7 +1005,7 @@ paths:
           description: The unique identifier for the organization
           schema:
             type: string
-            example: "ORG-123"
+            example: "ORG-001"
         - name: name
           in: query
           description: Filter purposes by name (partial match, case-insensitive search)
@@ -1100,7 +1111,7 @@ paths:
           description: The unique identifier for the organization
           schema:
             type: string
-            example: "ORG-123"
+            example: "ORG-001"
       requestBody:
         description: Array of purpose names to validate
         required: true
@@ -1202,7 +1213,7 @@ paths:
           description: The unique identifier for the organization
           schema:
             type: string
-            example: "ORG-123"
+            example: "ORG-001"
         - name: purposeId
           in: path
           required: true
@@ -1282,7 +1293,7 @@ paths:
           description: The unique identifier for the organization
           schema:
             type: string
-            example: "ORG-123"
+            example: "ORG-001"
         - name: purposeId
           in: path
           required: true
@@ -1451,7 +1462,7 @@ paths:
           description: The unique identifier for the organization
           schema:
             type: string
-            example: "ORG-123"
+            example: "ORG-001"
         - name: purposeId
           in: path
           required: true
@@ -1516,14 +1527,14 @@ paths:
           description: The unique identifier for the organization that owns this purpose group
           schema:
             type: string
-            example: "ORG-123"
+            example: "ORG-001"
         - in: header
           name: TPP-client-id
           required: true
           description: The client ID of the Third-Party Provider (TPP) application making the request.
           schema:
             type: string
-            example: "CLIENT-456"
+            example: "TPP-CLIENT-001"
       requestBody:
         description: Purpose group definition
         required: true
@@ -1660,7 +1671,7 @@ paths:
           description: The unique identifier for the organization
           schema:
             type: string
-            example: "ORG-123"
+            example: "ORG-001"
         - name: clientIds
           in: query
           required: false
@@ -1813,7 +1824,7 @@ paths:
           description: The unique identifier for the organization
           schema:
             type: string
-            example: "ORG-123"
+            example: "ORG-001"
         - name: groupId
           in: path
           required: true
@@ -1906,14 +1917,14 @@ paths:
           description: The unique identifier for the organization
           schema:
             type: string
-            example: "ORG-123"
+            example: "ORG-001"
         - in: header
           name: TPP-client-id
           required: true
           description: The client ID of the Third-Party Provider (TPP) application making the request
           schema:
             type: string
-            example: "CLIENT-456"
+            example: "TPP-CLIENT-001"
         - name: groupId
           in: path
           required: true
@@ -2046,7 +2057,7 @@ paths:
           description: The unique identifier for the organization
           schema:
             type: string
-            example: "ORG-123"
+            example: "ORG-001"
         - name: groupId
           in: path
           required: true
@@ -2157,6 +2168,7 @@ components:
             - type: string
             - type: object
             - type: array
+              items: {}
           example:
             scope: "read"
             permissions: ["email", "profile"]
@@ -2189,6 +2201,7 @@ components:
             - type: string
             - type: object
             - type: array
+              items: {}
           example:
             type: "attribute"
             name: "first_name"
@@ -2269,6 +2282,7 @@ components:
             - type: string
             - type: object
             - type: array
+              items: {}
           example:
             accountIds: ["123456", "789012"]
             permissions: ["read", "write"]
@@ -2395,6 +2409,7 @@ components:
             - type: string
             - type: object
             - type: array
+              items: {}
           example:
             accountIds: ["123456", "789012"]
     ConsentAuthorizationCreateResponse:
@@ -2426,6 +2441,7 @@ components:
             - type: string
             - type: object
             - type: array
+              items: {}
           example:
             accountIds: ["123456", "789012"]
     ConsentErrorCommon:
@@ -2966,6 +2982,7 @@ components:
             - type: string
             - type: object
             - type: array
+              items: {}
           example:
             accountIds: ["123456", "789012"]
     ValidateRequest:
@@ -3513,7 +3530,7 @@ components:
         clientId:
           type: string
           description: The client ID of the Third-Party Provider (TPP) that created this purpose group
-          example: "CLIENT-456"
+          example: "TPP-CLIENT-001"
         purposes:
           type: array
           description: Array of purposes included in this group with their mandatory flags
@@ -3550,63 +3567,6 @@ components:
             $ref: "#/components/schemas/PurposeGroupResponse"
         metadata:
           $ref: "#/components/schemas/ConsentSearchMetadata"
-    ErrorResponse:
-      type: object
-      properties:
-        code:
-          type: string
-          description: Specific error code identifying the type of error
-          example: "OCM-60002"
-        message:
-          type: string
-          description: Human-readable error message
-          example: "No organization discovery configuration found."
-        description:
-          type: string
-          description: Detailed description of the error with context
-          example: "There is no organization discovery configuration for organization with ID: c5e33086-585d-4578-88c9-3a048025b95e."
-        traceId:
-          type: string
-          description: Unique trace identifier for request tracking and debugging
-          example: "20251215T101734Z-r1797cbb47b9vtjrhC1SG14uv00000000gh0000000002vhz"
-      required:
-        - code
-        - message
-        - traceId
-    AuthorizationState:
-      type: string
-      description: |
-        Known authorization states/statuses that can be set on authorization resources.
-        
-        These states determine the consent status:
-        - `APPROVED` (default): Authorization is approved → consent becomes "ACTIVE"
-        - `CREATED`: Authorization is created but not yet approved → consent becomes "CREATED"
-        - `REJECTED`: Authorization was rejected → consent becomes "REJECTED"
-        - Custom states: Will be resolved via extension point to a known ConsentStatus
-      enum:
-        - APPROVED
-        - CREATED
-        - REJECTED
-      example: APPROVED
-    ConsentStatus:
-      type: string
-      description: |
-        Lifecycle statuses maintained by the Consent Management API.
-        
-        These statuses are automatically derived from authorization states and represent
-        the current state of the consent:
-        - `CREATED`: Consent is created but not yet approved
-        - `ACTIVE`: Consent is approved and active (derived from "APPROVED" authorization)
-        - `REJECTED`: Consent was rejected
-        - `REVOKED`: Consent was revoked by user or admin
-        - `EXPIRED`: Consent has expired based on validityTime
-      enum:
-        - CREATED
-        - ACTIVE
-        - REJECTED
-        - REVOKED
-        - EXPIRED
-      example: ACTIVE
   securitySchemes:
     basicAuth:
       type: http

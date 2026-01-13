@@ -30,7 +30,7 @@ func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Req
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	// Validate required headers
-	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
+	if err := utils.ValidateOrgID(orgID); err != nil {
 		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}

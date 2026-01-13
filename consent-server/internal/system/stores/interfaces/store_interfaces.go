@@ -6,6 +6,7 @@ import (
 	authResourceModel "github.com/wso2/consent-management-api/internal/authresource/model"
 	consentModel "github.com/wso2/consent-management-api/internal/consent/model"
 	consentPurposeModel "github.com/wso2/consent-management-api/internal/consentpurpose/model"
+	consentPurposeGroupModel "github.com/wso2/consent-management-api/internal/consentpurposegroup/model"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 )
 
@@ -62,4 +63,20 @@ type ConsentPurposeStore interface {
 	DeleteAttributesByPurposeID(tx dbmodel.TxInterface, purposeID, orgID string) error
 	LinkPurposeToConsent(tx dbmodel.TxInterface, consentID, purposeID, orgID string, value *string, isUserApproved, isMandatory bool) error
 	DeleteMappingsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
+}
+
+// ConsentPurposeGroupStore defines the interface for purpose group data operations
+type ConsentPurposeGroupStore interface {
+	CreateGroup(tx dbmodel.TxInterface, group *consentPurposeGroupModel.PurposeGroup) error
+	GetGroupByID(ctx context.Context, groupID, orgID string) (*consentPurposeGroupModel.PurposeGroup, error)
+	GetGroupByName(ctx context.Context, name, orgID string) (*consentPurposeGroupModel.PurposeGroup, error)
+	ListGroups(ctx context.Context, orgID, name string, clientIDs []string, purposeNames []string, offset, limit int) ([]consentPurposeGroupModel.PurposeGroup, int, error)
+	UpdateGroup(tx dbmodel.TxInterface, group *consentPurposeGroupModel.PurposeGroup) error
+	DeleteGroup(tx dbmodel.TxInterface, groupID, orgID string) error
+	CheckGroupNameExists(ctx context.Context, name, clientID, orgID string, excludeGroupID *string) (bool, error)
+	LinkPurposeToGroup(tx dbmodel.TxInterface, groupID, purposeID, orgID string, isMandatory bool) error
+	GetGroupPurposes(ctx context.Context, groupID, orgID string) ([]consentPurposeGroupModel.PurposeGroupPurpose, error)
+	DeleteGroupPurposes(tx dbmodel.TxInterface, groupID, orgID string) error
+	GetPurposeIDByName(ctx context.Context, purposeName, orgID string) (string, error)
+	ValidatePurposeNames(ctx context.Context, purposeNames []string, orgID string) (map[string]string, error)
 }

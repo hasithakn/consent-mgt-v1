@@ -230,7 +230,8 @@ func (ts *PurposeGroupAPITestSuite) TestGetPurposeGroup_MissingOrgIDHeader_Fails
 	// Deliberately omit org-id header
 
 	client := &http.Client{}
-	resp, _ := client.Do(httpReq)
+	resp, err := client.Do(httpReq)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "Should reject missing org-id")
@@ -261,7 +262,8 @@ func (ts *PurposeGroupAPITestSuite) TestGetPurposeGroup_WrongOrgID_ReturnsNotFou
 	httpReq.Header.Set("org-id", "different-org-id")
 
 	client := &http.Client{}
-	resp, _ := client.Do(httpReq)
+	resp, err := client.Do(httpReq)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusNotFound, resp.StatusCode, "Should not find group in different org")

@@ -277,7 +277,8 @@ func (ts *PurposeGroupAPITestSuite) TestCreatePurposeGroup_MissingOrgIDHeader_Fa
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
-	resp, _ := client.Do(httpReq)
+	resp, err := client.Do(httpReq)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "Should reject missing org-id")
@@ -303,7 +304,8 @@ func (ts *PurposeGroupAPITestSuite) TestCreatePurposeGroup_MissingClientIDHeader
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
-	resp, _ := client.Do(httpReq)
+	resp, err := client.Do(httpReq)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "Should reject missing TPP-client-id")

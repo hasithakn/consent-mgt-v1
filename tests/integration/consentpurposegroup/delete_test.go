@@ -164,7 +164,8 @@ func (ts *PurposeGroupAPITestSuite) TestDeletePurposeGroup_MissingOrgIDHeader_Fa
 	// Deliberately omit org-id header
 
 	client := &http.Client{}
-	resp, _ := client.Do(httpReq)
+	resp, err := client.Do(httpReq)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "Should reject missing org-id")
@@ -196,7 +197,8 @@ func (ts *PurposeGroupAPITestSuite) TestDeletePurposeGroup_WrongOrgID_ReturnsNot
 	httpReq.Header.Set("org-id", "different-org-id")
 
 	client := &http.Client{}
-	resp, _ := client.Do(httpReq)
+	resp, err := client.Do(httpReq)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusNotFound, resp.StatusCode, "Should not find group in different org")
@@ -345,7 +347,8 @@ func (ts *PurposeGroupAPITestSuite) TestDeletePurposeGroup_EmptyID_ReturnsBadReq
 	httpReq.Header.Set("org-id", testOrgID)
 
 	client := &http.Client{}
-	resp, _ := client.Do(httpReq)
+	resp, err := client.Do(httpReq)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Should return 404 or 405 (Method Not Allowed) since the route doesn't match

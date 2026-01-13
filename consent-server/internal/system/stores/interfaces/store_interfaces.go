@@ -28,6 +28,13 @@ type ConsentStore interface {
 	CreateAttributes(tx dbmodel.TxInterface, attributes []consentModel.ConsentAttribute) error
 	DeleteAttributesByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
 	CreateStatusAudit(tx dbmodel.TxInterface, audit *consentModel.ConsentStatusAudit) error
+	// Purpose Group Consent mapping methods
+	CreatePurposeGroupConsent(tx dbmodel.TxInterface, consentID, groupID, orgID string) error
+	CreatePurposeApproval(tx dbmodel.TxInterface, approval *consentModel.ConsentPurposeApprovalRecord) error
+	GetPurposeGroupsByConsentID(ctx context.Context, consentID, orgID string) ([]consentModel.ConsentPurposeGroupMapping, error)
+	GetPurposeApprovalsByConsentID(ctx context.Context, consentID, orgID string) ([]consentModel.ConsentPurposeApprovalRecord, error)
+	DeletePurposeGroupsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
+	DeletePurposeApprovalsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
 }
 
 // AuthResourceStore defines the interface for authorization resource data operations

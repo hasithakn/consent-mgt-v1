@@ -59,7 +59,7 @@ func (h *consentHandler) getConsent(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: Is clientID validation needed?
 
-	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
+	if err := utils.ValidateOrgID(orgID); err != nil {
 		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}

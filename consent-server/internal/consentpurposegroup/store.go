@@ -80,6 +80,11 @@ var (
 		ID:    "GET_PURPOSE_ID_BY_NAME",
 		Query: "SELECT ID FROM CONSENT_PURPOSE WHERE NAME = ? AND ORG_ID = ?",
 	}
+
+	queryCheckPurposeInGroups = dbmodel.DBQuery{
+		ID:    "CHECK_PURPOSE_IN_GROUPS",
+		Query: "SELECT COUNT(*) as count FROM CONSENT_PURPOSE_GROUP_MAPPING WHERE PURPOSE_ID = ? AND ORG_ID = ?",
+	}
 )
 
 // store implements the ConsentPurposeGroupStore interface
@@ -468,4 +473,21 @@ func (s *store) ValidatePurposeNames(ctx context.Context, purposeNames []string,
 	}
 
 	return result, nil
+}
+
+// IsPurposeUsedInGroups checks if a purpose is used in any purpose group
+func (s *store) IsPurposeUsedInGroups(ctx context.Context, purposeID, orgID string) (bool, error) {
+
+	rows, err := s.dbClient.Query(queryCheckPurposeInGroups, purposeID, orgID)
+	if err != nil {
+		return false, err
+	}
+
+	if len(rows) > 0 {
+		if count, ok := rows[0]["count"].(int64); ok {
+			return count > 0, nil
+		}
+	}
+
+	return false, nil
 }

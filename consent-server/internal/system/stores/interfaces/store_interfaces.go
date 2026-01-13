@@ -79,4 +79,5 @@ type ConsentPurposeGroupStore interface {
 	DeleteGroupPurposes(tx dbmodel.TxInterface, groupID, orgID string) error
 	GetPurposeIDByName(ctx context.Context, purposeName, orgID string) (string, error)
 	ValidatePurposeNames(ctx context.Context, purposeNames []string, orgID string) (map[string]string, error)
+	IsPurposeUsedInGroups(ctx context.Context, purposeID, orgID string) (bool, error)
 }

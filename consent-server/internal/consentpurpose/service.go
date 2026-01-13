@@ -341,6 +341,23 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 		return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("purpose with ID '%s' not found", purposeID))
 	}
 
+	// Check if purpose is used in any purpose groups
+	isUsed, err := s.stores.ConsentPurposeGroup.IsPurposeUsedInGroups(ctx, purposeID, orgID)
+	if err != nil {
+		logger.Error("Failed to check if purpose is used in groups",
+			log.Error(err),
+			log.String("purpose_id", purposeID),
+		)
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to check purpose usage: %v", err))
+	}
+	if isUsed {
+		logger.Warn("Cannot update purpose that is used in purpose groups",
+			log.String("purpose_id", purposeID),
+			log.String("purpose_name", existing.Name),
+		)
+		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("cannot update purpose '%s' as it is being used in one or more purpose groups", existing.Name))
+	}
+
 	// Update purpose fields
 	purpose := &model.ConsentPurpose{
 		ID:          purposeID,
@@ -421,6 +438,23 @@ func (s *consentPurposeService) DeletePurpose(ctx context.Context, purposeID, or
 	if existing == nil {
 		logger.Warn("Purpose not found for deletion", log.String("purpose_id", purposeID))
 		return serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("purpose with ID '%s' not found", purposeID))
+	}
+
+	// Check if purpose is used in any purpose groups
+	isUsed, err := s.stores.ConsentPurposeGroup.IsPurposeUsedInGroups(ctx, purposeID, orgID)
+	if err != nil {
+		logger.Error("Failed to check if purpose is used in groups",
+			log.Error(err),
+			log.String("purpose_id", purposeID),
+		)
+		return serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to check purpose usage: %v", err))
+	}
+	if isUsed {
+		logger.Warn("Cannot delete purpose that is used in purpose groups",
+			log.String("purpose_id", purposeID),
+			log.String("purpose_name", existing.Name),
+		)
+		return serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("cannot delete purpose '%s' as it is being used in one or more purpose groups", existing.Name))
 	}
 
 	// Delete attributes and purpose in a transaction

@@ -242,3 +242,45 @@ func (ts *PurposeAPITestSuite) TestDeletePurpose_ErrorCases() {
 		})
 	}
 }
+
+// TestDeletePurpose_UsedInPurposeGroup_Fails tests that a purpose used in a group cannot be deleted
+func (ts *PurposeAPITestSuite) TestDeletePurpose_UsedInPurposeGroup_Fails() {
+	t := ts.T()
+
+	// Create a purpose
+	createPayload := []ConsentPurposeCreateRequest{
+		{
+			Name:        "test_delete_in_group",
+			Description: "Purpose used in group",
+			Type:        "string",
+		},
+	}
+
+	resp, body := ts.createPurpose(createPayload)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var createResp PurposeCreateResponse
+	json.Unmarshal(body, &createResp)
+	purposeID := createResp.Data[0].ID
+	ts.trackPurpose(purposeID)
+
+	// Create a purpose group that uses this purpose
+	groupID := ts.createPurposeGroupWithPurpose("test_delete_in_group")
+	if groupID != "" {
+		defer ts.deletePurposeGroup(groupID)
+	}
+
+	// Try to delete the purpose - should fail
+	resp, body = ts.deletePurposeResponse(purposeID)
+	require.Equal(t, http.StatusConflict, resp.StatusCode, "Should not allow deleting purpose used in group: %s", body)
+
+	var errResp ErrorResponse
+	json.Unmarshal(body, &errResp)
+	msg := strings.ToLower(errResp.Description)
+	require.True(t, strings.Contains(msg, "purpose group") || strings.Contains(msg, "being used"),
+		"Error should mention purpose groups, got: %s", errResp.Description)
+
+	// Verify the purpose still exists
+	resp, _ = ts.getPurpose(purposeID)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "Purpose should still exist")
+}

@@ -372,3 +372,47 @@ func (ts *PurposeAPITestSuite) TestUpdatePurpose_ErrorCases() {
 		})
 	}
 }
+
+// TestUpdatePurpose_UsedInPurposeGroup_Fails tests that a purpose used in a group cannot be updated
+func (ts *PurposeAPITestSuite) TestUpdatePurpose_UsedInPurposeGroup_Fails() {
+	t := ts.T()
+
+	// Create a purpose
+	createPayload := []ConsentPurposeCreateRequest{
+		{
+			Name:        "test_update_in_group",
+			Description: "Purpose used in group",
+			Type:        "string",
+		},
+	}
+
+	resp, bodyBytes := ts.createPurpose(createPayload)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var createResp PurposeCreateResponse
+	json.Unmarshal(bodyBytes, &createResp)
+	purposeID := createResp.Data[0].ID
+	ts.trackPurpose(purposeID)
+
+	// Create a purpose group that uses this purpose
+	groupID := ts.createPurposeGroupWithPurpose("test_update_in_group")
+	if groupID != "" {
+		defer ts.deletePurposeGroup(groupID)
+	}
+
+	// Try to update the purpose - should fail
+	updatePayload := ConsentPurposeUpdateRequest{
+		Name:        "test_update_in_group_modified",
+		Description: "Modified description",
+		Type:        "string",
+	}
+
+	resp, bodyBytes = ts.updatePurpose(purposeID, updatePayload)
+	require.Equal(t, http.StatusConflict, resp.StatusCode, "Should not allow updating purpose used in group: %s", bodyBytes)
+
+	var errResp ErrorResponse
+	json.Unmarshal(bodyBytes, &errResp)
+	msg := strings.ToLower(errResp.Description)
+	require.True(t, strings.Contains(msg, "purpose group") || strings.Contains(msg, "being used"),
+		"Error should mention purpose groups, got: %s", errResp.Description)
+}

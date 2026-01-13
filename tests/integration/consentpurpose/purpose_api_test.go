@@ -161,28 +161,6 @@ func (ts *PurposeAPITestSuite) updatePurpose(purposeID string, payload interface
 	return resp, body
 }
 
-// deletePurpose deletes a purpose by ID
-func (ts *PurposeAPITestSuite) deletePurpose(purposeID string) {
-	httpReq, _ := http.NewRequest("DELETE",
-		fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID),
-		nil)
-	httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
-	httpReq.Header.Set(testutils.HeaderClientID, testutils.TestClientID)
-
-	client := testutils.GetHTTPClient()
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		ts.T().Logf("Warning: failed to delete purpose %s: %v", purposeID, err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		ts.T().Logf("Warning: failed to delete purpose %s: %d - %s", purposeID, resp.StatusCode, string(body))
-	}
-}
-
 // trackPurpose registers a purpose ID for cleanup in TearDownSuite
 func (ts *PurposeAPITestSuite) trackPurpose(purposeID string) {
 	ts.createdPurposeIDs = append(ts.createdPurposeIDs, purposeID)
@@ -212,4 +190,94 @@ func (ts *PurposeAPITestSuite) deletePurposeWithCheck(purposeID string) bool {
 	}
 
 	return false
+}
+
+// createPurposeGroupWithPurpose creates a purpose group with the specified purpose name
+// Returns the group ID on success, empty string on failure
+func (ts *PurposeAPITestSuite) createPurposeGroupWithPurpose(purposeName string) string {
+	payload := map[string]interface{}{
+		"name":        fmt.Sprintf("group_for_%s", purposeName),
+		"description": "Test purpose group",
+		"purposes": []map[string]interface{}{
+			{
+				"purposeName": purposeName,
+				"isMandatory": true,
+			},
+		},
+	}
+
+	reqBody, _ := json.Marshal(payload)
+	httpReq, _ := http.NewRequest("POST",
+		fmt.Sprintf("%s/api/v1/consent-purpose-groups", testServerURL),
+		bytes.NewBuffer(reqBody))
+	httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
+	httpReq.Header.Set(testutils.HeaderClientID, testClientID)
+	httpReq.Header.Set(testutils.HeaderContentType, "application/json")
+
+	client := testutils.GetHTTPClient()
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		ts.T().Logf("Failed to create purpose group: %v", err)
+		return ""
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		ts.T().Logf("Failed to create purpose group: %d - %s", resp.StatusCode, string(body))
+		return ""
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		ts.T().Logf("Failed to parse purpose group response: %v", err)
+		return ""
+	}
+
+	if id, ok := result["id"].(string); ok {
+		return id
+	}
+
+	return ""
+}
+
+// deletePurposeGroup deletes a purpose group by ID
+func (ts *PurposeAPITestSuite) deletePurposeGroup(groupID string) {
+	httpReq, _ := http.NewRequest("DELETE",
+		fmt.Sprintf("%s/api/v1/consent-purpose-groups/%s", testServerURL, groupID),
+		nil)
+	httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
+
+	client := testutils.GetHTTPClient()
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		ts.T().Logf("Warning: failed to delete purpose group %s: %v", groupID, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		ts.T().Logf("Warning: failed to delete purpose group %s: %d - %s", groupID, resp.StatusCode, string(body))
+	}
+}
+
+// deletePurposeResponse deletes a purpose and returns the response for assertion
+func (ts *PurposeAPITestSuite) deletePurposeResponse(purposeID string) (*http.Response, []byte) {
+	httpReq, _ := http.NewRequest("DELETE",
+		fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID),
+		nil)
+	httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
+	httpReq.Header.Set(testutils.HeaderClientID, testutils.TestClientID)
+
+	client := testutils.GetHTTPClient()
+	resp, err := client.Do(httpReq)
+	ts.Require().NoError(err)
+
+	body, err := io.ReadAll(resp.Body)
+	ts.Require().NoError(err)
+	resp.Body.Close()
+
+	return resp, body
 }

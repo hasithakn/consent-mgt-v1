@@ -272,7 +272,7 @@ func (h *consentHandler) searchConsentsByAttribute(w http.ResponseWriter, r *htt
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
-	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
+	if err := utils.ValidateOrgID(orgID); err != nil {
 		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}

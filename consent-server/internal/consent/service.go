@@ -1084,9 +1084,8 @@ func (consentService *consentService) ValidateConsent(ctx context.Context, req m
 		} else {
 			// Build complete consent response
 			consentResponse := buildConsentResponse(consent, purposeGroups, attributesMap, authResources)
-			// Convert to API response and then to ValidateConsentAPIResponse (which excludes modifiedResponse)
-			apiResponse := consentService.EnrichedConsentAPIResponseWithPurposeDetails(ctx, consentResponse, orgID)
-			response.ConsentInformation = apiResponse.ToValidateConsentAPIResponse()
+			// Convert to ValidateConsentAPIResponse with enriched purpose details
+			response.ConsentInformation = consentService.EnrichedValidateConsentAPIResponse(ctx, consentResponse, orgID)
 		}
 	}
 
@@ -1154,9 +1153,10 @@ func (consentService *consentService) expireConsent(ctx context.Context, consent
 	return nil
 }
 
-func (consentService *consentService) EnrichedConsentAPIResponseWithPurposeDetails(ctx context.Context, consent *model.ConsentResponse, orgID string) *model.ConsentAPIResponse {
+// EnrichedValidateConsentAPIResponse builds ValidateConsentAPIResponse with enriched purpose details (type, description, attributes, isMandatory)
+func (consentService *consentService) EnrichedValidateConsentAPIResponse(ctx context.Context, consent *model.ConsentResponse, orgID string) *model.ValidateConsentAPIResponse {
 	logger := log.GetLogger().WithContext(ctx)
-	logger.Debug("Enriching consent response with purpose details",
+	logger.Debug("Building enriched validate response with purpose details",
 		log.String("consent_id", consent.ConsentID),
 		log.String("org_id", orgID))
 
@@ -1167,21 +1167,65 @@ func (consentService *consentService) EnrichedConsentAPIResponseWithPurposeDetai
 		return nil
 	}
 
-	// Use ToAPIResponse to build the complete base response structure
-	apiResponse := consent.ToAPIResponse()
+	// Build base response
+	validateResponse := &model.ValidateConsentAPIResponse{
+		ID:                         consent.ConsentID,
+		Type:                       consent.ConsentType,
+		ClientID:                   consent.ClientID,
+		Status:                     consent.CurrentStatus,
+		CreatedTime:                consent.CreatedTime,
+		UpdatedTime:                consent.UpdatedTime,
+		ValidityTime:               consent.ValidityTime,
+		RecurringIndicator:         consent.RecurringIndicator,
+		Frequency:                  consent.ConsentFrequency,
+		DataAccessValidityDuration: consent.DataAccessValidityDuration,
+		Attributes:                 consent.Attributes,
+	}
 
-	// Enrich purpose groups with full purpose details (type, description, attributes)
-	if len(apiResponse.PurposeGroups) > 0 {
-		enrichedGroups := make([]model.ConsentPurposeGroupItem, 0, len(apiResponse.PurposeGroups))
+	// Convert authorizations
+	if len(consent.AuthResources) > 0 {
+		validateResponse.Authorizations = make([]model.AuthorizationAPIResponse, 0, len(consent.AuthResources))
+		for _, auth := range consent.AuthResources {
+			// Parse resources JSON string to interface
+			var resources interface{}
+			if auth.Resources != nil && *auth.Resources != "" {
+				if err := json.Unmarshal([]byte(*auth.Resources), &resources); err != nil {
+					// If parsing fails, set to empty object
+					resources = make(map[string]interface{})
+				}
+			} else {
+				// If resources is nil or empty, set to empty object
+				resources = make(map[string]interface{})
+			}
 
-		for _, group := range apiResponse.PurposeGroups {
-			enrichedGroup := model.ConsentPurposeGroupItem{
+			validateResponse.Authorizations = append(validateResponse.Authorizations, model.AuthorizationAPIResponse{
+				ID:          auth.AuthID,
+				UserID:      auth.UserID,
+				Type:        auth.AuthType,
+				Status:      auth.AuthStatus,
+				UpdatedTime: auth.UpdatedTime,
+				Resources:   resources,
+			})
+		}
+	}
+
+	// Enrich purpose groups with full purpose details (type, description, attributes, isMandatory)
+	if len(consent.PurposeGroups) > 0 {
+		enrichedGroups := make([]model.ConsentPurposeGroupItemValidate, 0, len(consent.PurposeGroups))
+
+		for _, group := range consent.PurposeGroups {
+			enrichedGroup := model.ConsentPurposeGroupItemValidate{
 				PurposeGroupName: group.PurposeGroupName,
-				Purposes:         make([]model.ConsentPurposeApprovalItem, 0, len(group.Purposes)),
+				Purposes:         make([]model.ConsentPurposeApprovalItemValidate, 0, len(group.Purposes)),
 			}
 
 			for _, p := range group.Purposes {
-				enrichedPurpose := p
+				enrichedPurpose := model.ConsentPurposeApprovalItemValidate{
+					PurposeName:    p.PurposeName,
+					IsUserApproved: p.IsUserApproved,
+					Value:          p.Value,
+					IsMandatory:    p.IsMandatory,
+				}
 
 				// Fetch full purpose details from consent purpose service
 				if p.PurposeName != "" {
@@ -1204,7 +1248,7 @@ func (consentService *consentService) EnrichedConsentAPIResponseWithPurposeDetai
 							}
 						}
 
-						logger.Debug("Purpose details enriched",
+						logger.Debug("Purpose details enriched for validate",
 							log.String("purpose", p.PurposeName),
 							log.String("type", purpose.Type),
 							log.String("description", enrichedPurpose.Description),
@@ -1228,13 +1272,22 @@ func (consentService *consentService) EnrichedConsentAPIResponseWithPurposeDetai
 		}
 
 		// Set enriched purpose groups
-		apiResponse.PurposeGroups = enrichedGroups
+		validateResponse.PurposeGroups = enrichedGroups
 	}
 
-	logger.Debug("Consent response enriched successfully",
-		log.Int("purpose_group_count", len(apiResponse.PurposeGroups)))
+	logger.Debug("Validate response enriched successfully",
+		log.Int("purpose_group_count", len(validateResponse.PurposeGroups)))
 
-	return apiResponse
+	return validateResponse
+}
+
+// EnrichedConsentAPIResponseWithPurposeDetails enriches consent response - kept for potential future use
+func (consentService *consentService) EnrichedConsentAPIResponseWithPurposeDetails(ctx context.Context, consent *model.ConsentResponse, orgID string) *model.ConsentAPIResponse {
+	if consent == nil {
+		return nil
+	}
+	// Use ToAPIResponse to build the complete base response structure
+	return consent.ToAPIResponse()
 }
 
 // buildConsentResponse constructs a complete ConsentResponse from already-resolved data.

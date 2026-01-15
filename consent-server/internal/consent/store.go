@@ -3,6 +3,7 @@ package consent
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/wso2/consent-management-api/internal/consent/model"
@@ -118,6 +119,11 @@ var (
 			WHERE pgc.CONSENT_ID = ? AND pgc.ORG_ID = ?
 			ORDER BY pg.NAME
 		`,
+	}
+
+	QueryCheckGroupUsedInConsents = dbmodel.DBQuery{
+		ID:    "CHECK_GROUP_USED_IN_CONSENTS",
+		Query: "SELECT COUNT(*) as count FROM CONSENT_PURPOSE_GROUP_CONSENT WHERE GROUP_ID = ? AND ORG_ID = ?",
 	}
 
 	QueryCreatePurposeApproval = dbmodel.DBQuery{
@@ -276,15 +282,15 @@ func (s *store) Search(ctx context.Context, filters model.ConsentSearchFilters) 
 		whereConditions = append(whereConditions, fmt.Sprintf("car.USER_ID IN (%s)", strings.Join(placeholders, ",")))
 	}
 
-	// Add time range filters (timestamps in milliseconds)
+	// Add time range filters (timestamps in milliseconds) - filter by UPDATED_TIME
 	if filters.FromTime != nil {
-		whereConditions = append(whereConditions, "CONSENT.CREATED_TIME >= ?")
+		whereConditions = append(whereConditions, "CONSENT.UPDATED_TIME >= ?")
 		args = append(args, *filters.FromTime)
 		countArgs = append(countArgs, *filters.FromTime)
 	}
 
 	if filters.ToTime != nil {
-		whereConditions = append(whereConditions, "CONSENT.CREATED_TIME <= ?")
+		whereConditions = append(whereConditions, "CONSENT.UPDATED_TIME <= ?")
 		args = append(args, *filters.ToTime)
 		countArgs = append(countArgs, *filters.ToTime)
 	}
@@ -717,6 +723,29 @@ func mapToStatusAudit(row map[string]interface{}) *model.ConsentStatusAudit {
 func (s *store) CreatePurposeGroupConsent(tx dbmodel.TxInterface, consentID, groupID, orgID string) error {
 	_, err := tx.Exec(QueryCreatePurposeGroupConsent.Query, consentID, groupID, orgID)
 	return err
+}
+
+// CheckGroupUsedInConsents checks if a purpose group is used in any consents
+func (s *store) CheckGroupUsedInConsents(ctx context.Context, groupID, orgID string) (bool, error) {
+	rows, err := s.dbClient.Query(QueryCheckGroupUsedInConsents, groupID, orgID)
+	if err != nil {
+		return false, err
+	}
+	if len(rows) == 0 {
+		return false, nil
+	}
+
+	count := int64(0)
+	if countVal, ok := rows[0]["count"].(int64); ok {
+		count = countVal
+	} else if countVal, ok := rows[0]["count"].([]uint8); ok {
+		// MySQL may return count as []uint8
+		if parsedCount, parseErr := strconv.ParseInt(string(countVal), 10, 64); parseErr == nil {
+			count = parsedCount
+		}
+	}
+
+	return count > 0, nil
 }
 
 // GetPurposeGroupsByConsentID retrieves all purpose group mappings for a consent

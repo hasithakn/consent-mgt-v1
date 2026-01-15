@@ -125,7 +125,7 @@ type ConsentPurposeApprovalItemValidate struct {
 
 // ConsentPurposeGroupItemValidate represents a purpose group with enriched details (for Validate endpoint)
 type ConsentPurposeGroupItemValidate struct {
-	PurposeGroupName string                                `json:"purposeGroupName" binding:"required"`
+	PurposeGroupName string                               `json:"purposeGroupName" binding:"required"`
 	Purposes         []ConsentPurposeApprovalItemValidate `json:"purposes" binding:"required,min=1"`
 }
 
@@ -649,22 +649,20 @@ type ValidateResponse struct {
 
 // ValidateConsentAPIResponse represents consent information in validate response (excludes modifiedResponse)
 type ValidateConsentAPIResponse struct {
-	ID                         string                             `json:"id"`
-	Type                       string                             `json:"type"`
-	ClientID                   string                             `json:"clientId"`
-	Status                     string                             `json:"status"`
-	CreatedTime                int64                              `json:"createdTime"`
-	UpdatedTime                int64                              `json:"updatedTime"`
-	ValidityTime               *int64                             `json:"validityTime"`
-	RecurringIndicator         *bool                              `json:"recurringIndicator"`
-	Frequency                  *int                               `json:"frequency"`
-	DataAccessValidityDuration *int64                             `json:"dataAccessValidityDuration"`
-	PurposeGroups              []ConsentPurposeGroupItemValidate  `json:"purposeGroups"`
-	Attributes                 map[string]string                  `json:"attributes,omitempty"`
-	Authorizations             []AuthorizationAPIResponse         `json:"authorizations,omitempty"`
+	ID                         string                            `json:"id"`
+	Type                       string                            `json:"type"`
+	ClientID                   string                            `json:"clientId"`
+	Status                     string                            `json:"status"`
+	CreatedTime                int64                             `json:"createdTime"`
+	UpdatedTime                int64                             `json:"updatedTime"`
+	ValidityTime               *int64                            `json:"validityTime"`
+	RecurringIndicator         *bool                             `json:"recurringIndicator"`
+	Frequency                  *int                              `json:"frequency"`
+	DataAccessValidityDuration *int64                            `json:"dataAccessValidityDuration"`
+	PurposeGroups              []ConsentPurposeGroupItemValidate `json:"purposeGroups"`
+	Attributes                 map[string]string                 `json:"attributes,omitempty"`
+	Authorizations             []AuthorizationAPIResponse        `json:"authorizations,omitempty"`
 }
-
-
 
 // ConsentRevokeResponse represents the response after revoking a consent
 type ConsentRevokeResponse struct {

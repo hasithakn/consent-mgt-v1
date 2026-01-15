@@ -176,6 +176,7 @@ func (h *consentHandler) updateConsent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	consentID := r.PathValue("consentId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
+	clientID := r.Header.Get(constants.HeaderTPPClientID)
 
 	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
 		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
@@ -193,7 +194,7 @@ func (h *consentHandler) updateConsent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	consent, serviceErr := h.service.UpdateConsent(ctx, req, orgID, consentID)
+	consent, serviceErr := h.service.UpdateConsent(ctx, req, clientID, orgID, consentID)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
@@ -211,7 +212,7 @@ func (h *consentHandler) revokeConsent(w http.ResponseWriter, r *http.Request) {
 	consentID := r.PathValue("consentId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
-	if err := utils.ValidateOrgIdAndClientIdIsPresent(r); err != nil {
+	if err := utils.ValidateOrgID(orgID); err != nil {
 		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
 		return
 	}

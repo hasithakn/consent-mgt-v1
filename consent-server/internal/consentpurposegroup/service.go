@@ -186,6 +186,17 @@ func (s *consentPurposeGroupService) UpdatePurposeGroup(ctx context.Context, gro
 		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, "you do not have permission to update this purpose group")
 	}
 
+	// Check if group is being used in any consents
+	inUse, checkErr := s.stores.Consent.CheckGroupUsedInConsents(ctx, groupID, orgID)
+	if checkErr != nil {
+		logger.Error("Failed to check if group is in use", log.Error(checkErr))
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, "failed to check group usage")
+	}
+	if inUse {
+		logger.Warn("Cannot update purpose group that is in use by consents", log.String("group_id", groupID))
+		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, "cannot update purpose group that is currently used in consents")
+	}
+
 	// Check if new name conflicts with another group (excluding current group)
 	exists, dbErr := s.stores.ConsentPurposeGroup.CheckGroupNameExists(ctx, req.Name, clientID, orgID, &groupID)
 	if dbErr != nil {
@@ -272,6 +283,17 @@ func (s *consentPurposeGroupService) DeletePurposeGroup(ctx context.Context, gro
 	if err != nil {
 		logger.Error("Failed to retrieve purpose group", log.Error(err))
 		return serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, "purpose group not found")
+	}
+
+	// Check if group is being used in any consents
+	inUse, checkErr := s.stores.Consent.CheckGroupUsedInConsents(ctx, groupID, orgID)
+	if checkErr != nil {
+		logger.Error("Failed to check if group is in use", log.Error(checkErr))
+		return serviceerror.CustomServiceError(serviceerror.DatabaseError, "failed to check group usage")
+	}
+	if inUse {
+		logger.Warn("Cannot delete purpose group that is in use by consents", log.String("group_id", groupID))
+		return serviceerror.CustomServiceError(serviceerror.ConflictError, "cannot delete purpose group that is currently used in consents")
 	}
 
 	// Execute transaction for deletion

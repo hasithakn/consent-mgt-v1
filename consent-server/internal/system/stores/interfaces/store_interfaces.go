@@ -35,6 +35,7 @@ type ConsentStore interface {
 	GetPurposeApprovalsByConsentID(ctx context.Context, consentID, orgID string) ([]consentModel.ConsentPurposeApprovalRecord, error)
 	DeletePurposeGroupsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
 	DeletePurposeApprovalsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
+	CheckGroupUsedInConsents(ctx context.Context, groupID, orgID string) (bool, error)
 }
 
 // AuthResourceStore defines the interface for authorization resource data operations

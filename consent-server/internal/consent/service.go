@@ -23,7 +23,7 @@ type ConsentService interface {
 	ListConsents(ctx context.Context, orgID string, limit, offset int) ([]model.ConsentResponse, int, *serviceerror.ServiceError)
 	SearchConsents(ctx context.Context, filters model.ConsentSearchFilters) ([]model.ConsentResponse, int, *serviceerror.ServiceError)
 	SearchConsentsDetailed(ctx context.Context, filters model.ConsentSearchFilters) (*model.ConsentDetailSearchResponse, *serviceerror.ServiceError)
-	UpdateConsent(ctx context.Context, req model.ConsentAPIUpdateRequest, orgID, consentID string) (*model.ConsentResponse, *serviceerror.ServiceError)
+	UpdateConsent(ctx context.Context, req model.ConsentAPIUpdateRequest, clientID, orgID, consentID string) (*model.ConsentResponse, *serviceerror.ServiceError)
 	RevokeConsent(ctx context.Context, consentID, orgID string, req model.ConsentRevokeRequest) (*model.ConsentRevokeResponse, *serviceerror.ServiceError)
 	ValidateConsent(ctx context.Context, req model.ValidateRequest, orgID string) (*model.ValidateResponse, *serviceerror.ServiceError)
 	SearchConsentsByAttribute(ctx context.Context, key, value, orgID string) (*model.ConsentAttributeSearchResponse, *serviceerror.ServiceError)
@@ -50,21 +50,10 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 		log.String("org_id", orgID),
 		log.String("consent_type", req.Type))
 
-	// Validate request
-	if err := utils.ValidateOrgID(orgID); err != nil {
-		logger.Warn("Invalid organization ID", log.Error(err), log.String("org_id", orgID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
-	}
-	if err := utils.ValidateClientID(clientID); err != nil {
-		logger.Warn("Invalid client ID", log.Error(err), log.String("client_id", clientID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
-	}
 	if err := validator.ValidateConsentCreateRequest(req, clientID, orgID); err != nil {
 		logger.Warn("Consent create request validation failed", log.Error(err))
 		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
 	}
-
-	logger.Debug("Request validation successful")
 
 	logger.Debug("Request validation successful")
 
@@ -604,21 +593,17 @@ func (consentService *consentService) SearchConsentsDetailed(ctx context.Context
 }
 
 // UpdateConsent updates an existing consent
-func (consentService *consentService) UpdateConsent(ctx context.Context, req model.ConsentAPIUpdateRequest, orgID, consentID string) (*model.ConsentResponse, *serviceerror.ServiceError) {
+func (consentService *consentService) UpdateConsent(ctx context.Context, req model.ConsentAPIUpdateRequest, clientID, orgID, consentID string) (*model.ConsentResponse, *serviceerror.ServiceError) {
 	logger := log.GetLogger().WithContext(ctx)
 	logger.Info("Updating consent",
 		log.String("consent_id", consentID),
+		log.String("client_id", clientID),
 		log.String("org_id", orgID))
 
 	// Get stores
 	authResourceStore := consentService.stores.AuthResource
 	consentStore := consentService.stores.Consent
 
-	// Validate request
-	if err := utils.ValidateOrgID(orgID); err != nil {
-		logger.Warn("Invalid organization ID", log.Error(err), log.String("org_id", orgID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
-	}
 	if err := validator.ValidateConsentUpdateRequest(req); err != nil {
 		logger.Warn("Consent update request validation failed", log.Error(err))
 		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
@@ -642,6 +627,16 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 	if existing == nil {
 		logger.Warn("Consent not found", log.String("consent_id", consentID))
 		return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("Consent with ID '%s' not found", consentID))
+	}
+
+	// Validate clientID matches - only the owner client can update the consent
+	if existing.ClientID != clientID {
+		logger.Warn("ClientID mismatch - unauthorized update attempt",
+			log.String("consent_client_id", existing.ClientID),
+			log.String("request_client_id", clientID),
+			log.String("consent_id", consentID))
+		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError,
+			fmt.Sprintf("Client '%s' is not authorized to update consent '%s'", clientID, consentID))
 	}
 
 	currentTime := utils.GetCurrentTimeMillis()
@@ -679,7 +674,7 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 		statusChanged = false
 	}
 
-	// Update consent fields
+	// Update consent fields (clientID is not updated - validated to match existing)
 	consent := &model.Consent{
 		ConsentID:                  consentID,
 		UpdatedTime:                currentTime,

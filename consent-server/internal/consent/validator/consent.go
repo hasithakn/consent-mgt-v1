@@ -72,6 +72,21 @@ func ValidateConsentUpdateRequest(req model.ConsentAPIUpdateRequest) error {
 		return fmt.Errorf("frequency must be non-negative")
 	}
 
+	// Validate auth resources if provided
+	if req.Authorizations != nil {
+		for i, authReq := range req.Authorizations {
+			if authReq.Type == "" {
+				return fmt.Errorf("authorizations[%d].type is required", i)
+			}
+			// Validate auth status if provided
+			if authReq.Status != "" {
+				if err := authvalidator.ValidateAuthStatus(authReq.Status); err != nil {
+					return fmt.Errorf("authorizations[%d]: %w", i, err)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

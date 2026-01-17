@@ -948,8 +948,9 @@ func (consentService *consentService) RevokeConsent(ctx context.Context, consent
 			return store.UpdateStatus(tx, consentID, orgID, string(revokedStatusName), currentTime)
 		},
 		func(tx dbmodel.TxInterface) error {
-			// Update all authorization statuses to SYS_REVOKED when consent is revoked
-			return authResourceStore.UpdateAllStatusByConsentID(tx, consentID, orgID, "SYS_REVOKED", currentTime)
+			// Update all authorization statuses to system revoked status when consent is revoked
+			sysRevokedStatus := string(config.Get().Consent.GetSystemRevokedAuthStatus())
+			return authResourceStore.UpdateAllStatusByConsentID(tx, consentID, orgID, sysRevokedStatus, currentTime)
 		},
 		func(tx dbmodel.TxInterface) error {
 			return store.CreateStatusAudit(tx, audit)
@@ -1123,8 +1124,9 @@ func (consentService *consentService) expireConsent(ctx context.Context, consent
 			return consentStore.UpdateStatus(tx, consent.ConsentID, orgID, expiredStatusName, currentTime)
 		},
 		func(tx dbmodel.TxInterface) error {
-			// Update all authorization statuses to SYS_EXPIRED when consent expires
-			return authResourceStore.UpdateAllStatusByConsentID(tx, consent.ConsentID, orgID, "SYS_EXPIRED", currentTime)
+			// Update all authorization statuses to system expired status when consent expires
+			sysExpiredStatus := string(config.Get().Consent.GetSystemExpiredAuthStatus())
+			return authResourceStore.UpdateAllStatusByConsentID(tx, consent.ConsentID, orgID, sysExpiredStatus, currentTime)
 		},
 		func(tx dbmodel.TxInterface) error {
 			return consentStore.CreateStatusAudit(tx, audit)

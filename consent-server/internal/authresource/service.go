@@ -7,10 +7,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/wso2/consent-management-api/internal/authresource/model"
+	authvalidator "github.com/wso2/consent-management-api/internal/authresource/validator"
 	consentModel "github.com/wso2/consent-management-api/internal/consent/model"
 	"github.com/wso2/consent-management-api/internal/consent/validator"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
@@ -23,10 +23,10 @@ import (
 // AuthResourceServiceInterface defines the contract for auth resource business operations
 type AuthResourceServiceInterface interface {
 	CreateAuthResource(ctx context.Context, consentID, orgID string, request *model.CreateRequest) (*model.Response, *serviceerror.ServiceError)
-	GetAuthResource(ctx context.Context, authID, orgID string) (*model.Response, *serviceerror.ServiceError)
+	GetAuthResource(ctx context.Context, authID, consentID, orgID string) (*model.Response, *serviceerror.ServiceError)
 	GetAuthResourcesByConsentID(ctx context.Context, consentID, orgID string) (*model.ListResponse, *serviceerror.ServiceError)
 	GetAuthResourcesByUserID(ctx context.Context, userID, orgID string) (*model.ListResponse, *serviceerror.ServiceError)
-	UpdateAuthResource(ctx context.Context, authID, orgID string, request *model.UpdateRequest) (*model.Response, *serviceerror.ServiceError)
+	UpdateAuthResource(ctx context.Context, authID, consentID, orgID string, request *model.UpdateRequest) (*model.Response, *serviceerror.ServiceError)
 	DeleteAuthResource(ctx context.Context, authID, orgID string) *serviceerror.ServiceError
 	DeleteAuthResourcesByConsentID(ctx context.Context, consentID, orgID string) *serviceerror.ServiceError
 	UpdateAllStatusByConsentID(ctx context.Context, consentID, orgID string, status string) *serviceerror.ServiceError
@@ -66,7 +66,6 @@ func (s *authResourceService) CreateAuthResource(
 
 	// Generate auth ID
 	authID := utils.GenerateUUID()
-	logger.Debug("Generated auth ID", log.String("auth_id", authID))
 
 	// Marshal resources to JSON if present
 	var resourcesJSON *string
@@ -109,17 +108,25 @@ func (s *authResourceService) CreateAuthResource(
 				return fmt.Errorf("failed to retrieve auth resources: %w", err)
 			}
 
-			// Extract auth statuses
-			authStatuses := make([]string, 0, len(allAuthResources))
+			// Extract auth statuses - IMPORTANT: Include the newly created auth resource
+			// because the database read above happens outside the transaction context
+			// and won't see the auth resource we just created in this transaction
+			authStatuses := make([]string, 0, len(allAuthResources)+1)
+
+			// First, add the newly created auth resource status
+			authStatuses = append(authStatuses, authResource.AuthStatus)
+
+			// Then add existing auth resources (excluding the newly created one if it somehow appears)
 			for _, ar := range allAuthResources {
-				authStatuses = append(authStatuses, ar.AuthStatus)
+				if ar.AuthID != authID {
+					authStatuses = append(authStatuses, ar.AuthStatus)
+				}
 			}
 
 			// Derive consent status based on all authorization statuses
-			// Use validator function to maintain consistency with consent creation logic
 			derivedConsentStatus := validator.EvaluateConsentStatusFromAuthStatuses(authStatuses)
 
-			// Get current consent to check if status changed - now with type safety!
+			// Get current consent to check if status changed
 			currentConsent, err := s.stores.Consent.GetByID(ctx, consentID, orgID)
 			if err != nil {
 				return fmt.Errorf("failed to retrieve consent: %w", err)
@@ -156,7 +163,6 @@ func (s *authResourceService) CreateAuthResource(
 			return nil
 		},
 	})
-	logger.Debug("Executing transaction for auth resource creation")
 	if err != nil {
 		logger.Error("Transaction failed for auth resource creation",
 			log.Error(err),
@@ -170,9 +176,6 @@ func (s *authResourceService) CreateAuthResource(
 
 	logger.Info("Auth resource created successfully",
 		log.String("auth_id", authResource.AuthID),
-		log.String("consent_id", authResource.ConsentID),
-		log.String("auth_type", authResource.AuthType),
-		log.String("auth_status", authResource.AuthStatus),
 	)
 	return s.buildResponse(authResource), nil
 }
@@ -180,16 +183,21 @@ func (s *authResourceService) CreateAuthResource(
 // GetAuthResource retrieves an authorization resource by ID
 func (s *authResourceService) GetAuthResource(
 	ctx context.Context,
-	authID, orgID string,
+	authID, consentID, orgID string,
 ) (*model.Response, *serviceerror.ServiceError) {
 	logger := log.GetLogger().WithContext(ctx)
 	logger.Debug("Retrieving auth resource",
 		log.String("auth_id", authID),
+		log.String("consent_id", consentID),
 		log.String("org_id", orgID),
 	)
 
 	// Validate inputs
 	if err := s.validateAuthIDAndOrgID(authID, orgID); err != nil {
+		logger.Warn("Validation failed for get auth resource", log.String("error", err.Error()))
+		return nil, err
+	}
+	if err := s.validateConsentIDAndOrgID(consentID, orgID); err != nil {
 		logger.Warn("Validation failed for get auth resource", log.String("error", err.Error()))
 		return nil, err
 	}
@@ -213,6 +221,19 @@ func (s *authResourceService) GetAuthResource(
 		return nil, serviceerror.CustomServiceError(
 			serviceerror.DatabaseError,
 			fmt.Sprintf("failed to retrieve auth resource: %v", err),
+		)
+	}
+
+	// Validate that the auth resource belongs to the specified consent
+	if authResource.ConsentID != consentID {
+		logger.Warn("Auth resource does not belong to specified consent",
+			log.String("auth_id", authID),
+			log.String("expected_consent_id", consentID),
+			log.String("actual_consent_id", authResource.ConsentID),
+		)
+		return nil, serviceerror.CustomServiceError(
+			serviceerror.ResourceNotFoundError,
+			fmt.Sprintf("auth resource %s does not belong to consent %s", authID, consentID),
 		)
 	}
 
@@ -323,12 +344,13 @@ func (s *authResourceService) GetAuthResourcesByUserID(
 // UpdateAuthResource updates an existing authorization resource
 func (s *authResourceService) UpdateAuthResource(
 	ctx context.Context,
-	authID, orgID string,
+	authID, consentID, orgID string,
 	request *model.UpdateRequest,
 ) (*model.Response, *serviceerror.ServiceError) {
 	logger := log.GetLogger().WithContext(ctx)
 	logger.Info("Updating auth resource",
 		log.String("auth_id", authID),
+		log.String("consent_id", consentID),
 		log.String("org_id", orgID),
 		log.String("new_auth_status", request.AuthStatus),
 	)
@@ -338,6 +360,13 @@ func (s *authResourceService) UpdateAuthResource(
 		logger.Warn("Validation failed for update auth resource",
 			log.String("error", err.Error()),
 			log.String("auth_id", authID),
+		)
+		return nil, err
+	}
+	if err := s.validateConsentIDAndOrgID(consentID, orgID); err != nil {
+		logger.Warn("Validation failed for update auth resource",
+			log.String("error", err.Error()),
+			log.String("consent_id", consentID),
 		)
 		return nil, err
 	}
@@ -358,12 +387,37 @@ func (s *authResourceService) UpdateAuthResource(
 		)
 	}
 
+	// Validate that the auth resource belongs to the specified consent
+	if existingAuthResource.ConsentID != consentID {
+		logger.Warn("Auth resource does not belong to specified consent",
+			log.String("auth_id", authID),
+			log.String("expected_consent_id", consentID),
+			log.String("actual_consent_id", existingAuthResource.ConsentID),
+		)
+		return nil, serviceerror.CustomServiceError(
+			serviceerror.ResourceNotFoundError,
+			fmt.Sprintf("auth resource %s does not belong to consent %s", authID, consentID),
+		)
+	}
+
 	// Update fields if provided
 	updatedAuthResource := *existingAuthResource
 	updatedAuthResource.UpdatedTime = utils.GetCurrentTimeMillis()
 
 	statusChanged := false
 	if request.AuthStatus != "" {
+		// Validate that auth status is not a system-reserved status
+		if err := authvalidator.ValidateAuthStatus(request.AuthStatus); err != nil {
+			logger.Warn("Invalid auth status provided",
+				log.String("auth_id", authID),
+				log.String("status", request.AuthStatus),
+				log.Error(err),
+			)
+			return nil, serviceerror.CustomServiceError(
+				serviceerror.ValidationError,
+				err.Error(),
+			)
+		}
 		updatedAuthResource.AuthStatus = request.AuthStatus
 		statusChanged = (existingAuthResource.AuthStatus != request.AuthStatus)
 		if statusChanged {
@@ -426,84 +480,36 @@ func (s *authResourceService) UpdateAuthResource(
 				log.Int("auth_count", len(authStatuses)),
 			)
 
-			// Get current consent to check if status changed using reflection
-			getByIDMethod := reflect.ValueOf(s.stores.Consent).MethodByName("GetByID")
-			getResults := getByIDMethod.Call([]reflect.Value{
-				reflect.ValueOf(ctx),
-				reflect.ValueOf(existingAuthResource.ConsentID),
-				reflect.ValueOf(orgID),
-			})
-			if !getResults[1].IsNil() {
-				return fmt.Errorf("failed to retrieve consent: %w", getResults[1].Interface().(error))
+			// Get current consent to check if status changed
+			currentConsent, err := s.stores.Consent.GetByID(ctx, existingAuthResource.ConsentID, orgID)
+			if err != nil {
+				return fmt.Errorf("failed to retrieve consent: %w", err)
 			}
-			currentConsentInterface := getResults[0].Interface()
-
-			// Extract current status using JSON marshal/unmarshal
-			type consentWithStatus struct {
-				CurrentStatus string `json:"currentStatus"`
-				OrgID         string `json:"orgId"`
-			}
-			currentConsentBytes, _ := json.Marshal(currentConsentInterface)
-			var currentConsent consentWithStatus
-			json.Unmarshal(currentConsentBytes, &currentConsent)
 
 			// Only update if consent status actually changed
 			if currentConsent.CurrentStatus != derivedConsentStatus {
 				updatedTime := utils.GetCurrentTimeMillis()
 
-				// Update consent status using reflection
-				updateStatusMethod := reflect.ValueOf(s.stores.Consent).MethodByName("UpdateStatus")
-				updateResults := updateStatusMethod.Call([]reflect.Value{
-					reflect.ValueOf(tx),
-					reflect.ValueOf(existingAuthResource.ConsentID),
-					reflect.ValueOf(orgID),
-					reflect.ValueOf(derivedConsentStatus),
-					reflect.ValueOf(updatedTime),
-				})
-				if !updateResults[0].IsNil() {
-					return updateResults[0].Interface().(error)
-				}
-
-				// Verify the consent exists by doing a SELECT after UPDATE
-				verifyMethod := reflect.ValueOf(s.stores.Consent).MethodByName("GetByID")
-				verifyResults := verifyMethod.Call([]reflect.Value{
-					reflect.ValueOf(ctx),
-					reflect.ValueOf(existingAuthResource.ConsentID),
-					reflect.ValueOf(orgID),
-				})
-				if !verifyResults[1].IsNil() {
-					return verifyResults[1].Interface().(error)
+				// Update consent status
+				if err := s.stores.Consent.UpdateStatus(tx, existingAuthResource.ConsentID, orgID, derivedConsentStatus, updatedTime); err != nil {
+					return err
 				}
 
 				// Create status audit record
 				auditID := utils.GenerateUUID()
 				reason := fmt.Sprintf("Authorization %s status updated from %s to %s", authID, existingAuthResource.AuthStatus, updatedAuthResource.AuthStatus)
-				audit := map[string]interface{}{
-					"statusAuditId":  auditID,
-					"consentId":      existingAuthResource.ConsentID,
-					"currentStatus":  derivedConsentStatus,
-					"actionTime":     updatedTime,
-					"reason":         reason,
-					"actionBy":       nil,
-					"previousStatus": currentConsent.CurrentStatus,
-					"orgId":          orgID,
+				audit := &consentModel.ConsentStatusAudit{
+					StatusAuditID:  auditID,
+					ConsentID:      existingAuthResource.ConsentID,
+					CurrentStatus:  derivedConsentStatus,
+					ActionTime:     updatedTime,
+					Reason:         &reason,
+					ActionBy:       nil,
+					PreviousStatus: &currentConsent.CurrentStatus,
+					OrgID:          orgID,
 				}
-
-				// Marshal to JSON then unmarshal to consent.model.ConsentStatusAudit
-				auditBytes, _ := json.Marshal(audit)
-				// Create the right type using reflection
-				createMethod := reflect.ValueOf(s.stores.Consent).MethodByName("CreateStatusAudit")
-				auditType := createMethod.Type().In(1).Elem() // Get the type of the second parameter (dereferenced)
-				consentAuditPtr := reflect.New(auditType)
-				json.Unmarshal(auditBytes, consentAuditPtr.Interface())
-
-				// Use reflection to call CreateStatusAudit
-				results := createMethod.Call([]reflect.Value{
-					reflect.ValueOf(tx),
-					consentAuditPtr,
-				})
-				if !results[0].IsNil() {
-					return results[0].Interface().(error)
+				if err := s.stores.Consent.CreateStatusAudit(tx, audit); err != nil {
+					return err
 				}
 				return nil
 			}
@@ -511,7 +517,6 @@ func (s *authResourceService) UpdateAuthResource(
 		})
 	}
 
-	logger.Debug("Executing transaction for auth resource update")
 	err = s.stores.ExecuteTransaction(transactionSteps)
 	if err != nil {
 		logger.Error("Transaction failed for auth resource update",
@@ -526,8 +531,6 @@ func (s *authResourceService) UpdateAuthResource(
 
 	logger.Info("Auth resource updated successfully",
 		log.String("auth_id", updatedAuthResource.AuthID),
-		log.String("consent_id", updatedAuthResource.ConsentID),
-		log.String("auth_status", updatedAuthResource.AuthStatus),
 		log.Bool("status_changed", statusChanged),
 	)
 	return s.buildResponse(&updatedAuthResource), nil
@@ -594,79 +597,42 @@ func (s *authResourceService) DeleteAuthResource(
 				log.Int("remaining_auth_count", len(authStatuses)),
 			)
 
-			// Get current consent to check if status changed using reflection
-			getByIDMethod := reflect.ValueOf(s.stores.Consent).MethodByName("GetByID")
-			getResults := getByIDMethod.Call([]reflect.Value{
-				reflect.ValueOf(ctx),
-				reflect.ValueOf(existingAuthResource.ConsentID),
-				reflect.ValueOf(orgID),
-			})
-			if !getResults[1].IsNil() {
-				return fmt.Errorf("failed to retrieve consent: %w", getResults[1].Interface().(error))
+			// Get current consent to check if status changed
+			currentConsent, err := s.stores.Consent.GetByID(ctx, existingAuthResource.ConsentID, orgID)
+			if err != nil {
+				return fmt.Errorf("failed to retrieve consent: %w", err)
 			}
-			currentConsentInterface := getResults[0].Interface()
-
-			// Extract current status using JSON marshal/unmarshal
-			type consentWithStatus struct {
-				CurrentStatus string `json:"currentStatus"`
-			}
-			currentConsentBytes, _ := json.Marshal(currentConsentInterface)
-			var currentConsent consentWithStatus
-			json.Unmarshal(currentConsentBytes, &currentConsent)
 
 			// Only update if consent status actually changed
 			if currentConsent.CurrentStatus != derivedConsentStatus {
 				updatedTime := utils.GetCurrentTimeMillis()
 
-				// Update consent status using reflection
-				updateStatusMethod := reflect.ValueOf(s.stores.Consent).MethodByName("UpdateStatus")
-				updateResults := updateStatusMethod.Call([]reflect.Value{
-					reflect.ValueOf(tx),
-					reflect.ValueOf(existingAuthResource.ConsentID),
-					reflect.ValueOf(orgID),
-					reflect.ValueOf(derivedConsentStatus),
-					reflect.ValueOf(updatedTime),
-				})
-				if !updateResults[0].IsNil() {
-					return updateResults[0].Interface().(error)
+				// Update consent status
+				if err := s.stores.Consent.UpdateStatus(tx, existingAuthResource.ConsentID, orgID, derivedConsentStatus, updatedTime); err != nil {
+					return err
 				}
 
 				// Create status audit record
 				auditID := utils.GenerateUUID()
 				reason := fmt.Sprintf("Authorization %s deleted with status %s", authID, existingAuthResource.AuthStatus)
-				audit := map[string]interface{}{
-					"statusAuditId":  auditID,
-					"consentId":      existingAuthResource.ConsentID,
-					"currentStatus":  derivedConsentStatus,
-					"actionTime":     updatedTime,
-					"reason":         reason,
-					"actionBy":       nil,
-					"previousStatus": currentConsent.CurrentStatus,
-					"orgId":          orgID,
+				audit := &consentModel.ConsentStatusAudit{
+					StatusAuditID:  auditID,
+					ConsentID:      existingAuthResource.ConsentID,
+					CurrentStatus:  derivedConsentStatus,
+					ActionTime:     updatedTime,
+					Reason:         &reason,
+					ActionBy:       nil,
+					PreviousStatus: &currentConsent.CurrentStatus,
+					OrgID:          orgID,
 				}
-
-				// Marshal to JSON then unmarshal to consent.model.ConsentStatusAudit
-				auditBytes, _ := json.Marshal(audit)
-				// Create the right type using reflection
-				createMethod := reflect.ValueOf(s.stores.Consent).MethodByName("CreateStatusAudit")
-				auditType := createMethod.Type().In(1).Elem() // Get the type of the second parameter (dereferenced)
-				consentAuditPtr := reflect.New(auditType)
-				json.Unmarshal(auditBytes, consentAuditPtr.Interface())
-
-				// Use reflection to call CreateStatusAudit
-				results := createMethod.Call([]reflect.Value{
-					reflect.ValueOf(tx),
-					consentAuditPtr,
-				})
-				if !results[0].IsNil() {
-					return results[0].Interface().(error)
+				if err := s.stores.Consent.CreateStatusAudit(tx, audit); err != nil {
+					return err
 				}
 				return nil
 			}
 			return nil
 		},
 	})
-	logger.Debug("Executing transaction for auth resource deletion")
 	if err != nil {
 		logger.Error("Transaction failed for auth resource deletion",
 			log.Error(err),
@@ -704,7 +670,6 @@ func (s *authResourceService) DeleteAuthResourcesByConsentID(
 
 	// Delete all auth resources for the consent
 	store := s.stores.AuthResource
-	logger.Debug("Executing transaction for auth resources deletion")
 	err := s.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
 		func(tx dbmodel.TxInterface) error {
 			return store.DeleteByConsentID(tx, consentID, orgID)
@@ -756,7 +721,6 @@ func (s *authResourceService) UpdateAllStatusByConsentID(
 	// Update all statuses
 	store := s.stores.AuthResource
 	updatedTime := utils.GetCurrentTimeMillis()
-	logger.Debug("Executing transaction for auth statuses update")
 	err := s.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
 		func(tx dbmodel.TxInterface) error {
 			return store.UpdateAllStatusByConsentID(tx, consentID, orgID, status, updatedTime)
@@ -802,6 +766,13 @@ func (s *authResourceService) validateCreateRequest(consentID, orgID string, req
 		return serviceerror.CustomServiceError(
 			serviceerror.InvalidRequestError,
 			"auth status is required",
+		)
+	}
+	// Validate that auth status is not a system-reserved status
+	if err := authvalidator.ValidateAuthStatus(request.AuthStatus); err != nil {
+		return serviceerror.CustomServiceError(
+			serviceerror.ValidationError,
+			err.Error(),
 		)
 	}
 	return nil

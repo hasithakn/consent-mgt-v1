@@ -96,7 +96,7 @@ func (h *authResourceHandler) handleGet(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Call service
-	response, serviceErr := h.service.GetAuthResource(ctx, authID, orgID)
+	response, serviceErr := h.service.GetAuthResource(ctx, authID, consentID, orgID)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
@@ -181,7 +181,7 @@ func (h *authResourceHandler) handleUpdate(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Call service
-	response, serviceErr := h.service.UpdateAuthResource(ctx, authID, orgID, &request)
+	response, serviceErr := h.service.UpdateAuthResource(ctx, authID, consentID, orgID, &request)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return

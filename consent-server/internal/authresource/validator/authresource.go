@@ -30,12 +30,12 @@ func ValidateAuthResourceCreateRequest(req model.ConsentAuthResourceCreateReques
 	return nil
 }
 
-// ValidateAuthStatus validates authorization status
+// ValidateAuthStatus validates authorization status and rejects system-reserved statuses
 func ValidateAuthStatus(status string) error {
 	cfg := config.Get().Consent
 	if cfg.AuthStatusMappings.SystemExpiredState == status ||
 		cfg.AuthStatusMappings.SystemRevokedState == status {
-		return fmt.Errorf("invalid auth status: %s", status)
+		return fmt.Errorf("authorization status '%s' is system-reserved and cannot be set by users", status)
 	}
 	return nil
 }

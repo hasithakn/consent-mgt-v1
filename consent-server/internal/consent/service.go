@@ -237,7 +237,22 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 
 	logger.Info("Consent created successfully", log.String("consent_id", consentID))
 
-	// TODO : check consent expireation and handle accordingly.
+	// Check if consent is expired and update status accordingly
+	expiredStatusName := string(config.Get().Consent.GetExpiredConsentStatus())
+	if consent.ValidityTime != nil && validator.IsConsentExpired(*consent.ValidityTime) {
+		// Consent was created with an expired validity time - expire it immediately
+		if consent.CurrentStatus != expiredStatusName {
+			if err := consentService.expireConsent(ctx, consent, orgID); err != nil {
+				logger.Error("Failed to expire consent after creation", log.Error(err))
+				// Continue with response - consent object is updated in-memory
+			} else {
+				// Re-fetch consent to get latest state from DB
+				if updatedConsent, fetchErr := consentService.stores.Consent.GetByID(ctx, consentID, orgID); fetchErr == nil && updatedConsent != nil {
+					consent = updatedConsent
+				}
+			}
+		}
+	}
 
 	// Retrieve related data after creation
 	logger.Debug("Retrieving related data for response")
@@ -299,7 +314,22 @@ func (consentService *consentService) GetConsent(ctx context.Context, consentID,
 		return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("Consent with ID '%s' not found", consentID))
 	}
 
-	// TODO : check consent expireation and handle accordingly.
+	// Check if consent is expired and update status accordingly
+	expiredStatusName := string(config.Get().Consent.GetExpiredConsentStatus())
+	if consent.ValidityTime != nil && validator.IsConsentExpired(*consent.ValidityTime) {
+		// Update consent status to expired if not already expired
+		if consent.CurrentStatus != expiredStatusName {
+			if err := consentService.expireConsent(ctx, consent, orgID); err != nil {
+				logger.Error("Failed to expire consent", log.Error(err))
+				// Continue with response - consent object is updated in-memory
+			} else {
+				// Re-fetch consent to get latest state from DB
+				if updatedConsent, fetchErr := consentStore.GetByID(ctx, consentID, orgID); fetchErr == nil && updatedConsent != nil {
+					consent = updatedConsent
+				}
+			}
+		}
+	}
 
 	// Retrieve all related data
 	attributes, _ := consentStore.GetAttributesByConsentID(ctx, consentID, orgID)
@@ -696,11 +726,10 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 
 	if statusChanged {
 
-		queries = []func(tx dbmodel.TxInterface) error{
-			func(tx dbmodel.TxInterface) error {
-				return consentStore.UpdateStatus(tx, consentID, orgID, newStatus, currentTime)
-			},
-		}
+		// Append status update to existing queries (don't replace the array)
+		queries = append(queries, func(tx dbmodel.TxInterface) error {
+			return consentStore.UpdateStatus(tx, consentID, orgID, newStatus, currentTime)
+		})
 
 		// Create status audit if status changed
 		auditID := utils.GenerateUUID()
@@ -853,6 +882,81 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 	if getErr != nil {
 		logger.Error("Failed to retrieve updated consent", log.Error(getErr))
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, getErr.Error())
+	}
+
+	// Check if consent expiration status needs to be updated
+	expiredStatusName := string(config.Get().Consent.GetExpiredConsentStatus())
+
+	// Case 1: Consent is expired and should be marked as expired
+	if updated.ValidityTime != nil && validator.IsConsentExpired(*updated.ValidityTime) {
+		if updated.CurrentStatus != expiredStatusName {
+			if err := consentService.expireConsent(ctx, updated, orgID); err != nil {
+				logger.Error("Failed to expire consent after update", log.Error(err))
+			} else {
+				// Re-fetch consent to get latest state from DB
+				if refreshedConsent, fetchErr := consentStore.GetByID(ctx, consentID, orgID); fetchErr == nil && refreshedConsent != nil {
+					updated = refreshedConsent
+				}
+			}
+		}
+	} else if updated.CurrentStatus == expiredStatusName {
+		// Case 2: Consent was expired but is no longer expired (validityTime updated to future)
+		// Re-evaluate status based on authorization states
+		allAuthResources, err := authResourceStore.GetByConsentID(ctx, consentID, orgID)
+		if err == nil {
+			authStatuses := make([]string, 0, len(allAuthResources))
+			for _, ar := range allAuthResources {
+				authStatuses = append(authStatuses, ar.AuthStatus)
+			}
+
+			// Derive new consent status from auth resources
+			derivedStatus := validator.EvaluateConsentStatusFromAuthStatuses(authStatuses)
+
+			// Update consent to active status if it should no longer be expired
+			if derivedStatus != expiredStatusName {
+				currentTime := utils.GetCurrentTimeMillis()
+
+				// Create audit entry
+				auditID := utils.GenerateUUID()
+				reason := "Consent reactivated - validity time extended to future"
+				actionBy := existing.ClientID
+				previousStatus := updated.CurrentStatus
+				audit := &model.ConsentStatusAudit{
+					StatusAuditID:  auditID,
+					ConsentID:      consentID,
+					CurrentStatus:  derivedStatus,
+					ActionTime:     currentTime,
+					Reason:         &reason,
+					ActionBy:       &actionBy,
+					PreviousStatus: &previousStatus,
+					OrgID:          orgID,
+				}
+
+				// Update status in transaction
+				err := consentService.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
+					func(tx dbmodel.TxInterface) error {
+						return consentStore.UpdateStatus(tx, consentID, orgID, derivedStatus, currentTime)
+					},
+					func(tx dbmodel.TxInterface) error {
+						return consentStore.CreateStatusAudit(tx, audit)
+					},
+				})
+
+				if err != nil {
+					logger.Error("Failed to reactivate consent after update", log.Error(err))
+				} else {
+					logger.Info("Consent reactivated after validity time update",
+						log.String("consent_id", consentID),
+						log.String("previous_status", previousStatus),
+						log.String("new_status", derivedStatus))
+
+					// Re-fetch consent to get latest state from DB
+					if refreshedConsent, fetchErr := consentStore.GetByID(ctx, consentID, orgID); fetchErr == nil && refreshedConsent != nil {
+						updated = refreshedConsent
+					}
+				}
+			}
+		}
 	}
 
 	authResources, _ := authResourceStore.GetByConsentID(ctx, consentID, orgID)
@@ -1042,20 +1146,6 @@ func (consentService *consentService) ValidateConsent(ctx context.Context, req m
 		response.ErrorDescription = fmt.Sprintf("Consent status is '%s', expected '%s'", consent.CurrentStatus, activeStatusName)
 	}
 
-	// If no errors, mark as valid
-	if response.ErrorCode == 0 {
-		response.IsValid = true
-		logger.Info("Consent validation successful",
-			log.String("consent_id", req.ConsentID),
-			log.Bool("is_valid", true))
-	} else {
-		logger.Warn("Consent validation failed",
-			log.String("consent_id", req.ConsentID),
-			log.Bool("is_valid", false),
-			log.Int("error_code", response.ErrorCode),
-			log.String("error_message", response.ErrorMessage))
-	}
-
 	// Retrieve related data for consent information (only if consent exists)
 	if consent != nil {
 		authResourceStore := consentService.stores.AuthResource
@@ -1082,7 +1172,43 @@ func (consentService *consentService) ValidateConsent(ctx context.Context, req m
 			consentResponse := buildConsentResponse(consent, purposeGroups, attributesMap, authResources)
 			// Convert to ValidateConsentAPIResponse with enriched purpose details
 			response.ConsentInformation = consentService.EnrichedValidateConsentAPIResponse(ctx, consentResponse, orgID)
+
+			// Check if all mandatory purposes are approved (only if no previous errors)
+			if response.ErrorCode == 0 {
+				unapprovedMandatoryPurposes := make([]string, 0)
+				for _, group := range purposeGroups {
+					for _, purpose := range group.Purposes {
+						if purpose.IsMandatory && !purpose.IsUserApproved {
+							unapprovedMandatoryPurposes = append(unapprovedMandatoryPurposes, purpose.PurposeName)
+						}
+					}
+				}
+
+				if len(unapprovedMandatoryPurposes) > 0 {
+					response.ErrorCode = 403
+					response.ErrorMessage = "mandatory_purposes_not_approved"
+					response.ErrorDescription = fmt.Sprintf("The following mandatory purposes are not approved: %v", unapprovedMandatoryPurposes)
+					logger.Warn("Mandatory purposes not approved",
+						log.String("consent_id", req.ConsentID),
+						log.Int("unapproved_count", len(unapprovedMandatoryPurposes)),
+						log.Any("unapproved_purposes", unapprovedMandatoryPurposes))
+				}
+			}
 		}
+	}
+
+	// If no errors, mark as valid
+	if response.ErrorCode == 0 {
+		response.IsValid = true
+		logger.Info("Consent validation successful",
+			log.String("consent_id", req.ConsentID),
+			log.Bool("is_valid", true))
+	} else {
+		logger.Warn("Consent validation failed",
+			log.String("consent_id", req.ConsentID),
+			log.Bool("is_valid", false),
+			log.Int("error_code", response.ErrorCode),
+			log.String("error_message", response.ErrorMessage))
 	}
 
 	return response, nil

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/wso2/consent-management-api/internal/consentpurpose/validators"
+	"github.com/wso2/consent-management-api/internal/consentelement/validators"
 )
 
 // JSONValue represents a JSON value that can be stored in the database
@@ -50,8 +50,8 @@ func (j *JSONValue) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ConsentPurpose represents a consent purpose entity
-type ConsentPurpose struct {
+// ConsentElement represents a consent element entity
+type ConsentElement struct {
 	ID          string            `json:"id" db:"ID"`
 	Name        string            `json:"name" db:"NAME"`
 	Description *string           `json:"description,omitempty" db:"DESCRIPTION"`
@@ -60,36 +60,36 @@ type ConsentPurpose struct {
 	OrgID       string            `json:"orgId" db:"ORG_ID"`
 }
 
-// ConsentPurposeMapping represents the CONSENT_PURPOSE_MAPPING table
-type ConsentPurposeMapping struct {
+// ConsentElementMapping represents the CONSENT_PURPOSE_ELEMENT_MAPPING table
+type ConsentElementMapping struct {
 	ConsentID      string      `db:"CONSENT_ID" json:"consentId"`
 	OrgID          string      `db:"ORG_ID" json:"orgId"`
-	PurposeID      string      `db:"PURPOSE_ID" json:"purposeId"`
+	ElementID      string      `db:"ELEMENT_ID" json:"elementId"`
 	Value          interface{} `db:"VALUE" json:"value,omitempty"`
 	IsUserApproved bool        `db:"IS_USER_APPROVED" json:"isUserApproved"`
 	IsMandatory    bool        `db:"IS_MANDATORY" json:"isMandatory"`
-	Name           string      `db:"-" json:"name"` // Purpose name for convenience (not in mapping table)
+	Name           string      `db:"-" json:"name"` // Element name for convenience (not in mapping table)
 }
 
-// ConsentPurposeCreateRequest represents the request to create a consent purpose
-type ConsentPurposeCreateRequest struct {
+// ConsentElementCreateRequest represents the request to create a consent element
+type ConsentElementCreateRequest struct {
 	Name        string            `json:"name" binding:"required"`
 	Description string            `json:"description,omitempty"`
 	Type        string            `json:"type" binding:"required"`
 	Properties  map[string]string `json:"properties,omitempty"`
 }
 
-// ConsentPurposeUpdateRequest represents the request to update a consent purpose
+// ConsentElementUpdateRequest represents the request to update a consent element
 // All fields are required - no partial updates allowed
-type ConsentPurposeUpdateRequest struct {
+type ConsentElementUpdateRequest struct {
 	Name        string            `json:"name" binding:"required,max=255"`
 	Description *string           `json:"description,omitempty" binding:"omitempty,max=1024"`
 	Type        string            `json:"type" binding:"required"`
 	Properties  map[string]string `json:"properties,omitempty"`
 }
 
-// ConsentPurposeResponse represents the response for consent purpose operations
-type ConsentPurposeResponse struct {
+// ConsentElementResponse represents the response for consent element operations
+type ConsentElementResponse struct {
 	ID          string            `json:"id"`
 	Name        string            `json:"name"`
 	Description *string           `json:"description,omitempty"`
@@ -97,15 +97,15 @@ type ConsentPurposeResponse struct {
 	Properties  map[string]string `json:"properties,omitempty"`
 }
 
-// ConsentPurposeListResponse represents a list of consent purposes
-type ConsentPurposeListResponse struct {
-	Purposes []ConsentPurposeResponse `json:"purposes"`
+// ListResponse represents a list of consent elements
+type ListResponse struct {
+	Elements []ConsentElementResponse `json:"elements"`
 	Total    int                      `json:"total"`
 }
 
-// ToConsentPurposeResponse converts ConsentPurpose to ConsentPurposeResponse
-func (cp *ConsentPurpose) ToConsentPurposeResponse() *ConsentPurposeResponse {
-	return &ConsentPurposeResponse{
+// ToConsentElementResponse converts ConsentElement to ConsentElementResponse
+func (cp *ConsentElement) ToConsentElementResponse() *ConsentElementResponse {
+	return &ConsentElementResponse{
 		ID:          cp.ID,
 		Name:        cp.Name,
 		Description: cp.Description,
@@ -114,30 +114,22 @@ func (cp *ConsentPurpose) ToConsentPurposeResponse() *ConsentPurposeResponse {
 	}
 }
 
-// ValidatePurposeType validates that the purpose type is registered in the handler registry
-func ValidatePurposeType(typeVal string) error {
+// ValidateElementType validates that the element type is registered in the handler registry
+func ValidateElementType(typeVal string) error {
 	_, err := validators.GetHandler(typeVal)
 	if err != nil {
 		// Get all registered types for helpful error message
 		registeredTypes := validators.GetAllHandlerTypes()
-		return fmt.Errorf("invalid purpose type '%s': must be one of %v", typeVal, registeredTypes)
+		return fmt.Errorf("invalid element type '%s': must be one of %v", typeVal, registeredTypes)
 	}
 	return nil
 }
 
-// Type aliases for backward compatibility with service layer
-type CreateRequest = ConsentPurposeCreateRequest
-type UpdateRequest = ConsentPurposeUpdateRequest
-
-// ConsentPurposeAttribute represents attributes for consent purposes
-type ConsentPurposeAttribute struct {
+// ConsentElementProperty represents properties for consent elements
+type ConsentElementProperty struct {
 	ID        string `db:"ID"`
-	PurposeID string `db:"PURPOSE_ID"`
+	ElementID string `db:"ELEMENT_ID"`
 	Key       string `db:"ATT_KEY"`
 	Value     string `db:"ATT_VALUE"`
 	OrgID     string `db:"ORG_ID"`
 }
-
-// Type aliases for backward compatibility
-type Response = ConsentPurposeResponse
-type ListResponse = ConsentPurposeListResponse

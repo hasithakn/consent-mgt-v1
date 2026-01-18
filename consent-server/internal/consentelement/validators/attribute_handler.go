@@ -1,17 +1,17 @@
 package validators
 
-// AttributePurposeTypeHandler handles "resource-field-type" consent purposes
+// AttributeElementTypeHandler handles "resource-field-type" consent elements
 // Resource field type requires resourcePath and jsonPath to be present
-type AttributePurposeTypeHandler struct{}
+type AttributeElementTypeHandler struct{}
 
 // GetType returns the type identifier
-func (h *AttributePurposeTypeHandler) GetType() string {
+func (h *AttributeElementTypeHandler) GetType() string {
 	return "resource-field-type"
 }
 
 // ValidateProperties validates properties for resource-field-type
 // Mandatory: resourcePath and jsonPath must be present
-func (h *AttributePurposeTypeHandler) ValidateProperties(properties map[string]string) []ValidationError {
+func (h *AttributeElementTypeHandler) ValidateProperties(properties map[string]string) []ValidationError {
 	var errors []ValidationError
 
 	// resourcePath is MANDATORY
@@ -35,14 +35,14 @@ func (h *AttributePurposeTypeHandler) ValidateProperties(properties map[string]s
 
 // ProcessProperties processes properties for resource-field-type
 // Basic processing, could add defaults or validation
-func (h *AttributePurposeTypeHandler) ProcessProperties(properties map[string]string) map[string]string {
+func (h *AttributeElementTypeHandler) ProcessProperties(properties map[string]string) map[string]string {
 	// Return as-is
 	return properties
 }
 
 // GetPropertySpec returns the property specification for resource-field-type
-func (h *AttributePurposeTypeHandler) GetPropertySpec() []PurposePropertySpec {
-	return []PurposePropertySpec{
+func (h *AttributeElementTypeHandler) GetPropertySpec() []ElementPropertySpec {
+	return []ElementPropertySpec{
 		{
 			Name:        "resourcePath",
 			Required:    true,

@@ -1283,7 +1283,7 @@ func (consentService *consentService) EnrichedValidateConsentAPIResponse(ctx con
 		log.String("consent_id", consent.ConsentID),
 		log.String("org_id", orgID))
 
-	purposeStore := consentService.stores.ConsentPurpose
+	purposeStore := consentService.stores.ConsentElement
 
 	if consent == nil {
 		logger.Debug("Consent is nil, returning nil")
@@ -1362,12 +1362,12 @@ func (consentService *consentService) EnrichedValidateConsentAPIResponse(ctx con
 							enrichedPurpose.Description = *purpose.Description
 						}
 
-						// Fetch attributes from CONSENT_PURPOSE_ATTRIBUTE table
-						attributes, attrErr := purposeStore.GetAttributesByPurposeID(ctx, purpose.ID, orgID)
-						if attrErr == nil && len(attributes) > 0 {
+						// Fetch properties from CONSENT_ELEMENT_PROPERTY table
+						properties, propErr := purposeStore.GetPropertiesByElementID(ctx, purpose.ID, orgID)
+						if propErr == nil && len(properties) > 0 {
 							enrichedPurpose.Attributes = make(map[string]interface{})
-							for _, attr := range attributes {
-								enrichedPurpose.Attributes[attr.Key] = attr.Value
+							for _, prop := range properties {
+								enrichedPurpose.Attributes[prop.Key] = prop.Value
 							}
 						}
 
@@ -1376,7 +1376,7 @@ func (consentService *consentService) EnrichedValidateConsentAPIResponse(ctx con
 							log.String("type", purpose.Type),
 							log.String("description", enrichedPurpose.Description),
 							log.Bool("isMandatory", enrichedPurpose.IsMandatory),
-							log.Int("attributes_count", len(enrichedPurpose.Attributes)))
+							log.Int("properties_count", len(enrichedPurpose.Attributes)))
 					} else if err != nil {
 						logger.Warn("Failed to fetch purpose details",
 							log.String("purpose", p.PurposeName),

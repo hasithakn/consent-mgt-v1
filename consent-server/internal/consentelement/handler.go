@@ -1,31 +1,31 @@
-package consentpurpose
+package consentelement
 
 import (
 	"encoding/json"
 	"net/http"
 	"strconv"
 
-	"github.com/wso2/consent-management-api/internal/consentpurpose/model"
+	"github.com/wso2/consent-management-api/internal/consentelement/model"
 	"github.com/wso2/consent-management-api/internal/system/constants"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
 	"github.com/wso2/consent-management-api/internal/system/utils"
 )
 
-// consentPurposeHandler handles HTTP requests for consent purposes
-type consentPurposeHandler struct {
-	service ConsentPurposeService
+// consentElementHandler handles HTTP requests for consent elements
+type consentElementHandler struct {
+	service ConsentElementService
 }
 
-// newConsentPurposeHandler creates a new consent purpose handler
-func newConsentPurposeHandler(service ConsentPurposeService) *consentPurposeHandler {
-	return &consentPurposeHandler{
+// newConsentElementHandler creates a new consent element handler
+func newConsentElementHandler(service ConsentElementService) *consentElementHandler {
+	return &consentElementHandler{
 		service: service,
 	}
 }
 
-// createPurpose handles POST /consent-purposes
+// createElement handles POST /consent-elements
 // Supports both single and batch creation (array input)
-func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Request) {
+func (h *consentElementHandler) createElement(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
@@ -36,29 +36,29 @@ func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Req
 	}
 
 	// Decode as array of requests (batch creation)
-	var requests []model.CreateRequest
+	var requests []model.ConsentElementCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
 		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
 		return
 	}
 
-	// Validate at least one purpose provided
+	// Validate at least one element provided
 	if len(requests) == 0 {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "at least one purpose must be provided"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "at least one element must be provided"))
 		return
 	}
 
-	// Create purposes in batch (atomic transaction)
-	purposes, serviceErr := h.service.CreatePurposesInBatch(ctx, requests, orgID)
+	// Create elements in batch (atomic transaction)
+	elements, serviceErr := h.service.CreateElementsInBatch(ctx, requests, orgID)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
 	}
 
 	// Convert to response format
-	responses := make([]model.Response, 0, len(purposes))
-	for _, p := range purposes {
-		responses = append(responses, model.Response{
+	responses := make([]model.ConsentElementResponse, 0, len(elements))
+	for _, p := range elements {
+		responses = append(responses, model.ConsentElementResponse{
 			ID:          p.ID,
 			Name:        p.Name,
 			Description: p.Description,
@@ -70,7 +70,7 @@ func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Req
 	// Return response with data wrapper
 	response := map[string]interface{}{
 		"data":    responses,
-		"message": "Consent purposes created successfully",
+		"message": "Consent elements created successfully",
 	}
 
 	w.Header().Set(constants.HeaderContentType, "application/json")
@@ -78,10 +78,10 @@ func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(response)
 }
 
-// getPurpose handles GET /consent-purposes/{purposeId}
-func (h *consentPurposeHandler) getPurpose(w http.ResponseWriter, r *http.Request) {
+// getElement handles GET /consent-elements/{elementId}
+func (h *consentElementHandler) getElement(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	purposeID := r.PathValue("purposeId")
+	elementID := r.PathValue("elementId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
@@ -89,26 +89,26 @@ func (h *consentPurposeHandler) getPurpose(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	purpose, serviceErr := h.service.GetPurpose(ctx, purposeID, orgID)
+	element, serviceErr := h.service.GetElement(ctx, elementID, orgID)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
 	}
 
-	response := model.Response{
-		ID:          purpose.ID,
-		Name:        purpose.Name,
-		Description: purpose.Description,
-		Type:        purpose.Type,
-		Properties:  purpose.Properties,
+	response := model.ConsentElementResponse{
+		ID:          element.ID,
+		Name:        element.Name,
+		Description: element.Description,
+		Type:        element.Type,
+		Properties:  element.Properties,
 	}
 
 	w.Header().Set(constants.HeaderContentType, "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
-// listPurposes handles GET /purposes
-func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Request) {
+// listElements handles GET /consent-elements
+func (h *consentElementHandler) listElements(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
@@ -136,16 +136,16 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 	// Parse optional name filter
 	name := r.URL.Query().Get("name")
 
-	purposes, total, serviceErr := h.service.ListPurposes(ctx, orgID, limit, offset, name)
+	elements, total, serviceErr := h.service.ListElements(ctx, orgID, limit, offset, name)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
 	}
 
 	// Convert to response models
-	purposeResponses := make([]model.Response, 0, len(purposes))
-	for _, p := range purposes {
-		purposeResponses = append(purposeResponses, model.Response{
+	elementResponses := make([]model.ConsentElementResponse, 0, len(elements))
+	for _, p := range elements {
+		elementResponses = append(elementResponses, model.ConsentElementResponse{
 			ID:          p.ID,
 			Name:        p.Name,
 			Description: p.Description,
@@ -156,11 +156,11 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 
 	// Build response with metadata as per swagger spec
 	response := map[string]interface{}{
-		"data": purposeResponses,
+		"data": elementResponses,
 		"metadata": map[string]int{
 			"total":  total,
 			"offset": offset,
-			"count":  len(purposeResponses),
+			"count":  len(elementResponses),
 			"limit":  limit,
 		},
 	}
@@ -169,10 +169,10 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(response)
 }
 
-// updatePurpose handles PUT /consent-purposes/{purposeId}
-func (h *consentPurposeHandler) updatePurpose(w http.ResponseWriter, r *http.Request) {
+// updateElement handles PUT /consent-elements/{elementId}
+func (h *consentElementHandler) updateElement(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	purposeID := r.PathValue("purposeId")
+	elementID := r.PathValue("elementId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	// Validate required headers
@@ -181,34 +181,34 @@ func (h *consentPurposeHandler) updatePurpose(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var req model.UpdateRequest
+	var req model.ConsentElementUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
 		return
 	}
 
-	purpose, serviceErr := h.service.UpdatePurpose(ctx, purposeID, req, orgID)
+	element, serviceErr := h.service.UpdateElement(ctx, elementID, req, orgID)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
 	}
 
-	response := model.Response{
-		ID:          purpose.ID,
-		Name:        purpose.Name,
-		Description: purpose.Description,
-		Type:        purpose.Type,
-		Properties:  purpose.Properties,
+	response := model.ConsentElementResponse{
+		ID:          element.ID,
+		Name:        element.Name,
+		Description: element.Description,
+		Type:        element.Type,
+		Properties:  element.Properties,
 	}
 
 	w.Header().Set(constants.HeaderContentType, "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
-// deletePurpose handles DELETE /consent-purposes/{purposeId}
-func (h *consentPurposeHandler) deletePurpose(w http.ResponseWriter, r *http.Request) {
+// deleteElement handles DELETE /consent-elements/{elementId}
+func (h *consentElementHandler) deleteElement(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	purposeID := r.PathValue("purposeId")
+	elementID := r.PathValue("elementId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
@@ -216,7 +216,7 @@ func (h *consentPurposeHandler) deletePurpose(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if serviceErr := h.service.DeletePurpose(ctx, purposeID, orgID); serviceErr != nil {
+	if serviceErr := h.service.DeleteElement(ctx, elementID, orgID); serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
 	}
@@ -224,8 +224,8 @@ func (h *consentPurposeHandler) deletePurpose(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// validatePurposes handles POST /consent-purposes/validate
-func (h *consentPurposeHandler) validatePurposes(w http.ResponseWriter, r *http.Request) {
+// validateElements handles POST /consent-elements/validate
+func (h *consentElementHandler) validateElements(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
@@ -234,13 +234,13 @@ func (h *consentPurposeHandler) validatePurposes(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var purposeNames []string
-	if err := json.NewDecoder(r.Body).Decode(&purposeNames); err != nil {
+	var elementNames []string
+	if err := json.NewDecoder(r.Body).Decode(&elementNames); err != nil {
 		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
 		return
 	}
 
-	validNames, serviceErr := h.service.ValidatePurposeNames(ctx, orgID, purposeNames)
+	validNames, serviceErr := h.service.ValidateElementNames(ctx, orgID, elementNames)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return

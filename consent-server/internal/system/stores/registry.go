@@ -14,7 +14,7 @@ type StoreRegistry struct {
 	// Store instances with typed interfaces
 	Consent             interfaces.ConsentStore
 	AuthResource        interfaces.AuthResourceStore
-	ConsentPurpose      interfaces.ConsentPurposeStore
+	ConsentElement      interfaces.ConsentElementStore
 	ConsentPurposeGroup interfaces.ConsentPurposeGroupStore
 }
 
@@ -23,14 +23,14 @@ func NewStoreRegistry(
 	dbClient provider.DBClientInterface,
 	consentStore interfaces.ConsentStore,
 	authResourceStore interfaces.AuthResourceStore,
-	consentPurposeStore interfaces.ConsentPurposeStore,
+	consentElementStore interfaces.ConsentElementStore,
 	consentPurposeGroupStore interfaces.ConsentPurposeGroupStore,
 ) *StoreRegistry {
 	return &StoreRegistry{
 		dbClient:            dbClient,
 		Consent:             consentStore,
 		AuthResource:        authResourceStore,
-		ConsentPurpose:      consentPurposeStore,
+		ConsentElement:      consentElementStore,
 		ConsentPurposeGroup: consentPurposeGroupStore,
 	}
 }

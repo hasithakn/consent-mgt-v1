@@ -8,8 +8,8 @@ type ValidationError struct {
 	Message string `json:"message"`
 }
 
-// PurposePropertySpec defines metadata about a property for a purpose type
-type PurposePropertySpec struct {
+// ElementPropertySpec defines metadata about a property for a element type
+type ElementPropertySpec struct {
 	Name        string `json:"name"`
 	Required    bool   `json:"required"`
 	Type        string `json:"type"` // "string", "json", etc.
@@ -17,8 +17,8 @@ type PurposePropertySpec struct {
 	Example     string `json:"example"`
 }
 
-// PurposeTypeHandler defines behavior for a specific consent purpose type
-type PurposeTypeHandler interface {
+// ElementTypeHandler defines behavior for a specific consent element type
+type ElementTypeHandler interface {
 	// GetType returns the type string this handler manages (e.g., "string-type", "json-payload-type", "resource-field-type")
 	GetType() string
 
@@ -32,7 +32,7 @@ type PurposeTypeHandler interface {
 
 	// GetPropertySpec returns the schema/spec for this handler's properties
 	// Useful for documentation and dynamic UI generation
-	GetPropertySpec() []PurposePropertySpec
+	GetPropertySpec() []ElementPropertySpec
 }
 
 // Helper function to validate JSON string

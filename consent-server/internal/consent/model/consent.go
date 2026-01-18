@@ -86,8 +86,8 @@ func (j *JSON) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ConsentPurposeItem represents a single consent purpose with name, value, and selection status
-type ConsentPurposeItem struct {
+// ConsentElementItem represents a single consent purpose with name, value, and selection status
+type ConsentElementItem struct {
 	Name           string                 `json:"name"`
 	Value          interface{}            `json:"value,omitempty"`          // Can be string, object, or array - omitted when nil
 	IsUserApproved *bool                  `json:"isUserApproved,omitempty"` // Optional: defaults to false if not provided

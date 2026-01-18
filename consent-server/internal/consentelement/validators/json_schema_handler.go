@@ -1,17 +1,17 @@
 package validators
 
-// JsonSchemaPurposeTypeHandler handles "json-payload-type" consent purposes
+// JsonSchemaElementTypeHandler handles "json-payload-type" consent elements
 // JSON payload type requires validationSchema property to be present and valid JSON
-type JsonSchemaPurposeTypeHandler struct{}
+type JsonSchemaElementTypeHandler struct{}
 
 // GetType returns the type identifier
-func (h *JsonSchemaPurposeTypeHandler) GetType() string {
+func (h *JsonSchemaElementTypeHandler) GetType() string {
 	return "json-payload-type"
 }
 
 // ValidateProperties validates properties for json-payload-type
 // Mandatory: validationSchema must be present and valid JSON
-func (h *JsonSchemaPurposeTypeHandler) ValidateProperties(properties map[string]string) []ValidationError {
+func (h *JsonSchemaElementTypeHandler) ValidateProperties(properties map[string]string) []ValidationError {
 	var errors []ValidationError
 
 	// validationSchema is MANDATORY
@@ -37,14 +37,14 @@ func (h *JsonSchemaPurposeTypeHandler) ValidateProperties(properties map[string]
 
 // ProcessProperties processes properties for json-payload-type
 // Could normalize JSON, add defaults, etc.
-func (h *JsonSchemaPurposeTypeHandler) ProcessProperties(properties map[string]string) map[string]string {
+func (h *JsonSchemaElementTypeHandler) ProcessProperties(properties map[string]string) map[string]string {
 	// Return as-is, basic processing
 	return properties
 }
 
 // GetPropertySpec returns the property specification for json-payload-type
-func (h *JsonSchemaPurposeTypeHandler) GetPropertySpec() []PurposePropertySpec {
-	return []PurposePropertySpec{
+func (h *JsonSchemaElementTypeHandler) GetPropertySpec() []ElementPropertySpec {
+	return []ElementPropertySpec{
 		{
 			Name:        "validationSchema",
 			Required:    true,
@@ -56,7 +56,7 @@ func (h *JsonSchemaPurposeTypeHandler) GetPropertySpec() []PurposePropertySpec {
 			Name:        "resourcePath",
 			Required:    false,
 			Type:        "string",
-			Description: "Resource path for this purpose",
+			Description: "Resource path for this element",
 			Example:     "/accounts",
 		},
 		{

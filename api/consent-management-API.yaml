@@ -35,12 +35,12 @@ servers:
         default: "3000"
         description: Port number for the Consent Management server.
 tags:
-  - name: Consent
-    description: Provides RESTful endpoints to handle the full lifecycle of consent resources and their associated authorizations. Supports operations such as initiation, retrieval, update, and revocation.
   - name: Consent Elements
     description: Manage element definitions (reference data for categorizing consents). Elements can be created, retrieved, updated, deleted, and validated.
   - name: Consent Purpose
     description: Manage consent purposes. Purposes allow organizing related elements together with mandatory/optional flags for streamlined consent collection.
+  - name: Consent
+    description: Provides RESTful endpoints to handle the full lifecycle of consent resources and their associated authorizations. Supports operations such as initiation, retrieval, update, and revocation.
 paths:
   /consents:
     post:

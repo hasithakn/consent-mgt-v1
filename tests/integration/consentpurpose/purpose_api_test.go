@@ -1,4 +1,4 @@
-package consentpurposegroup
+package consentpurpose
 
 import (
 	"bytes"
@@ -17,40 +17,26 @@ var (
 )
 
 const (
-	testOrgID    = "test-org-purposegroup"
-	testClientID = "test-client-purposegroup"
+	testOrgID    = "test-org-purpose"
+	testClientID = "test-client-purpose"
 )
 
-type PurposeGroupAPITestSuite struct {
+type PurposeAPITestSuite struct {
 	suite.Suite
-	createdGroupIDs   []string
 	createdPurposeIDs []string
+	createdElementIDs []string
 }
 
 // SetupSuite runs once before all tests
-func (ts *PurposeGroupAPITestSuite) SetupSuite() {
-	ts.createdGroupIDs = make([]string, 0)
+func (ts *PurposeAPITestSuite) SetupSuite() {
 	ts.createdPurposeIDs = make([]string, 0)
-	ts.T().Logf("=== ConsentPurposeGroup Test Suite Starting ===")
-	ts.setupTestPurposes()
+	ts.createdElementIDs = make([]string, 0)
+	ts.T().Logf("=== ConsentPurpose Test Suite Starting ===")
+	ts.setupTestElements()
 }
 
 // TearDownSuite runs once after all tests to cleanup
-func (ts *PurposeGroupAPITestSuite) TearDownSuite() {
-	if len(ts.createdGroupIDs) > 0 {
-		ts.T().Logf("=== Cleaning up %d created purpose groups ===", len(ts.createdGroupIDs))
-		successCount := 0
-		failCount := 0
-		for _, id := range ts.createdGroupIDs {
-			if ts.deleteGroupWithCheck(id) {
-				successCount++
-			} else {
-				failCount++
-			}
-		}
-		ts.T().Logf("=== Group cleanup complete: %d deleted, %d failed ===", successCount, failCount)
-	}
-
+func (ts *PurposeAPITestSuite) TearDownSuite() {
 	if len(ts.createdPurposeIDs) > 0 {
 		ts.T().Logf("=== Cleaning up %d created purposes ===", len(ts.createdPurposeIDs))
 		successCount := 0
@@ -65,16 +51,30 @@ func (ts *PurposeGroupAPITestSuite) TearDownSuite() {
 		ts.T().Logf("=== Purpose cleanup complete: %d deleted, %d failed ===", successCount, failCount)
 	}
 
-	ts.T().Logf("=== ConsentPurposeGroup Test Suite Complete ===")
+	if len(ts.createdElementIDs) > 0 {
+		ts.T().Logf("=== Cleaning up %d created elements ===", len(ts.createdElementIDs))
+		successCount := 0
+		failCount := 0
+		for _, id := range ts.createdElementIDs {
+			if ts.deleteElementWithCheck(id) {
+				successCount++
+			} else {
+				failCount++
+			}
+		}
+		ts.T().Logf("=== Element cleanup complete: %d deleted, %d failed ===", successCount, failCount)
+	}
+
+	ts.T().Logf("=== ConsentPurpose Test Suite Complete ===")
 }
 
-func TestPurposeGroupAPITestSuite(t *testing.T) {
-	suite.Run(t, new(PurposeGroupAPITestSuite))
+func TestPurposeAPITestSuite(t *testing.T) {
+	suite.Run(t, new(PurposeAPITestSuite))
 }
 
-// setupTestPurposes creates purposes needed for tests
-func (ts *PurposeGroupAPITestSuite) setupTestPurposes() {
-	purposeNames := []string{
+// setupTestElements creates elements needed for tests
+func (ts *PurposeAPITestSuite) setupTestElements() {
+	elementNames := []string{
 		"test_email",
 		"test_phone",
 		"test_address",
@@ -82,12 +82,12 @@ func (ts *PurposeGroupAPITestSuite) setupTestPurposes() {
 		"test_analytics",
 	}
 
-	for _, name := range purposeNames {
+	for _, name := range elementNames {
 		payload := []map[string]interface{}{
 			{
 				"name":        name,
-				"description": fmt.Sprintf("Test purpose for %s", name),
-				"type":        "string",
+				"description": fmt.Sprintf("Test element for %s", name),
+				"type":        "string-type",
 				"attributes": map[string]string{
 					"resourcePath": fmt.Sprintf("/user/%s", name),
 				},
@@ -95,7 +95,7 @@ func (ts *PurposeGroupAPITestSuite) setupTestPurposes() {
 		}
 
 		reqBody, _ := json.Marshal(payload)
-		httpReq, _ := http.NewRequest("POST", testServerURL+"/api/v1/consent-purposes",
+		httpReq, _ := http.NewRequest("POST", testServerURL+"/api/v1/consent-elements",
 			bytes.NewBuffer(reqBody))
 		httpReq.Header.Set("org-id", testOrgID)
 		httpReq.Header.Set("Content-Type", "application/json")
@@ -103,7 +103,7 @@ func (ts *PurposeGroupAPITestSuite) setupTestPurposes() {
 		client := &http.Client{}
 		resp, err := client.Do(httpReq)
 		if err != nil {
-			ts.T().Logf("ERROR creating test purpose %s: %v", name, err)
+			ts.T().Logf("ERROR creating test element %s: %v", name, err)
 			continue
 		}
 
@@ -117,24 +117,24 @@ func (ts *PurposeGroupAPITestSuite) setupTestPurposes() {
 				} `json:"data"`
 			}
 			if json.Unmarshal(bodyBytes, &createResp) == nil && len(createResp.Data) > 0 {
-				ts.createdPurposeIDs = append(ts.createdPurposeIDs, createResp.Data[0].ID)
-				ts.T().Logf("✓ Created test purpose: %s (ID: %s)", name, createResp.Data[0].ID)
+				ts.createdElementIDs = append(ts.createdElementIDs, createResp.Data[0].ID)
+				ts.T().Logf("✓ Created test element: %s (ID: %s)", name, createResp.Data[0].ID)
 			} else {
-				ts.T().Logf("ERROR: Failed to parse purpose response for %s", name)
+				ts.T().Logf("ERROR: Failed to parse element response for %s", name)
 			}
 		} else {
-			ts.T().Logf("ERROR: Failed to create purpose %s - Status: %d, Body: %s", name, resp.StatusCode, string(bodyBytes))
+			ts.T().Logf("ERROR: Failed to create element %s - Status: %d, Body: %s", name, resp.StatusCode, string(bodyBytes))
 		}
 	}
 
-	if len(ts.createdPurposeIDs) == 0 {
-		ts.T().Fatal("Failed to create any test purposes - tests cannot continue")
+	if len(ts.createdElementIDs) == 0 {
+		ts.T().Fatal("Failed to create any test elements - tests cannot continue")
 	}
-	ts.T().Logf("Successfully created %d/%d test purposes", len(ts.createdPurposeIDs), len(purposeNames))
+	ts.T().Logf("Successfully created %d/%d test elements", len(ts.createdElementIDs), len(elementNames))
 }
 
-// createGroup creates a purpose group and returns the response
-func (ts *PurposeGroupAPITestSuite) createGroup(payload interface{}) (*http.Response, []byte) {
+// createPurpose creates a consent purpose and returns the response
+func (ts *PurposeAPITestSuite) createPurpose(payload interface{}) (*http.Response, []byte) {
 	var reqBody []byte
 	var err error
 
@@ -145,7 +145,7 @@ func (ts *PurposeGroupAPITestSuite) createGroup(payload interface{}) (*http.Resp
 		ts.Require().NoError(err)
 	}
 
-	httpReq, _ := http.NewRequest("POST", testServerURL+"/api/v1/consent-purpose-groups",
+	httpReq, _ := http.NewRequest("POST", testServerURL+"/api/v1/consent-purposes",
 		bytes.NewBuffer(reqBody))
 	httpReq.Header.Set("org-id", testOrgID)
 	httpReq.Header.Set("TPP-client-id", testClientID)
@@ -162,10 +162,10 @@ func (ts *PurposeGroupAPITestSuite) createGroup(payload interface{}) (*http.Resp
 	return resp, bodyBytes
 }
 
-// getGroup retrieves a purpose group by ID
-func (ts *PurposeGroupAPITestSuite) getGroup(groupID string) (*http.Response, []byte) {
+// getPurpose retrieves a consent purpose by ID
+func (ts *PurposeAPITestSuite) getPurpose(purposeID string) (*http.Response, []byte) {
 	httpReq, _ := http.NewRequest("GET",
-		fmt.Sprintf("%s/api/v1/consent-purpose-groups/%s", testServerURL, groupID),
+		fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID),
 		nil)
 	httpReq.Header.Set("org-id", testOrgID)
 
@@ -180,9 +180,9 @@ func (ts *PurposeGroupAPITestSuite) getGroup(groupID string) (*http.Response, []
 	return resp, bodyBytes
 }
 
-// listGroups lists purpose groups with optional filters
-func (ts *PurposeGroupAPITestSuite) listGroups(name string, clientIDs []string, purposeNames []string, limit, offset int) (*http.Response, []byte) {
-	url := fmt.Sprintf("%s/api/v1/consent-purpose-groups?limit=%d&offset=%d", testServerURL, limit, offset)
+// listPurposes lists consent purposes with optional filters
+func (ts *PurposeAPITestSuite) listPurposes(name string, clientIDs []string, purposeNames []string, limit, offset int) (*http.Response, []byte) {
+	url := fmt.Sprintf("%s/api/v1/consent-purposes?limit=%d&offset=%d", testServerURL, limit, offset)
 
 	if name != "" {
 		url += fmt.Sprintf("&name=%s", name)
@@ -210,8 +210,8 @@ func (ts *PurposeGroupAPITestSuite) listGroups(name string, clientIDs []string, 
 	return resp, bodyBytes
 }
 
-// updateGroup updates a purpose group
-func (ts *PurposeGroupAPITestSuite) updateGroup(groupID string, payload interface{}) (*http.Response, []byte) {
+// updatePurpose updates a consent purpose
+func (ts *PurposeAPITestSuite) updatePurpose(purposeID string, payload interface{}) (*http.Response, []byte) {
 	var reqBody []byte
 	var err error
 
@@ -223,7 +223,7 @@ func (ts *PurposeGroupAPITestSuite) updateGroup(groupID string, payload interfac
 	}
 
 	httpReq, _ := http.NewRequest("PUT",
-		fmt.Sprintf("%s/api/v1/consent-purpose-groups/%s", testServerURL, groupID),
+		fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID),
 		bytes.NewBuffer(reqBody))
 	httpReq.Header.Set("org-id", testOrgID)
 	httpReq.Header.Set("TPP-client-id", testClientID)
@@ -240,10 +240,10 @@ func (ts *PurposeGroupAPITestSuite) updateGroup(groupID string, payload interfac
 	return resp, bodyBytes
 }
 
-// deleteGroup deletes a purpose group
-func (ts *PurposeGroupAPITestSuite) deleteGroup(groupID string) (*http.Response, []byte) {
+// deletePurpose deletes a consent purpose
+func (ts *PurposeAPITestSuite) deletePurpose(purposeID string) (*http.Response, []byte) {
 	httpReq, _ := http.NewRequest("DELETE",
-		fmt.Sprintf("%s/api/v1/consent-purpose-groups/%s", testServerURL, groupID),
+		fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID),
 		nil)
 	httpReq.Header.Set("org-id", testOrgID)
 
@@ -258,42 +258,42 @@ func (ts *PurposeGroupAPITestSuite) deleteGroup(groupID string) (*http.Response,
 	return resp, bodyBytes
 }
 
-// trackGroup tracks a created group for cleanup
-func (ts *PurposeGroupAPITestSuite) trackGroup(groupID string) {
-	ts.createdGroupIDs = append(ts.createdGroupIDs, groupID)
-}
-
-// deleteGroupWithCheck attempts to delete a group and returns success status
-func (ts *PurposeGroupAPITestSuite) deleteGroupWithCheck(groupID string) bool {
-	resp, body := ts.deleteGroup(groupID)
-	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound {
-		ts.T().Logf("Deleted group: %s", groupID)
-		return true
-	}
-	ts.T().Logf("Failed to delete group %s: %d - %s", groupID, resp.StatusCode, body)
-	return false
+// trackPurpose tracks a created purpose for cleanup
+func (ts *PurposeAPITestSuite) trackPurpose(purposeID string) {
+	ts.createdPurposeIDs = append(ts.createdPurposeIDs, purposeID)
 }
 
 // deletePurposeWithCheck attempts to delete a purpose and returns success status
-func (ts *PurposeGroupAPITestSuite) deletePurposeWithCheck(purposeID string) bool {
+func (ts *PurposeAPITestSuite) deletePurposeWithCheck(purposeID string) bool {
+	resp, body := ts.deletePurpose(purposeID)
+	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound {
+		ts.T().Logf("Deleted purpose: %s", purposeID)
+		return true
+	}
+	ts.T().Logf("Failed to delete purpose %s: %d - %s", purposeID, resp.StatusCode, body)
+	return false
+}
+
+// deleteElementWithCheck attempts to delete an element and returns success status
+func (ts *PurposeAPITestSuite) deleteElementWithCheck(elementID string) bool {
 	httpReq, _ := http.NewRequest("DELETE",
-		fmt.Sprintf("%s/api/v1/consent-purposes/%s", testServerURL, purposeID),
+		fmt.Sprintf("%s/api/v1/consent-elements/%s", testServerURL, elementID),
 		nil)
 	httpReq.Header.Set("org-id", testOrgID)
 
 	client := &http.Client{}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		ts.T().Logf("Failed to delete purpose %s: %v", purposeID, err)
+		ts.T().Logf("Failed to delete element %s: %v", elementID, err)
 		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound {
-		ts.T().Logf("Deleted purpose: %s", purposeID)
+		ts.T().Logf("Deleted element: %s", elementID)
 		return true
 	}
-	ts.T().Logf("Failed to delete purpose %s: %d", purposeID, resp.StatusCode)
+	ts.T().Logf("Failed to delete element %s: %d", elementID, resp.StatusCode)
 	return false
 }
 

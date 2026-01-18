@@ -6,7 +6,7 @@ import (
 	authResourceModel "github.com/wso2/consent-management-api/internal/authresource/model"
 	consentModel "github.com/wso2/consent-management-api/internal/consent/model"
 	consentElementModel "github.com/wso2/consent-management-api/internal/consentelement/model"
-	consentPurposeGroupModel "github.com/wso2/consent-management-api/internal/consentpurposegroup/model"
+	consentConsentPurposeModel "github.com/wso2/consent-management-api/internal/consentpurpose/model"
 	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 )
 
@@ -28,14 +28,14 @@ type ConsentStore interface {
 	CreateAttributes(tx dbmodel.TxInterface, attributes []consentModel.ConsentAttribute) error
 	DeleteAttributesByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
 	CreateStatusAudit(tx dbmodel.TxInterface, audit *consentModel.ConsentStatusAudit) error
-	// Purpose Group Consent mapping methods
-	CreatePurposeGroupConsent(tx dbmodel.TxInterface, consentID, groupID, orgID string) error
+	// Purpose Consent mapping methods
+	CreateConsentPurposeConsent(tx dbmodel.TxInterface, consentID, purposeID, orgID string) error
 	CreatePurposeApproval(tx dbmodel.TxInterface, approval *consentModel.ConsentPurposeApprovalRecord) error
-	GetPurposeGroupsByConsentID(ctx context.Context, consentID, orgID string) ([]consentModel.ConsentPurposeGroupMapping, error)
+	GetConsentPurposesByConsentID(ctx context.Context, consentID, orgID string) ([]consentModel.ConsentPurposeMapping, error)
 	GetPurposeApprovalsByConsentID(ctx context.Context, consentID, orgID string) ([]consentModel.ConsentPurposeApprovalRecord, error)
-	DeletePurposeGroupsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
+	DeleteConsentPurposesByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
 	DeletePurposeApprovalsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
-	CheckGroupUsedInConsents(ctx context.Context, groupID, orgID string) (bool, error)
+	CheckPurposeUsedInConsents(ctx context.Context, purposeID, orgID string) (bool, error)
 }
 
 // AuthResourceStore defines the interface for authorization resource data operations
@@ -72,19 +72,19 @@ type ConsentElementStore interface {
 	DeleteMappingsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error
 }
 
-// ConsentPurposeGroupStore defines the interface for purpose group data operations
-type ConsentPurposeGroupStore interface {
-	CreateGroup(tx dbmodel.TxInterface, group *consentPurposeGroupModel.PurposeGroup) error
-	GetGroupByID(ctx context.Context, groupID, orgID string) (*consentPurposeGroupModel.PurposeGroup, error)
-	GetGroupByName(ctx context.Context, name, orgID string) (*consentPurposeGroupModel.PurposeGroup, error)
-	ListGroups(ctx context.Context, orgID, name string, clientIDs []string, purposeNames []string, offset, limit int) ([]consentPurposeGroupModel.PurposeGroup, int, error)
-	UpdateGroup(tx dbmodel.TxInterface, group *consentPurposeGroupModel.PurposeGroup) error
-	DeleteGroup(tx dbmodel.TxInterface, groupID, orgID string) error
-	CheckGroupNameExists(ctx context.Context, name, clientID, orgID string, excludeGroupID *string) (bool, error)
-	LinkPurposeToGroup(tx dbmodel.TxInterface, groupID, purposeID, orgID string, isMandatory bool) error
-	GetGroupPurposes(ctx context.Context, groupID, orgID string) ([]consentPurposeGroupModel.PurposeGroupPurpose, error)
-	DeleteGroupPurposes(tx dbmodel.TxInterface, groupID, orgID string) error
+// ConsentPurposeStore defines the interface for purpose data operations
+type ConsentPurposeStore interface {
+	CreatePurpose(tx dbmodel.TxInterface, purpose *consentConsentPurposeModel.ConsentPurpose) error
+	GetPurposeByID(ctx context.Context, purposeID, orgID string) (*consentConsentPurposeModel.ConsentPurpose, error)
+	GetPurposeByName(ctx context.Context, name, orgID string) (*consentConsentPurposeModel.ConsentPurpose, error)
+	ListPurposes(ctx context.Context, orgID, name string, clientIDs []string, purposeNames []string, offset, limit int) ([]consentConsentPurposeModel.ConsentPurpose, int, error)
+	UpdatePurpose(tx dbmodel.TxInterface, purpose *consentConsentPurposeModel.ConsentPurpose) error
+	DeletePurpose(tx dbmodel.TxInterface, purposeID, orgID string) error
+	CheckPurposeNameExists(ctx context.Context, name, clientID, orgID string, excludePurposeID *string) (bool, error)
+	LinkElementToPurpose(tx dbmodel.TxInterface, purposeID, elementID, orgID string, isMandatory bool) error
+	GetPurposeElements(ctx context.Context, purposeID, orgID string) ([]consentConsentPurposeModel.PurposeElement, error)
+	DeletePurposeElements(tx dbmodel.TxInterface, purposeID, orgID string) error
 	GetPurposeIDByName(ctx context.Context, purposeName, orgID string) (string, error)
 	ValidatePurposeNames(ctx context.Context, purposeNames []string, orgID string) (map[string]string, error)
-	IsPurposeUsedInGroups(ctx context.Context, purposeID, orgID string) (bool, error)
+	IsElementUsedInPurposes(ctx context.Context, elementID, orgID string) (bool, error)
 }

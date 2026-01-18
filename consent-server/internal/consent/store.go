@@ -101,66 +101,66 @@ var (
 		Query: "", // Built dynamically
 	}
 
-	// Purpose Group Consent queries
-	QueryCreatePurposeGroupConsent = dbmodel.DBQuery{
-		ID:    "CREATE_PURPOSE_GROUP_CONSENT",
-		Query: "INSERT INTO CONSENT_PURPOSE_GROUP_CONSENT (CONSENT_ID, GROUP_ID, ORG_ID) VALUES (?, ?, ?)",
+	// Purpose Consent queries
+	QueryCreateConsentPurposeConsent = dbmodel.DBQuery{
+		ID:    "CREATE_CONSENT_PURPOSE_CONSENT",
+		Query: "INSERT INTO PURPOSE_CONSENT_MAPPING (CONSENT_ID, PURPOSE_ID, ORG_ID) VALUES (?, ?, ?)",
 	}
 
-	QueryGetPurposeGroupsByConsentID = dbmodel.DBQuery{
-		ID: "GET_PURPOSE_GROUPS_BY_CONSENT_ID",
+	QueryGetConsentPurposesByConsentID = dbmodel.DBQuery{
+		ID: "GET_PURPOSES_BY_CONSENT_ID",
 		Query: `
 			SELECT 
 				pgc.CONSENT_ID,
-				pgc.GROUP_ID,
-				pg.NAME as GROUP_NAME
-			FROM CONSENT_PURPOSE_GROUP_CONSENT pgc
-			JOIN CONSENT_PURPOSE_GROUP pg ON pgc.GROUP_ID = pg.ID AND pgc.ORG_ID = pg.ORG_ID
+				pgc.PURPOSE_ID,
+				pg.NAME as PURPOSE_NAME
+			FROM PURPOSE_CONSENT_MAPPING pgc
+			JOIN CONSENT_PURPOSE pg ON pgc.PURPOSE_ID = pg.ID AND pgc.ORG_ID = pg.ORG_ID
 			WHERE pgc.CONSENT_ID = ? AND pgc.ORG_ID = ?
 			ORDER BY pg.NAME
 		`,
 	}
 
-	QueryCheckGroupUsedInConsents = dbmodel.DBQuery{
-		ID:    "CHECK_GROUP_USED_IN_CONSENTS",
-		Query: "SELECT COUNT(*) as count FROM CONSENT_PURPOSE_GROUP_CONSENT WHERE GROUP_ID = ? AND ORG_ID = ?",
+	QueryCheckPurposeUsedInConsents = dbmodel.DBQuery{
+		ID:    "CHECK_PURPOSE_USED_IN_CONSENTS",
+		Query: "SELECT COUNT(*) as count FROM PURPOSE_CONSENT_MAPPING WHERE PURPOSE_ID = ? AND ORG_ID = ?",
 	}
 
-	QueryCreatePurposeApproval = dbmodel.DBQuery{
-		ID:    "CREATE_PURPOSE_APPROVAL",
-		Query: "INSERT INTO CONSENT_PURPOSE_APPROVAL (CONSENT_ID, GROUP_ID, PURPOSE_ID, IS_USER_APPROVED, VALUE, ORG_ID) VALUES (?, ?, ?, ?, ?, ?)",
+	QueryCreateElementApproval = dbmodel.DBQuery{
+		ID:    "CREATE_ELEMENT_APPROVAL",
+		Query: "INSERT INTO CONSENT_ELEMENT_APPROVAL (CONSENT_ID, PURPOSE_ID, ELEMENT_ID, IS_USER_APPROVED, VALUE, ORG_ID) VALUES (?, ?, ?, ?, ?, ?)",
 	}
 
-	QueryGetPurposeApprovalsByConsentID = dbmodel.DBQuery{
-		ID: "GET_PURPOSE_APPROVALS_BY_CONSENT_ID",
+	QueryGetElementApprovalsByConsentID = dbmodel.DBQuery{
+		ID: "GET_ELEMENT_APPROVALS_BY_CONSENT_ID",
 		Query: `
 			SELECT 
 				pa.CONSENT_ID,
-				pa.GROUP_ID,
-				pg.NAME as GROUP_NAME,
 				pa.PURPOSE_ID,
-				p.NAME as PURPOSE_NAME,
+				pg.NAME as PURPOSE_NAME,
+				pa.ELEMENT_ID,
+				p.NAME as ELEMENT_NAME,
 				pa.IS_USER_APPROVED,
 				pa.VALUE,
 				gm.IS_MANDATORY
-			FROM CONSENT_PURPOSE_APPROVAL pa
-		JOIN CONSENT_ELEMENT p ON pa.PURPOSE_ID = p.ID AND pa.ORG_ID = p.ORG_ID
-		JOIN CONSENT_PURPOSE_GROUP pg ON pa.GROUP_ID = pg.ID AND pa.ORG_ID = pg.ORG_ID
-		JOIN CONSENT_PURPOSE_ELEMENT_MAPPING gm ON pa.GROUP_ID = gm.GROUP_ID 
-			AND pa.PURPOSE_ID = gm.ELEMENT_ID AND pa.ORG_ID = gm.ORG_ID
+			FROM CONSENT_ELEMENT_APPROVAL pa
+		JOIN CONSENT_ELEMENT p ON pa.ELEMENT_ID = p.ID AND pa.ORG_ID = p.ORG_ID
+		JOIN CONSENT_PURPOSE pg ON pa.PURPOSE_ID = pg.ID AND pa.ORG_ID = pg.ORG_ID
+		JOIN PURPOSE_ELEMENT_MAPPING gm ON pa.PURPOSE_ID = gm.PURPOSE_ID 
+			AND pa.ELEMENT_ID = gm.ELEMENT_ID AND pa.ORG_ID = gm.ORG_ID
 			WHERE pa.CONSENT_ID = ? AND pa.ORG_ID = ?
 			ORDER BY pg.NAME, p.NAME
 		`,
 	}
 
-	QueryDeletePurposeGroupsByConsentID = dbmodel.DBQuery{
-		ID:    "DELETE_PURPOSE_GROUPS_BY_CONSENT_ID",
-		Query: "DELETE FROM CONSENT_PURPOSE_GROUP_CONSENT WHERE CONSENT_ID = ? AND ORG_ID = ?",
+	QueryDeleteConsentPurposesByConsentID = dbmodel.DBQuery{
+		ID:    "DELETE_PURPOSES_BY_CONSENT_ID",
+		Query: "DELETE FROM PURPOSE_CONSENT_MAPPING WHERE CONSENT_ID = ? AND ORG_ID = ?",
 	}
 
-	QueryDeletePurposeApprovalsByConsentID = dbmodel.DBQuery{
-		ID:    "DELETE_PURPOSE_APPROVALS_BY_CONSENT_ID",
-		Query: "DELETE FROM CONSENT_PURPOSE_APPROVAL WHERE CONSENT_ID = ? AND ORG_ID = ?",
+	QueryDeleteElementApprovalsByConsentID = dbmodel.DBQuery{
+		ID:    "DELETE_ELEMENT_APPROVALS_BY_CONSENT_ID",
+		Query: "DELETE FROM CONSENT_ELEMENT_APPROVAL WHERE CONSENT_ID = ? AND ORG_ID = ?",
 	}
 )
 
@@ -719,15 +719,15 @@ func mapToStatusAudit(row map[string]interface{}) *model.ConsentStatusAudit {
 	return audit
 }
 
-// CreatePurposeGroupConsent links a consent to a purpose group
-func (s *store) CreatePurposeGroupConsent(tx dbmodel.TxInterface, consentID, groupID, orgID string) error {
-	_, err := tx.Exec(QueryCreatePurposeGroupConsent.Query, consentID, groupID, orgID)
+// CreateConsentPurposeConsent links a consent to a purpose
+func (s *store) CreateConsentPurposeConsent(tx dbmodel.TxInterface, consentID, purposeID, orgID string) error {
+	_, err := tx.Exec(QueryCreateConsentPurposeConsent.Query, consentID, purposeID, orgID)
 	return err
 }
 
-// CheckGroupUsedInConsents checks if a purpose group is used in any consents
-func (s *store) CheckGroupUsedInConsents(ctx context.Context, groupID, orgID string) (bool, error) {
-	rows, err := s.dbClient.Query(QueryCheckGroupUsedInConsents, groupID, orgID)
+// CheckPurposeUsedInConsents checks if a purpose is used in any consents
+func (s *store) CheckPurposeUsedInConsents(ctx context.Context, purposeID, orgID string) (bool, error) {
+	rows, err := s.dbClient.Query(QueryCheckPurposeUsedInConsents, purposeID, orgID)
 	if err != nil {
 		return false, err
 	}
@@ -748,19 +748,19 @@ func (s *store) CheckGroupUsedInConsents(ctx context.Context, groupID, orgID str
 	return count > 0, nil
 }
 
-// GetPurposeGroupsByConsentID retrieves all purpose group mappings for a consent
-func (s *store) GetPurposeGroupsByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentPurposeGroupMapping, error) {
-	rows, err := s.dbClient.Query(QueryGetPurposeGroupsByConsentID, consentID, orgID)
+// GetConsentPurposesByConsentID retrieves all purpose mappings for a consent
+func (s *store) GetConsentPurposesByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentPurposeMapping, error) {
+	rows, err := s.dbClient.Query(QueryGetConsentPurposesByConsentID, consentID, orgID)
 	if err != nil {
 		return nil, err
 	}
 
-	mappings := make([]model.ConsentPurposeGroupMapping, 0)
+	mappings := make([]model.ConsentPurposeMapping, 0)
 	for _, row := range rows {
-		mapping := model.ConsentPurposeGroupMapping{
-			ConsentID: getString(row, "consent_id"),
-			GroupID:   getString(row, "group_id"),
-			GroupName: getString(row, "group_name"),
+		mapping := model.ConsentPurposeMapping{
+			ConsentID:   getString(row, "consent_id"),
+			PurposeID:   getString(row, "purpose_id"),
+			PurposeName: getString(row, "purpose_name"),
 		}
 		mappings = append(mappings, mapping)
 	}
@@ -770,10 +770,10 @@ func (s *store) GetPurposeGroupsByConsentID(ctx context.Context, consentID, orgI
 
 // CreatePurposeApproval creates a purpose approval record
 func (s *store) CreatePurposeApproval(tx dbmodel.TxInterface, approval *model.ConsentPurposeApprovalRecord) error {
-	_, err := tx.Exec(QueryCreatePurposeApproval.Query,
+	_, err := tx.Exec(QueryCreateElementApproval.Query,
 		approval.ConsentID,
-		approval.GroupID,
 		approval.PurposeID,
+		approval.ElementID,
 		approval.IsUserApproved,
 		approval.Value, // JSON string or nil
 		approval.OrgID,
@@ -781,9 +781,9 @@ func (s *store) CreatePurposeApproval(tx dbmodel.TxInterface, approval *model.Co
 	return err
 }
 
-// GetPurposeApprovalsByConsentID retrieves all purpose approvals for a consent, grouped by purpose group
+// GetPurposeApprovalsByConsentID retrieves all purpose approvals for a consent, grouped by purpose
 func (s *store) GetPurposeApprovalsByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentPurposeApprovalRecord, error) {
-	rows, err := s.dbClient.Query(QueryGetPurposeApprovalsByConsentID, consentID, orgID)
+	rows, err := s.dbClient.Query(QueryGetElementApprovalsByConsentID, consentID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -792,10 +792,10 @@ func (s *store) GetPurposeApprovalsByConsentID(ctx context.Context, consentID, o
 	for _, row := range rows {
 		approval := model.ConsentPurposeApprovalRecord{
 			ConsentID:      getString(row, "consent_id"),
-			GroupID:        getString(row, "group_id"),
-			GroupName:      getString(row, "group_name"),
 			PurposeID:      getString(row, "purpose_id"),
 			PurposeName:    getString(row, "purpose_name"),
+			ElementID:      getString(row, "element_id"),
+			ElementName:    getString(row, "element_name"),
 			IsUserApproved: getBool(row, "is_user_approved"),
 			IsMandatory:    getBool(row, "is_mandatory"),
 			Value:          getStringPointer(row, "value"),
@@ -807,15 +807,15 @@ func (s *store) GetPurposeApprovalsByConsentID(ctx context.Context, consentID, o
 	return approvals, nil
 }
 
-// DeletePurposeGroupsByConsentID deletes all purpose group mappings for a consent
-func (s *store) DeletePurposeGroupsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
-	_, err := tx.Exec(QueryDeletePurposeGroupsByConsentID.Query, consentID, orgID)
+// DeleteConsentPurposesByConsentID deletes all purpose mappings for a consent
+func (s *store) DeleteConsentPurposesByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
+	_, err := tx.Exec(QueryDeleteConsentPurposesByConsentID.Query, consentID, orgID)
 	return err
 }
 
 // DeletePurposeApprovalsByConsentID deletes all purpose approval records for a consent
 func (s *store) DeletePurposeApprovalsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
-	_, err := tx.Exec(QueryDeletePurposeApprovalsByConsentID.Query, consentID, orgID)
+	_, err := tx.Exec(QueryDeleteElementApprovalsByConsentID.Query, consentID, orgID)
 	return err
 }
 

@@ -6,7 +6,7 @@ import (
 	"github.com/wso2/consent-management-api/internal/authresource"
 	"github.com/wso2/consent-management-api/internal/consent"
 	"github.com/wso2/consent-management-api/internal/consentelement"
-	"github.com/wso2/consent-management-api/internal/consentpurposegroup"
+	"github.com/wso2/consent-management-api/internal/consentpurpose"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
 	"github.com/wso2/consent-management-api/internal/system/log"
 	"github.com/wso2/consent-management-api/internal/system/stores"
@@ -25,7 +25,7 @@ func registerServices(
 		consent.NewConsentStore(dbClient),
 		authresource.NewAuthResourceStore(dbClient),
 		consentelement.NewConsentElementStore(dbClient),
-		consentpurposegroup.NewPurposeGroupStore(dbClient),
+		consentpurpose.NewPurposeStore(dbClient),
 	)
 	logger.Info("Store Registry initialized with all stores")
 
@@ -36,8 +36,8 @@ func registerServices(
 	consentelement.Initialize(mux, storeRegistry)
 	logger.Info("ConsentPurpose module initialized")
 
-	consentpurposegroup.Initialize(mux, storeRegistry)
-	logger.Info("ConsentPurposeGroup module initialized")
+	consentpurpose.Initialize(mux, storeRegistry)
+	logger.Info("ConsentPurpose module initialized")
 
 	consent.Initialize(mux, storeRegistry)
 	logger.Info("Consent module initialized")

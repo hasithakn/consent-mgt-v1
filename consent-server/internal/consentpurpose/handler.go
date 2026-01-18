@@ -1,4 +1,4 @@
-package consentpurposegroup
+package consentpurpose
 
 import (
 	"encoding/json"
@@ -6,26 +6,26 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/wso2/consent-management-api/internal/consentpurposegroup/model"
+	"github.com/wso2/consent-management-api/internal/consentpurpose/model"
 	"github.com/wso2/consent-management-api/internal/system/constants"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
 	"github.com/wso2/consent-management-api/internal/system/utils"
 )
 
-// consentPurposeGroupHandler handles HTTP requests for purpose groups
-type consentPurposeGroupHandler struct {
-	service ConsentPurposeGroupService
+// consentPurposeHandler handles HTTP requests for consent purposes
+type consentPurposeHandler struct {
+	service ConsentPurposeService
 }
 
-// newConsentPurposeGroupHandler creates a new purpose group handler
-func newConsentPurposeGroupHandler(service ConsentPurposeGroupService) *consentPurposeGroupHandler {
-	return &consentPurposeGroupHandler{
+// newConsentPurposeHandler creates a new consent purpose handler
+func newConsentPurposeHandler(service ConsentPurposeService) *consentPurposeHandler {
+	return &consentPurposeHandler{
 		service: service,
 	}
 }
 
-// createPurposeGroup handles POST /consent-purpose-groups
-func (h *consentPurposeGroupHandler) createPurposeGroup(w http.ResponseWriter, r *http.Request) {
+// createPurpose handles POST /consent-purposes
+func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
 	clientID := r.Header.Get(constants.HeaderTPPClientID)
@@ -47,25 +47,25 @@ func (h *consentPurposeGroupHandler) createPurposeGroup(w http.ResponseWriter, r
 		return
 	}
 
-	// Create purpose group
-	group, serviceErr := h.service.CreatePurposeGroup(ctx, req, orgID, clientID)
+	// Create consent purpose
+	purpose, serviceErr := h.service.CreatePurpose(ctx, req, orgID, clientID)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
 	}
 
 	// Return response
-	response := group.ToResponse()
+	response := purpose.ToResponse()
 	w.Header().Set(constants.HeaderContentType, "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
 }
 
-// getPurposeGroup handles GET /consent-purpose-groups/{groupId}
-func (h *consentPurposeGroupHandler) getPurposeGroup(w http.ResponseWriter, r *http.Request) {
+// getPurpose handles GET /consent-purposes/{purposeId}
+func (h *consentPurposeHandler) getPurpose(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
-	groupID := r.PathValue("groupId")
+	purposeID := r.PathValue("purposeId")
 
 	// Validate required headers
 	if orgID == "" {
@@ -73,27 +73,27 @@ func (h *consentPurposeGroupHandler) getPurposeGroup(w http.ResponseWriter, r *h
 		return
 	}
 
-	if groupID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "groupId is required"))
+	if purposeID == "" {
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "purposeId is required"))
 		return
 	}
 
-	// Get purpose group
-	group, serviceErr := h.service.GetPurposeGroup(ctx, groupID, orgID)
+	// Get consent purpose
+	purpose, serviceErr := h.service.GetPurpose(ctx, purposeID, orgID)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
 	}
 
 	// Return response
-	response := group.ToResponse()
+	response := purpose.ToResponse()
 	w.Header().Set(constants.HeaderContentType, "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
 
-// listPurposeGroups handles GET /consent-purpose-groups
-func (h *consentPurposeGroupHandler) listPurposeGroups(w http.ResponseWriter, r *http.Request) {
+// listPurposes handles GET /consent-purposes
+func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
@@ -144,17 +144,17 @@ func (h *consentPurposeGroupHandler) listPurposeGroups(w http.ResponseWriter, r 
 		}
 	}
 
-	// List purpose groups
-	groups, total, serviceErr := h.service.ListPurposeGroups(ctx, orgID, name, clientIDs, purposeNames, offset, limit)
+	// List consent purposes
+	purposes, total, serviceErr := h.service.ListPurposes(ctx, orgID, name, clientIDs, purposeNames, offset, limit)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
 	}
 
 	// Convert to response format
-	responses := make([]model.Response, 0, len(groups))
-	for _, g := range groups {
-		responses = append(responses, g.ToResponse())
+	responses := make([]model.Response, 0, len(purposes))
+	for _, p := range purposes {
+		responses = append(responses, p.ToResponse())
 	}
 
 	// Build response with pagination metadata
@@ -173,12 +173,12 @@ func (h *consentPurposeGroupHandler) listPurposeGroups(w http.ResponseWriter, r 
 	json.NewEncoder(w).Encode(response)
 }
 
-// updatePurposeGroup handles PUT /consent-purpose-groups/{groupId}
-func (h *consentPurposeGroupHandler) updatePurposeGroup(w http.ResponseWriter, r *http.Request) {
+// updatePurpose handles PUT /consent-purposes/{purposeId}
+func (h *consentPurposeHandler) updatePurpose(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
 	clientID := r.Header.Get(constants.HeaderTPPClientID)
-	groupID := r.PathValue("groupId")
+	purposeID := r.PathValue("purposeId")
 
 	// Validate required headers and parameters
 	if orgID == "" {
@@ -189,8 +189,8 @@ func (h *consentPurposeGroupHandler) updatePurposeGroup(w http.ResponseWriter, r
 		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "TPP-client-id header is required"))
 		return
 	}
-	if groupID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "groupId is required"))
+	if purposeID == "" {
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "purposeId is required"))
 		return
 	}
 
@@ -201,38 +201,38 @@ func (h *consentPurposeGroupHandler) updatePurposeGroup(w http.ResponseWriter, r
 		return
 	}
 
-	// Update purpose group
-	group, serviceErr := h.service.UpdatePurposeGroup(ctx, groupID, req, orgID, clientID)
+	// Update consent purpose
+	purpose, serviceErr := h.service.UpdatePurpose(ctx, purposeID, req, orgID, clientID)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
 	}
 
 	// Return response
-	response := group.ToResponse()
+	response := purpose.ToResponse()
 	w.Header().Set(constants.HeaderContentType, "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
 
-// deletePurposeGroup handles DELETE /consent-purpose-groups/{groupId}
-func (h *consentPurposeGroupHandler) deletePurposeGroup(w http.ResponseWriter, r *http.Request) {
+// deletePurpose handles DELETE /consent-purposes/{purposeId}
+func (h *consentPurposeHandler) deletePurpose(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
-	groupID := r.PathValue("groupId")
+	purposeID := r.PathValue("purposeId")
 
 	// Validate required headers and parameters
 	if orgID == "" {
 		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "org-id header is required"))
 		return
 	}
-	if groupID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "groupId is required"))
+	if purposeID == "" {
+		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "purposeId is required"))
 		return
 	}
 
-	// Delete purpose group
-	if serviceErr := h.service.DeletePurposeGroup(ctx, groupID, orgID); serviceErr != nil {
+	// Delete consent purpose
+	if serviceErr := h.service.DeletePurpose(ctx, purposeID, orgID); serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
 	}

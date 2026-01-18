@@ -64,17 +64,17 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
 	}
 
-	// HANDLE PURPOSE GROUPS (validate and resolve all purposes)
-	var resolvedPurposeGroups []model.ConsentPurposeGroupCreateRequest
-	if len(createReq.PurposeGroups) > 0 {
+	// HANDLE PURPOSES (validate and resolve all purposes)
+	var resolvedPurposes []model.ConsentPurposeCreateRequest
+	if len(createReq.Purposes) > 0 {
 		var err error
-		resolvedPurposeGroups, err = consentService.validatePurposeGroups(ctx, createReq.PurposeGroups, clientID, orgID)
+		resolvedPurposes, err = consentService.validatePurposes(ctx, createReq.Purposes, clientID, orgID)
 		if err != nil {
-			logger.Error("Purpose group validation failed", log.Error(err))
+			logger.Error("Purpose validation failed", log.Error(err))
 			return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
 		}
-		logger.Debug("Purpose groups validated and resolved",
-			log.Int("group_count", len(resolvedPurposeGroups)))
+		logger.Debug("Purposes validated and resolved",
+			log.Int("purpose_count", len(resolvedPurposes)))
 	}
 
 	// Extract auth statuses
@@ -201,22 +201,22 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 		})
 	}
 
-	// Add purpose group and approval records
-	for _, pg := range resolvedPurposeGroups {
-		// Link consent to purpose group
-		groupID := pg.GroupID
+	// Add purpose and approval records
+	for _, pg := range resolvedPurposes {
+		// Link consent to purpose
+		purposeID := pg.PurposeID
 		queries = append(queries, func(tx dbmodel.TxInterface) error {
-			return consentStore.CreatePurposeGroupConsent(tx, consentID, groupID, orgID)
+			return consentStore.CreateConsentPurposeConsent(tx, consentID, purposeID, orgID)
 		})
 
-		// Create approval records for each purpose in the group
-		for _, purpose := range pg.Purposes {
+		// Create approval records for each element in the purpose
+		for _, element := range pg.Elements {
 			approval := &model.ConsentPurposeApprovalRecord{
 				ConsentID:      consentID,
-				GroupID:        groupID,
-				PurposeID:      purpose.PurposeID,
-				IsUserApproved: purpose.IsUserApproved,
-				Value:          purpose.Value,
+				PurposeID:      purposeID,
+				ElementID:      element.PurposeID,
+				IsUserApproved: element.IsUserApproved,
+				Value:          element.Value,
 				OrgID:          orgID,
 			}
 
@@ -265,24 +265,24 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 		attributesMap[a.AttKey] = a.AttValue
 	}
 
-	// Use the generic method to resolve purpose groups with all purposes
-	purposeGroups, err := consentService.getResolvedConsentPurposesWithGroups(ctx, consentID, orgID)
+	// Use the generic method to resolve purposes with all purposes
+	purposes, err := consentService.getResolvedConsentPurposes(ctx, consentID, orgID)
 	if err != nil {
-		logger.Error("Failed to resolve purpose groups for response",
+		logger.Error("Failed to resolve purposes for response",
 			log.String("consent_id", consentID),
 			log.Error(err))
-		// Return with empty purpose groups on error rather than failing the whole response
-		purposeGroups = []model.ConsentPurposeGroupItem{}
+		// Return with empty purposes on error rather than failing the whole response
+		purposes = []model.ConsentPurposeItem{}
 	}
 
-	// Build complete response using the resolved purpose groups data
-	response := buildConsentResponse(consent, purposeGroups, attributesMap, authResources)
+	// Build complete response using the resolved purposes data
+	response := buildConsentResponse(consent, purposes, attributesMap, authResources)
 
 	logger.Info("Consent creation completed",
 		log.String("consent_id", consentID),
 		log.String("status", consent.CurrentStatus),
 		log.Int("auth_resources", len(authResources)),
-		log.Int("purpose_groups", len(purposeGroups)),
+		log.Int("purpose_count", len(purposes)),
 		log.Int("attributes", len(attributesMap)))
 
 	return response, nil
@@ -341,21 +341,21 @@ func (consentService *consentService) GetConsent(ctx context.Context, consentID,
 		attributesMap[a.AttKey] = a.AttValue
 	}
 
-	// Resolve purpose groups with all purposes
-	purposeGroups, err := consentService.getResolvedConsentPurposesWithGroups(ctx, consentID, orgID)
+	// Resolve purposes with all purposes
+	purposes, err := consentService.getResolvedConsentPurposes(ctx, consentID, orgID)
 	if err != nil {
-		logger.Error("Failed to resolve purpose groups", log.Error(err))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to resolve purpose groups: %v", err))
+		logger.Error("Failed to resolve purposes", log.Error(err))
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to resolve purposes: %v", err))
 	}
 
 	// Build complete response with all related data
-	response := buildConsentResponse(consent, purposeGroups, attributesMap, authResources)
+	response := buildConsentResponse(consent, purposes, attributesMap, authResources)
 
 	logger.Debug("Consent retrieved successfully",
 		log.String("consent_id", consentID),
 		log.String("status", consent.CurrentStatus),
 		log.Int("auth_resources", len(authResources)),
-		log.Int("purpose_groups", len(response.PurposeGroups)),
+		log.Int("purpose_count", len(response.Purposes)),
 	)
 	return response, nil
 }
@@ -556,14 +556,14 @@ func (consentService *consentService) SearchConsentsDetailed(ctx context.Context
 			})
 		}
 
-		// Resolve purpose groups for this consent
-		purposeGroups, err := consentService.getResolvedConsentPurposesWithGroups(ctx, consent.ConsentID, filters.OrgID)
+		// Resolve purposes for this consent
+		purposes, err := consentService.getResolvedConsentPurposes(ctx, consent.ConsentID, filters.OrgID)
 		if err != nil {
-			logger.Warn("Failed to resolve purpose groups for consent",
+			logger.Warn("Failed to resolve purposes for consent",
 				log.String("consent_id", consent.ConsentID),
 				log.Error(err))
-			// Continue with empty purpose groups rather than failing
-			purposeGroups = []model.ConsentPurposeGroupItem{}
+			// Continue with empty purposes rather than failing
+			purposes = []model.ConsentPurposeItem{}
 		}
 
 		// Get attributes (already grouped by consent ID)
@@ -592,7 +592,7 @@ func (consentService *consentService) SearchConsentsDetailed(ctx context.Context
 
 		detailedResponses = append(detailedResponses, model.ConsentDetailResponse{
 			ID:                         consent.ConsentID,
-			PurposeGroups:              purposeGroups,
+			Purposes:                   purposes,
 			CreatedTime:                consent.CreatedTime,
 			UpdatedTime:                consent.UpdatedTime,
 			ClientID:                   consent.ClientID,
@@ -820,43 +820,43 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 		}
 	}
 
-	// HANDLE PURPOSE GROUPS UPDATE (validate and resolve all purposes if provided)
-	var resolvedPurposeGroups []model.ConsentPurposeGroupCreateRequest
-	if updateReq.PurposeGroups != nil {
+	// HANDLE PURPOSES UPDATE (validate and resolve all purposes if provided)
+	var resolvedPurposes []model.ConsentPurposeCreateRequest
+	if updateReq.Purposes != nil {
 		var err error
-		resolvedPurposeGroups, err = consentService.validatePurposeGroups(ctx, updateReq.PurposeGroups, existing.ClientID, orgID)
+		resolvedPurposes, err = consentService.validatePurposes(ctx, updateReq.Purposes, existing.ClientID, orgID)
 		if err != nil {
-			logger.Error("Purpose group validation failed", log.Error(err))
+			logger.Error("Purpose validation failed", log.Error(err))
 			return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
 		}
-		logger.Debug("Purpose groups validated and resolved",
-			log.Int("group_count", len(resolvedPurposeGroups)))
+		logger.Debug("Purposes validated and resolved",
+			log.Int("purpose_count", len(resolvedPurposes)))
 
-		// Delete existing purpose group mappings and approvals
+		// Delete existing purpose mappings and approvals
 		queries = append(queries, func(tx dbmodel.TxInterface) error {
-			return consentStore.DeletePurposeGroupsByConsentID(tx, consentID, orgID)
+			return consentStore.DeleteConsentPurposesByConsentID(tx, consentID, orgID)
 		})
 
 		queries = append(queries, func(tx dbmodel.TxInterface) error {
 			return consentStore.DeletePurposeApprovalsByConsentID(tx, consentID, orgID)
 		})
 
-		// Add new purpose group and approval records
-		for _, pg := range resolvedPurposeGroups {
-			// Link consent to purpose group
-			groupID := pg.GroupID
+		// Add new purpose and approval records
+		for _, pg := range resolvedPurposes {
+			// Link consent to purpose
+			purposeID := pg.PurposeID
 			queries = append(queries, func(tx dbmodel.TxInterface) error {
-				return consentStore.CreatePurposeGroupConsent(tx, consentID, groupID, orgID)
+				return consentStore.CreateConsentPurposeConsent(tx, consentID, purposeID, orgID)
 			})
 
-			// Create approval records for each purpose in the group
-			for _, purpose := range pg.Purposes {
+			// Create approval records for each purpose in the purpose
+			for _, element := range pg.Elements {
 				approval := &model.ConsentPurposeApprovalRecord{
 					ConsentID:      consentID,
-					GroupID:        groupID,
-					PurposeID:      purpose.PurposeID,
-					IsUserApproved: purpose.IsUserApproved,
-					Value:          purpose.Value,
+					PurposeID:      purposeID,
+					ElementID:      element.PurposeID,
+					IsUserApproved: element.IsUserApproved,
+					Value:          element.Value,
 					OrgID:          orgID,
 				}
 
@@ -968,21 +968,21 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 		attributesMap[a.AttKey] = a.AttValue
 	}
 
-	// Resolve purpose groups with all purposes
-	purposeGroups, err := consentService.getResolvedConsentPurposesWithGroups(ctx, consentID, orgID)
+	// Resolve purposes with all purposes
+	purposes, err := consentService.getResolvedConsentPurposes(ctx, consentID, orgID)
 	if err != nil {
-		logger.Error("Failed to resolve purpose groups", log.Error(err))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to resolve purpose groups: %v", err))
+		logger.Error("Failed to resolve purposes", log.Error(err))
+		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to resolve purposes: %v", err))
 	}
 
 	// Build complete response
-	response := buildConsentResponse(updated, purposeGroups, attributesMap, authResources)
+	response := buildConsentResponse(updated, purposes, attributesMap, authResources)
 
 	logger.Info("Consent updated successfully",
 		log.String("consent_id", consentID),
 		log.String("status", updated.CurrentStatus),
 		log.Int("auth_resources", len(authResources)),
-		log.Int("purpose_groups", len(response.PurposeGroups)),
+		log.Int("purpose_count", len(response.Purposes)),
 		log.Int("attributes", len(attributesMap)))
 
 	return response, nil
@@ -1159,27 +1159,27 @@ func (consentService *consentService) ValidateConsent(ctx context.Context, req m
 			attributesMap[a.AttKey] = a.AttValue
 		}
 
-		// Resolve purpose groups with all purposes
-		purposeGroups, err := consentService.getResolvedConsentPurposesWithGroups(ctx, consent.ConsentID, orgID)
+		// Resolve purposes with all purposes
+		purposes, err := consentService.getResolvedConsentPurposes(ctx, consent.ConsentID, orgID)
 		if err != nil {
-			logger.Error("Failed to resolve purpose groups", log.Error(err))
+			logger.Error("Failed to resolve purposes", log.Error(err))
 			// Continue with validation, but set error in response
 			response.ErrorCode = 500
 			response.ErrorMessage = "response_build_error"
-			response.ErrorDescription = "Failed to resolve purpose groups"
+			response.ErrorDescription = "Failed to resolve purposes"
 		} else {
 			// Build complete consent response
-			consentResponse := buildConsentResponse(consent, purposeGroups, attributesMap, authResources)
+			consentResponse := buildConsentResponse(consent, purposes, attributesMap, authResources)
 			// Convert to ValidateConsentAPIResponse with enriched purpose details
 			response.ConsentInformation = consentService.EnrichedValidateConsentAPIResponse(ctx, consentResponse, orgID)
 
 			// Check if all mandatory purposes are approved (only if no previous errors)
 			if response.ErrorCode == 0 {
 				unapprovedMandatoryPurposes := make([]string, 0)
-				for _, group := range purposeGroups {
-					for _, purpose := range group.Purposes {
-						if purpose.IsMandatory && !purpose.IsUserApproved {
-							unapprovedMandatoryPurposes = append(unapprovedMandatoryPurposes, purpose.PurposeName)
+				for _, purpose := range purposes {
+					for _, element := range purpose.Elements {
+						if element.IsMandatory && !element.IsUserApproved {
+							unapprovedMandatoryPurposes = append(unapprovedMandatoryPurposes, element.PurposeName)
 						}
 					}
 				}
@@ -1332,18 +1332,18 @@ func (consentService *consentService) EnrichedValidateConsentAPIResponse(ctx con
 		}
 	}
 
-	// Enrich purpose groups with full purpose details (type, description, attributes, isMandatory)
-	if len(consent.PurposeGroups) > 0 {
-		enrichedGroups := make([]model.ConsentPurposeGroupItemValidate, 0, len(consent.PurposeGroups))
+	// Enrich purposes with full purpose details (type, description, attributes, isMandatory)
+	if len(consent.Purposes) > 0 {
+		enrichedPurposes := make([]model.ConsentPurposeItemValidate, 0, len(consent.Purposes))
 
-		for _, group := range consent.PurposeGroups {
-			enrichedGroup := model.ConsentPurposeGroupItemValidate{
-				PurposeGroupName: group.PurposeGroupName,
-				Purposes:         make([]model.ConsentPurposeApprovalItemValidate, 0, len(group.Purposes)),
+		for _, purposeItem := range consent.Purposes {
+			enrichedPurposeItem := model.ConsentPurposeItemValidate{
+				PurposeName: purposeItem.PurposeName,
+				Elements:    make([]model.ConsentPurposeApprovalItemValidate, 0, len(purposeItem.Elements)),
 			}
 
-			for _, p := range group.Purposes {
-				enrichedPurpose := model.ConsentPurposeApprovalItemValidate{
+			for _, p := range purposeItem.Elements {
+				enrichedElement := model.ConsentPurposeApprovalItemValidate{
 					PurposeName:    p.PurposeName,
 					IsUserApproved: p.IsUserApproved,
 					Value:          p.Value,
@@ -1355,28 +1355,28 @@ func (consentService *consentService) EnrichedValidateConsentAPIResponse(ctx con
 					purpose, err := purposeStore.GetByName(ctx, p.PurposeName, orgID)
 					if err == nil && purpose != nil {
 						// Enrich with purpose details
-						enrichedPurpose.Type = purpose.Type
+						enrichedElement.Type = purpose.Type
 
 						// Dereference description pointer if not nil
 						if purpose.Description != nil {
-							enrichedPurpose.Description = *purpose.Description
+							enrichedElement.Description = *purpose.Description
 						}
 
 						// Fetch properties from CONSENT_ELEMENT_PROPERTY table
 						properties, propErr := purposeStore.GetPropertiesByElementID(ctx, purpose.ID, orgID)
 						if propErr == nil && len(properties) > 0 {
-							enrichedPurpose.Attributes = make(map[string]interface{})
+							enrichedElement.Attributes = make(map[string]interface{})
 							for _, prop := range properties {
-								enrichedPurpose.Attributes[prop.Key] = prop.Value
+								enrichedElement.Attributes[prop.Key] = prop.Value
 							}
 						}
 
 						logger.Debug("Purpose details enriched for validate",
 							log.String("purpose", p.PurposeName),
 							log.String("type", purpose.Type),
-							log.String("description", enrichedPurpose.Description),
-							log.Bool("isMandatory", enrichedPurpose.IsMandatory),
-							log.Int("properties_count", len(enrichedPurpose.Attributes)))
+							log.String("description", enrichedElement.Description),
+							log.Bool("isMandatory", enrichedElement.IsMandatory),
+							log.Int("properties_count", len(enrichedElement.Attributes)))
 					} else if err != nil {
 						logger.Warn("Failed to fetch purpose details",
 							log.String("purpose", p.PurposeName),
@@ -1388,18 +1388,18 @@ func (consentService *consentService) EnrichedValidateConsentAPIResponse(ctx con
 					}
 				}
 
-				enrichedGroup.Purposes = append(enrichedGroup.Purposes, enrichedPurpose)
+				enrichedPurposeItem.Elements = append(enrichedPurposeItem.Elements, enrichedElement)
 			}
 
-			enrichedGroups = append(enrichedGroups, enrichedGroup)
+			enrichedPurposes = append(enrichedPurposes, enrichedPurposeItem)
 		}
 
-		// Set enriched purpose groups
-		validateResponse.PurposeGroups = enrichedGroups
+		// Set enriched purposes
+		validateResponse.Purposes = enrichedPurposes
 	}
 
 	logger.Debug("Validate response enriched successfully",
-		log.Int("purpose_group_count", len(validateResponse.PurposeGroups)))
+		log.Int("purpose_purpose_count", len(validateResponse.Purposes)))
 
 	return validateResponse
 }
@@ -1419,7 +1419,7 @@ func (consentService *consentService) EnrichedConsentAPIResponseWithPurposeDetai
 // This makes the function easily testable and free of side effects.
 func buildConsentResponse(
 	consent *model.Consent,
-	purposeGroups []model.ConsentPurposeGroupItem,
+	purposes []model.ConsentPurposeItem,
 	attributes map[string]string,
 	authResources []authmodel.AuthResource,
 ) *model.ConsentResponse {
@@ -1428,7 +1428,7 @@ func buildConsentResponse(
 
 	return &model.ConsentResponse{
 		ConsentID:                  consent.ConsentID,
-		PurposeGroups:              purposeGroups,
+		Purposes:                   purposes,
 		CreatedTime:                consent.CreatedTime,
 		UpdatedTime:                consent.UpdatedTime,
 		ClientID:                   consent.ClientID,
@@ -1483,83 +1483,83 @@ func (consentService *consentService) SearchConsentsByAttribute(ctx context.Cont
 	}, nil
 }
 
-// getResolvedConsentPurposesWithGroups fetches purpose groups for a consent and resolves all purposes.
-// This is a generic method that constructs the complete purpose group structure with all purposes:
-// 1. Fetches purpose group mappings from CONSENT_PURPOSE_GROUP_CONSENT table
-// 2. For each linked group, fetches ALL purposes defined in that group from DB
+// getResolvedConsentPurposes fetches purposes for a consent and resolves all purposes.
+// This is a generic method that constructs the complete purpose structure with all purposes:
+// 1. Fetches purpose mappings from PURPOSE_CONSENT_MAPPING table
+// 2. For each linked purpose, fetches ALL elements defined in that purpose from DB
 // 3. Creates a fresh map with default values (isUserApproved=false, value=nil)
 // 4. Fetches approval records and uses them ONLY to update approval values
-// Returns fully resolved purpose groups ready for response serialization.
-func (s *consentService) getResolvedConsentPurposesWithGroups(
+// Returns fully resolved purposes ready for response serialization.
+func (s *consentService) getResolvedConsentPurposes(
 	ctx context.Context,
 	consentID, orgID string,
-) ([]model.ConsentPurposeGroupItem, error) {
+) ([]model.ConsentPurposeItem, error) {
 	logger := log.GetLogger().WithContext(ctx)
 
 	consentStore := s.stores.Consent
-	purposeGroupStore := s.stores.ConsentPurposeGroup
+	purposeStore := s.stores.ConsentPurpose
 
-	// Step 1: Fetch purpose group mappings from CONSENT_PURPOSE_GROUP_CONSENT table
-	// This is the source of truth for which groups are linked to this consent
-	groupMappings, err := consentStore.GetPurposeGroupsByConsentID(ctx, consentID, orgID)
+	// Step 1: Fetch purpose mappings from PURPOSE_CONSENT_MAPPING table
+	// This is the source of truth for which purposes are linked to this consent
+	purposeMappings, err := consentStore.GetConsentPurposesByConsentID(ctx, consentID, orgID)
 	if err != nil {
-		logger.Error("Failed to fetch purpose group mappings",
+		logger.Error("Failed to fetch purpose mappings",
 			log.String("consent_id", consentID),
 			log.Error(err))
-		return nil, fmt.Errorf("failed to fetch purpose group mappings: %w", err)
+		return nil, fmt.Errorf("failed to fetch purpose mappings: %w", err)
 	}
 
-	// If no groups are mapped, return empty list
-	if len(groupMappings) == 0 {
-		logger.Debug("No purpose groups mapped to consent",
+	// If no purposes are mapped, return empty list
+	if len(purposeMappings) == 0 {
+		logger.Debug("No purposes mapped to consent",
 			log.String("consent_id", consentID))
-		return []model.ConsentPurposeGroupItem{}, nil
+		return []model.ConsentPurposeItem{}, nil
 	}
 
-	logger.Debug("Identified purpose groups from mappings",
+	logger.Debug("Identified purposes from mappings",
 		log.String("consent_id", consentID),
-		log.Int("group_count", len(groupMappings)))
+		log.Int("purpose_count", len(purposeMappings)))
 
-	// Step 2: For each mapped group, fetch ALL purposes defined in that group
+	// Step 2: For each mapped purpose, fetch ALL elements defined in that purpose
 	// and build a fresh map with default values
-	purposeGroupsMap := make(map[string]*model.ConsentPurposeGroupItem)
+	purposesMap := make(map[string]*model.ConsentPurposeItem)
 
-	for _, mapping := range groupMappings {
-		groupID := mapping.GroupID
-		groupName := mapping.GroupName
+	for _, mapping := range purposeMappings {
+		purposeID := mapping.PurposeID
+		purposeName := mapping.PurposeName
 
-		// Fetch all purposes in this group from database
-		groupPurposes, err := purposeGroupStore.GetGroupPurposes(ctx, groupID, orgID)
+		// Fetch all purposes in this purpose from database
+		purposeElements, err := purposeStore.GetPurposeElements(ctx, purposeID, orgID)
 		if err != nil {
-			logger.Error("Failed to fetch purposes for group",
-				log.String("group_name", groupName),
-				log.String("group_id", groupID),
+			logger.Error("Failed to fetch purposes for purpose",
+				log.String("purpose_name", purposeName),
+				log.String("purpose_id", purposeID),
 				log.Error(err))
-			return nil, fmt.Errorf("failed to fetch purposes for group '%s': %w", groupName, err)
+			return nil, fmt.Errorf("failed to fetch purposes for purpose '%s': %w", purposeName, err)
 		}
 
-		// Initialize group with all purposes having default values
-		purposeGroupsMap[groupName] = &model.ConsentPurposeGroupItem{
-			PurposeGroupName: groupName,
-			Purposes:         make([]model.ConsentPurposeApprovalItem, 0, len(groupPurposes)),
+		// Initialize purpose with all elements having default values
+		purposesMap[purposeName] = &model.ConsentPurposeItem{
+			PurposeName: purposeName,
+			Elements:    make([]model.ConsentPurposeApprovalItem, 0, len(purposeElements)),
 		}
 
-		// Add all purposes with default values (isUserApproved=false, value=nil, isMandatory from group definition)
-		for _, gp := range groupPurposes {
-			purposeGroupsMap[groupName].Purposes = append(
-				purposeGroupsMap[groupName].Purposes,
+		// Add all elements with default values (isUserApproved=false, value=nil, isMandatory from purpose definition)
+		for _, elem := range purposeElements {
+			purposesMap[purposeName].Elements = append(
+				purposesMap[purposeName].Elements,
 				model.ConsentPurposeApprovalItem{
-					PurposeName:    gp.PurposeName,
-					IsUserApproved: false,          // Default: not approved
-					Value:          nil,            // Default: no value
-					IsMandatory:    gp.IsMandatory, // From group definition
+					PurposeName:    elem.ElementName,
+					IsUserApproved: false,            // Default: not approved
+					Value:          nil,              // Default: no value
+					IsMandatory:    elem.IsMandatory, // From purpose definition
 				},
 			)
 		}
 
-		logger.Debug("Initialized purpose group with default values",
-			log.String("group_name", groupName),
-			log.Int("purpose_count", len(groupPurposes)))
+		logger.Debug("Initialized purpose with default values",
+			log.String("purpose_name", purposeName),
+			log.Int("purpose_count", len(purposeElements)))
 	}
 
 	// Step 3: Fetch approval records from CONSENT_PURPOSE_APPROVAL table
@@ -1580,201 +1580,201 @@ func (s *consentService) getResolvedConsentPurposesWithGroups(
 			if err := json.Unmarshal([]byte(*approval.Value), &value); err != nil {
 				logger.Warn("Failed to unmarshal purpose value",
 					log.String("purpose", approval.PurposeName),
-					log.String("group", approval.GroupName),
+					log.String("purpose", approval.PurposeName),
 					log.Error(err))
 			}
 		}
 
-		// Find and update the purpose in the group
-		if group, exists := purposeGroupsMap[approval.GroupName]; exists {
-			for i := range group.Purposes {
-				if group.Purposes[i].PurposeName == approval.PurposeName {
+		// Find and update the element in the purpose
+		if purp, exists := purposesMap[approval.PurposeName]; exists {
+			for i := range purp.Elements {
+				if purp.Elements[i].PurposeName == approval.ElementName {
 					// Update with actual approval values from DB
-					group.Purposes[i].IsUserApproved = approval.IsUserApproved
-					group.Purposes[i].Value = value
+					purp.Elements[i].IsUserApproved = approval.IsUserApproved
+					purp.Elements[i].Value = value
 					break
 				}
 			}
 		}
 	}
 
-	logger.Debug("Updated purpose groups with approval values",
+	logger.Debug("Updated elements with approval values",
 		log.String("consent_id", consentID),
 		log.Int("approval_count", len(approvals)))
 
 	// Step 5: Convert map to slice for response
-	purposeGroups := make([]model.ConsentPurposeGroupItem, 0, len(purposeGroupsMap))
-	for _, pg := range purposeGroupsMap {
-		purposeGroups = append(purposeGroups, *pg)
+	purposes := make([]model.ConsentPurposeItem, 0, len(purposesMap))
+	for _, pg := range purposesMap {
+		purposes = append(purposes, *pg)
 	}
 
-	logger.Debug("Resolved consent purpose groups",
+	logger.Debug("Resolved consent purposes",
 		log.String("consent_id", consentID),
-		log.Int("group_count", len(purposeGroups)))
+		log.Int("purpose_count", len(purposes)))
 
-	return purposeGroups, nil
+	return purposes, nil
 }
 
-// validateNoDuplicatePurposesAcrossGroups ensures no purpose appears in multiple groups.
+// validateNoDuplicatePurposesAcrossPurposes ensures no element appears in multiple purposes.
 // This validation is called AFTER purpose resolution from database, so it checks the
 // complete set of purposes (including auto-filled ones), not just what user provided.
-// This prevents a purpose from being assigned to multiple groups, which would create
+// This prevents a purpose from being assigned to multiple purposes, which would create
 // ambiguity in consent management.
-func (s *consentService) validateNoDuplicatePurposesAcrossGroups(
-	purposeGroups []model.ConsentPurposeGroupCreateRequest,
+func (s *consentService) validateNoDuplicatePurposesAcrossPurposes(
+	purposes []model.ConsentPurposeCreateRequest,
 ) error {
-	// Track which group each purpose belongs to
-	purposeNamesSeen := make(map[string]string) // purpose name -> group name
+	// Track which parent purpose each element belongs to
+	purposeNamesSeen := make(map[string]string) // purpose name -> parent purpose name
 
-	for _, pg := range purposeGroups {
-		for _, p := range pg.Purposes {
-			if existingGroup, found := purposeNamesSeen[p.PurposeName]; found {
-				// Found duplicate - same purpose in multiple groups
+	for _, pg := range purposes {
+		for _, p := range pg.Elements {
+			if existingPurpose, found := purposeNamesSeen[p.PurposeName]; found {
+				// Found duplicate - same element in multiple purposes
 				return fmt.Errorf(
-					"duplicate purpose '%s' found in groups '%s' and '%s'",
+					"duplicate purpose '%s' found in purposes '%s' and '%s'",
 					p.PurposeName,
-					existingGroup,
-					pg.GroupName,
+					existingPurpose,
+					pg.PurposeName,
 				)
 			}
-			purposeNamesSeen[p.PurposeName] = pg.GroupName
+			purposeNamesSeen[p.PurposeName] = pg.PurposeName
 		}
 	}
 
 	return nil
 }
 
-// validatePurposeGroups validates purpose groups and resolves all purposes from database.
+// validatePurposes validates purposes and resolves all purposes from database.
 // This method:
-// 1. Fetches purpose group definitions from DB (validates group existence)
-// 2. Fetches all purposes within each group from DB
-// 3. Validates that user-provided purposes belong to their respective groups
+// 1. Fetches purpose definitions from DB (validates purpose existence)
+// 2. Fetches all purposes within each purpose from DB
+// 3. Validates that user-provided elements belong to their respective purposes
 // 4. Resolves missing purposes (not in request) with isUserApproved=false
-// 5. Validates no duplicate purposes exist across all resolved groups
-// Returns fully enriched purpose groups ready for database insertion.
-func (s *consentService) validatePurposeGroups(
+// 5. Validates no duplicate elements exist across all resolved elements in purposes
+// Returns fully enriched purposes ready for database insertion.
+func (s *consentService) validatePurposes(
 	ctx context.Context,
-	purposeGroups []model.ConsentPurposeGroupCreateRequest,
+	purposes []model.ConsentPurposeCreateRequest,
 	clientID, orgID string,
-) ([]model.ConsentPurposeGroupCreateRequest, error) {
+) ([]model.ConsentPurposeCreateRequest, error) {
 
 	logger := log.GetLogger().WithContext(ctx)
 
-	// Step 1: Resolve purpose groups and get their full definitions from database
-	resolvedGroups := make([]model.ConsentPurposeGroupCreateRequest, 0, len(purposeGroups))
-	purposeGroupStore := s.stores.ConsentPurposeGroup
+	// Step 1: Resolve purposes and get their full definitions from database
+	resolvedPurposes := make([]model.ConsentPurposeCreateRequest, 0, len(purposes))
+	purposeStore := s.stores.ConsentPurpose
 
-	for _, pg := range purposeGroups {
-		// Fetch purpose group metadata by name for this client
-		// Note: Using limit=1 since group names should be unique per client
-		groups, _, err := purposeGroupStore.ListGroups(ctx, orgID, pg.GroupName, []string{clientID}, nil, 0, 1)
+	for _, pg := range purposes {
+		// Fetch purpose metadata by name for this client
+		// Note: Using limit=1 since purpose names should be unique per client
+		purposes, _, err := purposeStore.ListPurposes(ctx, orgID, pg.PurposeName, []string{clientID}, nil, 0, 1)
 		if err != nil {
-			logger.Error("Failed to fetch purpose group from database",
-				log.String("group_name", pg.GroupName),
+			logger.Error("Failed to fetch purpose from database",
+				log.String("purpose_name", pg.PurposeName),
 				log.String("client_id", clientID),
 				log.Error(err))
-			return nil, fmt.Errorf("failed to get purpose group '%s': %w", pg.GroupName, err)
+			return nil, fmt.Errorf("failed to get purpose '%s': %w", pg.PurposeName, err)
 		}
 
-		if len(groups) == 0 {
-			logger.Warn("Purpose group not found",
-				log.String("group_name", pg.GroupName),
+		if len(purposes) == 0 {
+			logger.Warn("Purpose not found",
+				log.String("purpose_name", pg.PurposeName),
 				log.String("client_id", clientID))
-			return nil, fmt.Errorf("purpose group '%s' not found for client '%s'", pg.GroupName, clientID)
+			return nil, fmt.Errorf("purpose '%s' not found for client '%s'", pg.PurposeName, clientID)
 		}
 
-		group := groups[0]
-		logger.Debug("Purpose group found",
-			log.String("group_name", pg.GroupName),
-			log.String("group_id", group.ID))
+		purpose := purposes[0]
+		logger.Debug("Purpose found",
+			log.String("purpose_name", pg.PurposeName),
+			log.String("purpose_id", purpose.ID))
 
-		// Step 2: Fetch ALL purposes defined in this group from database
-		// This gives us the complete list of purposes with their IDs, names, and mandatory flags
-		groupPurposesFromDB, err := purposeGroupStore.GetGroupPurposes(ctx, group.ID, orgID)
+		// Step 2: Fetch ALL elements defined in this purpose from database
+		// This gives us the complete list of elements with their IDs, names, and mandatory flags
+		purposeElementsFromDB, err := purposeStore.GetPurposeElements(ctx, purpose.ID, orgID)
 		if err != nil {
-			logger.Error("Failed to fetch purposes for group",
-				log.String("group_name", pg.GroupName),
-				log.String("group_id", group.ID),
+			logger.Error("Failed to fetch purposes for purpose",
+				log.String("purpose_name", pg.PurposeName),
+				log.String("purpose_id", purpose.ID),
 				log.Error(err))
-			return nil, fmt.Errorf("failed to get purposes for group '%s': %w", pg.GroupName, err)
+			return nil, fmt.Errorf("failed to get purposes for purpose '%s': %w", pg.PurposeName, err)
 		}
 
-		logger.Debug("Fetched purposes for group",
-			log.String("group_name", pg.GroupName),
-			log.Int("total_purposes", len(groupPurposesFromDB)),
-			log.Int("requested_purposes", len(pg.Purposes)))
+		logger.Debug("Fetched purposes for purpose",
+			log.String("purpose_name", pg.PurposeName),
+			log.Int("total_purposes", len(purposeElementsFromDB)),
+			log.Int("requested_purposes", len(pg.Elements)))
 
 		// Step 3: Create lookup map for purposes provided in the request
 		// Key: purpose name, Value: approval details from request
 		requestedPurposes := make(map[string]model.ConsentPurposeApprovalCreateRequest)
-		for _, p := range pg.Purposes {
+		for _, p := range pg.Elements {
 			requestedPurposes[p.PurposeName] = p
 		}
 
 		// Step 4: Create lookup map for valid purposes from database
-		// This is used to validate that user-provided purposes actually belong to this group
+		// This is used to validate that user-provided purposes actually belong to this purpose
 		validPurposeNames := make(map[string]bool)
-		for _, gp := range groupPurposesFromDB {
-			validPurposeNames[gp.PurposeName] = true
+		for _, elem := range purposeElementsFromDB {
+			validPurposeNames[elem.ElementName] = true
 		}
 
-		// Step 5: Validate that all requested purposes belong to this group
+		// Step 5: Validate that all requested purposes belong to this purpose
 		for purposeName := range requestedPurposes {
 			if !validPurposeNames[purposeName] {
-				logger.Warn("Purpose does not belong to group",
+				logger.Warn("Element does not belong to purpose",
 					log.String("purpose_name", purposeName),
-					log.String("group_name", pg.GroupName))
-				return nil, fmt.Errorf("purpose '%s' does not belong to group '%s'", purposeName, pg.GroupName)
+					log.String("purpose_name", pg.PurposeName))
+				return nil, fmt.Errorf("purpose '%s' does not belong to purpose '%s'", purposeName, pg.PurposeName)
 			}
 		}
 
-		// Step 6: Resolve ALL purposes in the group (merge requested + missing)
-		// For purposes in request: use their approval status and values
-		// For purposes not in request: add with isUserApproved=false (user didn't approve)
-		allPurposes := make([]model.ConsentPurposeApprovalCreateRequest, 0, len(groupPurposesFromDB))
+		// Step 6: Resolve ALL elements in the purpose (merge requested + missing)
+		// For elements in request: use their approval status and values
+		// For elements not in request: add with isUserApproved=false (user didn't approve)
+		allPurposes := make([]model.ConsentPurposeApprovalCreateRequest, 0, len(purposeElementsFromDB))
 
-		for _, dbPurpose := range groupPurposesFromDB {
-			if requestedPurpose, found := requestedPurposes[dbPurpose.PurposeName]; found {
+		for _, dbPurpose := range purposeElementsFromDB {
+			if requestedPurpose, found := requestedPurposes[dbPurpose.ElementName]; found {
 				// Purpose was explicitly provided in request - use user's approval status
-				requestedPurpose.PurposeID = dbPurpose.PurposeID
+				requestedPurpose.PurposeID = dbPurpose.ElementID
 				requestedPurpose.IsMandatory = dbPurpose.IsMandatory
 				allPurposes = append(allPurposes, requestedPurpose)
 				logger.Debug("Using requested purpose approval",
-					log.String("purpose", dbPurpose.PurposeName),
+					log.String("purpose", dbPurpose.ElementName),
 					log.Bool("approved", requestedPurpose.IsUserApproved))
 			} else {
 				// Purpose was NOT in request - auto-fill with isUserApproved=false
 				allPurposes = append(allPurposes, model.ConsentPurposeApprovalCreateRequest{
-					PurposeID:      dbPurpose.PurposeID,
-					PurposeName:    dbPurpose.PurposeName,
+					PurposeID:      dbPurpose.ElementID,
+					PurposeName:    dbPurpose.ElementName,
 					IsUserApproved: false, // Not approved since user didn't provide it
 					Value:          nil,
 					IsMandatory:    dbPurpose.IsMandatory,
 				})
 				logger.Debug("Auto-filling missing purpose",
-					log.String("purpose", dbPurpose.PurposeName),
+					log.String("purpose", dbPurpose.ElementName),
 					log.Bool("approved", false))
 			}
 		}
 
-		// Add fully resolved group to result
-		resolvedGroups = append(resolvedGroups, model.ConsentPurposeGroupCreateRequest{
-			GroupName: pg.GroupName,
-			GroupID:   group.ID,
-			Purposes:  allPurposes, // Contains ALL purposes (requested + auto-filled)
+		// Add fully resolved purpose to result
+		resolvedPurposes = append(resolvedPurposes, model.ConsentPurposeCreateRequest{
+			PurposeName: pg.PurposeName,
+			PurposeID:   purpose.ID,
+			Elements:    allPurposes, // Contains ALL elements (requested + auto-filled)
 		})
 	}
 
-	// Step 7: Validate no duplicate purposes across ALL resolved groups
+	// Step 7: Validate no duplicate elements across ALL resolved purposes
 	// This check happens AFTER resolution because we now have the complete picture
-	// of all purposes across all groups (including auto-filled ones)
-	if err := s.validateNoDuplicatePurposesAcrossGroups(resolvedGroups); err != nil {
+	// of all elements across all purposes (including auto-filled ones)
+	if err := s.validateNoDuplicatePurposesAcrossPurposes(resolvedPurposes); err != nil {
 		logger.Warn("Duplicate purpose validation failed", log.Error(err))
 		return nil, err
 	}
 
-	logger.Info("Purpose groups validated and resolved successfully",
-		log.Int("group_count", len(resolvedGroups)))
+	logger.Info("Purposes validated and resolved successfully",
+		log.Int("purpose_count", len(resolvedPurposes)))
 
-	return resolvedGroups, nil
+	return resolvedPurposes, nil
 }

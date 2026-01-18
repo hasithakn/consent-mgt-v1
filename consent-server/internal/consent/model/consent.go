@@ -97,15 +97,15 @@ type ConsentElementItem struct {
 	Attributes     map[string]interface{} `json:"attributes,omitempty"`     // Enriched from purpose definition (optional)
 }
 
-// ConsentPurposeGroupItem represents a purpose group in consent API
-type ConsentPurposeGroupItem struct {
-	PurposeGroupName string                       `json:"purposeGroupName" binding:"required"`
-	Purposes         []ConsentPurposeApprovalItem `json:"purposes" binding:"required,min=1"`
+// ConsentPurposeItem represents a purpose in consent API
+type ConsentPurposeItem struct {
+	PurposeName string                       `json:"name" binding:"required"`
+	Elements    []ConsentPurposeApprovalItem `json:"elements" binding:"required,min=1"`
 }
 
-// ConsentPurposeApprovalItem represents a purpose approval within a group (for POST, GET, PUT, Search)
+// ConsentPurposeApprovalItem represents an element approval within a purpose (for POST, GET, PUT, Search)
 type ConsentPurposeApprovalItem struct {
-	PurposeName    string      `json:"purposeName" binding:"required"`
+	PurposeName    string      `json:"name" binding:"required"`
 	IsUserApproved bool        `json:"isUserApproved"`
 	Value          interface{} `json:"value,omitempty"`
 	// IsMandatory is tracked internally but excluded from JSON in regular responses
@@ -114,7 +114,7 @@ type ConsentPurposeApprovalItem struct {
 
 // ConsentPurposeApprovalItemValidate represents a purpose approval with enriched details (for Validate endpoint)
 type ConsentPurposeApprovalItemValidate struct {
-	PurposeName    string                 `json:"purposeName" binding:"required"`
+	PurposeName    string                 `json:"name" binding:"required"`
 	IsUserApproved bool                   `json:"isUserApproved"`
 	Value          interface{}            `json:"value,omitempty"`
 	IsMandatory    bool                   `json:"isMandatory"`
@@ -123,17 +123,17 @@ type ConsentPurposeApprovalItemValidate struct {
 	Attributes     map[string]interface{} `json:"attributes,omitempty"`
 }
 
-// ConsentPurposeGroupItemValidate represents a purpose group with enriched details (for Validate endpoint)
-type ConsentPurposeGroupItemValidate struct {
-	PurposeGroupName string                               `json:"purposeGroupName" binding:"required"`
-	Purposes         []ConsentPurposeApprovalItemValidate `json:"purposes" binding:"required,min=1"`
+// ConsentPurposeItemValidate represents a purpose with enriched details (for Validate endpoint)
+type ConsentPurposeItemValidate struct {
+	PurposeName string                               `json:"name" binding:"required"`
+	Elements    []ConsentPurposeApprovalItemValidate `json:"elements" binding:"required,min=1"`
 }
 
-// ConsentPurposeGroupCreateRequest - internal format for purpose group processing
-type ConsentPurposeGroupCreateRequest struct {
-	GroupName string
-	GroupID   string
-	Purposes  []ConsentPurposeApprovalCreateRequest
+// ConsentPurposeCreateRequest - internal format for purpose processing
+type ConsentPurposeCreateRequest struct {
+	PurposeName string
+	PurposeID   string
+	Elements    []ConsentPurposeApprovalCreateRequest
 }
 
 // ConsentPurposeApprovalCreateRequest - internal format for purpose approval
@@ -142,28 +142,28 @@ type ConsentPurposeApprovalCreateRequest struct {
 	PurposeName    string
 	IsUserApproved bool
 	Value          *string // JSON string
-	IsMandatory    bool    // from group definition
+	IsMandatory    bool    // from purpose definition
 }
 
-// ConsentPurposeApprovalRecord represents the DB record for purpose approvals
+// ConsentPurposeApprovalRecord represents the DB record for element approvals
 type ConsentPurposeApprovalRecord struct {
 	ConsentID      string
-	GroupID        string
-	GroupName      string
 	PurposeID      string
 	PurposeName    string
+	ElementID      string
+	ElementName    string
 	IsUserApproved bool
 	IsMandatory    bool
 	Value          *string // JSON string
 	OrgID          string
 }
 
-// ConsentPurposeGroupMapping represents the mapping between consent and purpose groups
-// from CONSENT_PURPOSE_GROUP_CONSENT table
-type ConsentPurposeGroupMapping struct {
-	ConsentID string
-	GroupID   string
-	GroupName string
+// ConsentPurposeMapping represents the mapping between consent and purposes
+// from PURPOSE_CONSENT_MAPPING table
+type ConsentPurposeMapping struct {
+	ConsentID   string
+	PurposeID   string
+	PurposeName string
 }
 
 // ConsentAPIRequest represents the API payload for creating a consent (external format)
@@ -174,7 +174,7 @@ type ConsentAPIRequest struct {
 	RecurringIndicator         *bool                     `json:"recurringIndicator,omitempty"`
 	Frequency                  *int                      `json:"frequency,omitempty"`
 	DataAccessValidityDuration *int64                    `json:"dataAccessValidityDuration,omitempty"`
-	PurposeGroups              []ConsentPurposeGroupItem `json:"purposeGroups" binding:"required,min=1"`
+	Purposes                   []ConsentPurposeItem      `json:"purposes" binding:"required,min=1"`
 	Attributes                 map[string]string         `json:"attributes,omitempty"`
 	Authorizations             []AuthorizationAPIRequest `json:"authorizations"` // Remove omitempty to allow explicit empty array in updates
 }
@@ -235,21 +235,21 @@ func (req *AuthorizationAPIUpdateRequest) ToAuthResourceUpdateRequest() *authmod
 
 // ConsentAPIUpdateRequest represents the API payload for updating a consent (external format)
 // Note: Status is not included in the request - it will be derived from authorization states
-// Note: PurposeGroups, Attributes, and Authorizations don't have omitempty to allow empty arrays/maps for removal
+// Note: Purposes, Attributes, and Authorizations don't have omitempty to allow empty arrays/maps for removal
 type ConsentAPIUpdateRequest struct {
 	Type                       string                    `json:"type,omitempty"`
 	ValidityTime               *int64                    `json:"validityTime,omitempty"`
 	RecurringIndicator         *bool                     `json:"recurringIndicator,omitempty"`
 	Frequency                  *int                      `json:"frequency,omitempty"`
 	DataAccessValidityDuration *int64                    `json:"dataAccessValidityDuration,omitempty"`
-	PurposeGroups              []ConsentPurposeGroupItem `json:"purposeGroups"`
+	Purposes                   []ConsentPurposeItem      `json:"purposes"`
 	Attributes                 map[string]string         `json:"attributes"`
 	Authorizations             []AuthorizationAPIRequest `json:"authorizations"`
 }
 
 // ConsentCreateRequest represents the internal request payload for creating a consent
 type ConsentCreateRequest struct {
-	PurposeGroups              []ConsentPurposeGroupCreateRequest           `json:"purposeGroups" binding:"required,min=1"`
+	Purposes                   []ConsentPurposeCreateRequest                `json:"purposes" binding:"required,min=1"`
 	ConsentType                string                                       `json:"consentType" binding:"required"`
 	CurrentStatus              string                                       `json:"currentStatus" binding:"required"`
 	ConsentFrequency           *int                                         `json:"consentFrequency,omitempty"`
@@ -262,7 +262,7 @@ type ConsentCreateRequest struct {
 
 // ConsentUpdateRequest represents the request payload for updating a consent
 type ConsentUpdateRequest struct {
-	PurposeGroups              []ConsentPurposeGroupCreateRequest           `json:"purposeGroups,omitempty"`
+	Purposes                   []ConsentPurposeCreateRequest                `json:"purposes,omitempty"`
 	ConsentType                string                                       `json:"consentType,omitempty"`
 	CurrentStatus              string                                       `json:"currentStatus,omitempty"`
 	ConsentFrequency           *int                                         `json:"consentFrequency,omitempty"`
@@ -276,7 +276,7 @@ type ConsentUpdateRequest struct {
 // ConsentResponse represents the response after consent creation/retrieval
 type ConsentResponse struct {
 	ConsentID                  string                          `json:"consentId"`
-	PurposeGroups              []ConsentPurposeGroupItem       `json:"purposeGroups"`
+	Purposes                   []ConsentPurposeItem            `json:"purposes"`
 	CreatedTime                int64                           `json:"createdTime"`
 	UpdatedTime                int64                           `json:"updatedTime"`
 	ClientID                   string                          `json:"clientId"`
@@ -334,19 +334,19 @@ type ConsentSearchFilters struct {
 
 // ConsentDetailResponse represents a detailed consent with related data
 type ConsentDetailResponse struct {
-	ID                         string                    `json:"id"`
-	PurposeGroups              []ConsentPurposeGroupItem `json:"purposeGroups"`
-	CreatedTime                int64                     `json:"createdTime"`
-	UpdatedTime                int64                     `json:"updatedTime"`
-	ClientID                   string                    `json:"clientId"`
-	Type                       string                    `json:"type"`
-	Status                     string                    `json:"status"`
-	Frequency                  int                       `json:"frequency"`
-	ValidityTime               int64                     `json:"validityTime"`
-	RecurringIndicator         bool                      `json:"recurringIndicator"`
-	DataAccessValidityDuration int64                     `json:"dataAccessValidityDuration"`
-	Attributes                 map[string]string         `json:"attributes"`
-	Authorizations             []AuthorizationDetail     `json:"authorizations"`
+	ID                         string                `json:"id"`
+	Purposes                   []ConsentPurposeItem  `json:"purposes"`
+	CreatedTime                int64                 `json:"createdTime"`
+	UpdatedTime                int64                 `json:"updatedTime"`
+	ClientID                   string                `json:"clientId"`
+	Type                       string                `json:"type"`
+	Status                     string                `json:"status"`
+	Frequency                  int                   `json:"frequency"`
+	ValidityTime               int64                 `json:"validityTime"`
+	RecurringIndicator         bool                  `json:"recurringIndicator"`
+	DataAccessValidityDuration int64                 `json:"dataAccessValidityDuration"`
+	Attributes                 map[string]string     `json:"attributes"`
+	Authorizations             []AuthorizationDetail `json:"authorizations"`
 }
 
 // AuthorizationDetail represents authorization resource details
@@ -397,11 +397,11 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 		DataAccessValidityDuration: req.DataAccessValidityDuration,
 	}
 
-	// Structure purpose groups data (validation happens in service layer)
-	purposeGroups := make([]ConsentPurposeGroupCreateRequest, len(req.PurposeGroups))
-	for i, pg := range req.PurposeGroups {
-		purposes := make([]ConsentPurposeApprovalCreateRequest, len(pg.Purposes))
-		for j, p := range pg.Purposes {
+	// Structure purposes data (validation happens in service layer)
+	purposes := make([]ConsentPurposeCreateRequest, len(req.Purposes))
+	for i, pg := range req.Purposes {
+		elements := make([]ConsentPurposeApprovalCreateRequest, len(pg.Elements))
+		for j, p := range pg.Elements {
 			var valueJSON *string
 			if p.Value != nil {
 				valueBytes, err := json.Marshal(p.Value)
@@ -412,19 +412,19 @@ func (req *ConsentAPIRequest) ToConsentCreateRequest() (*ConsentCreateRequest, e
 				valueJSON = &valueStr
 			}
 
-			purposes[j] = ConsentPurposeApprovalCreateRequest{
+			elements[j] = ConsentPurposeApprovalCreateRequest{
 				PurposeName:    p.PurposeName,
 				IsUserApproved: p.IsUserApproved,
 				Value:          valueJSON,
 			}
 		}
 
-		purposeGroups[i] = ConsentPurposeGroupCreateRequest{
-			GroupName: pg.PurposeGroupName,
-			Purposes:  purposes,
+		purposes[i] = ConsentPurposeCreateRequest{
+			PurposeName: pg.PurposeName,
+			Elements:    elements,
 		}
 	}
-	createReq.PurposeGroups = purposeGroups
+	createReq.Purposes = purposes
 
 	// Map authorizations to auth resources
 	if len(req.Authorizations) > 0 {
@@ -459,14 +459,14 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 
 	AuthStatusMappings := config.Get().Consent.AuthStatusMappings
 
-	// Convert purpose groups from API format to internal format
-	var purposeGroups []ConsentPurposeGroupCreateRequest
-	if req.PurposeGroups != nil {
-		purposeGroups = make([]ConsentPurposeGroupCreateRequest, len(req.PurposeGroups))
-		for i, pg := range req.PurposeGroups {
-			// Convert purposes within the group
-			purposes := make([]ConsentPurposeApprovalCreateRequest, len(pg.Purposes))
-			for j, p := range pg.Purposes {
+	// Convert purposes from API format to internal format
+	var purposes []ConsentPurposeCreateRequest
+	if req.Purposes != nil {
+		purposes = make([]ConsentPurposeCreateRequest, len(req.Purposes))
+		for i, pg := range req.Purposes {
+			// Convert elements within the purpose
+			elements := make([]ConsentPurposeApprovalCreateRequest, len(pg.Elements))
+			for j, p := range pg.Elements {
 				// Marshal value to JSON if present
 				var valueJSON *string
 				if p.Value != nil {
@@ -478,7 +478,7 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 					valueJSON = &valueStr
 				}
 
-				purposes[j] = ConsentPurposeApprovalCreateRequest{
+				elements[j] = ConsentPurposeApprovalCreateRequest{
 					PurposeName:    p.PurposeName,
 					IsUserApproved: p.IsUserApproved,
 					Value:          valueJSON,
@@ -486,16 +486,16 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 				}
 			}
 
-			purposeGroups[i] = ConsentPurposeGroupCreateRequest{
-				GroupName: pg.PurposeGroupName,
-				Purposes:  purposes,
-				// GroupID will be resolved during validation
+			purposes[i] = ConsentPurposeCreateRequest{
+				PurposeName: pg.PurposeName,
+				Elements:    elements,
+				// PurposeID will be resolved during validation
 			}
 		}
 	}
 
 	updateReq := &ConsentUpdateRequest{
-		PurposeGroups:              purposeGroups,
+		Purposes:                   purposes,
 		ConsentType:                req.Type,
 		CurrentStatus:              "", // Will be set by handler based on auth states
 		Attributes:                 req.Attributes,
@@ -536,7 +536,7 @@ func (req *ConsentAPIUpdateRequest) ToConsentUpdateRequest() (*ConsentUpdateRequ
 // ConsentAPIResponse represents the API response format for consent (external format)
 type ConsentAPIResponse struct {
 	ID                         string                     `json:"id"`
-	PurposeGroups              []ConsentPurposeGroupItem  `json:"purposeGroups"`
+	Purposes                   []ConsentPurposeItem       `json:"purposes"`
 	CreatedTime                int64                      `json:"createdTime"`
 	UpdatedTime                int64                      `json:"updatedTime"`
 	ClientID                   string                     `json:"clientId"`
@@ -569,15 +569,15 @@ func (resp *ConsentResponse) ToAPIResponse() *ConsentAPIResponse {
 		attributes = make(map[string]string)
 	}
 
-	// Initialize PurposeGroups with empty array if nil
-	purposeGroups := resp.PurposeGroups
-	if purposeGroups == nil {
-		purposeGroups = make([]ConsentPurposeGroupItem, 0)
+	// Initialize Purposes with empty array if nil
+	purposes := resp.Purposes
+	if purposes == nil {
+		purposes = make([]ConsentPurposeItem, 0)
 	}
 
 	apiResp := &ConsentAPIResponse{
 		ID:                         resp.ConsentID,
-		PurposeGroups:              purposeGroups,
+		Purposes:                   purposes,
 		CreatedTime:                resp.CreatedTime,
 		UpdatedTime:                resp.UpdatedTime,
 		ClientID:                   resp.ClientID,
@@ -649,19 +649,19 @@ type ValidateResponse struct {
 
 // ValidateConsentAPIResponse represents consent information in validate response (excludes modifiedResponse)
 type ValidateConsentAPIResponse struct {
-	ID                         string                            `json:"id"`
-	Type                       string                            `json:"type"`
-	ClientID                   string                            `json:"clientId"`
-	Status                     string                            `json:"status"`
-	CreatedTime                int64                             `json:"createdTime"`
-	UpdatedTime                int64                             `json:"updatedTime"`
-	ValidityTime               *int64                            `json:"validityTime"`
-	RecurringIndicator         *bool                             `json:"recurringIndicator"`
-	Frequency                  *int                              `json:"frequency"`
-	DataAccessValidityDuration *int64                            `json:"dataAccessValidityDuration"`
-	PurposeGroups              []ConsentPurposeGroupItemValidate `json:"purposeGroups"`
-	Attributes                 map[string]string                 `json:"attributes,omitempty"`
-	Authorizations             []AuthorizationAPIResponse        `json:"authorizations,omitempty"`
+	ID                         string                       `json:"id"`
+	Type                       string                       `json:"type"`
+	ClientID                   string                       `json:"clientId"`
+	Status                     string                       `json:"status"`
+	CreatedTime                int64                        `json:"createdTime"`
+	UpdatedTime                int64                        `json:"updatedTime"`
+	ValidityTime               *int64                       `json:"validityTime"`
+	RecurringIndicator         *bool                        `json:"recurringIndicator"`
+	Frequency                  *int                         `json:"frequency"`
+	DataAccessValidityDuration *int64                       `json:"dataAccessValidityDuration"`
+	Purposes                   []ConsentPurposeItemValidate `json:"purposes"`
+	Attributes                 map[string]string            `json:"attributes,omitempty"`
+	Authorizations             []AuthorizationAPIResponse   `json:"authorizations,omitempty"`
 }
 
 // ConsentRevokeResponse represents the response after revoking a consent

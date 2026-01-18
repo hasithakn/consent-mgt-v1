@@ -1,13 +1,10 @@
 -- Consent Management API Database Schema
--- Version: 2.0.0
--- Description: Updated schema with consent elements (renamed from consent purposes)
--- Changes: CONSENT_PURPOSE → CONSENT_ELEMENT, attributes → properties
 
 -- Drop tables if they exist (for clean reinstall)
 DROP TABLE IF EXISTS CONSENT_ELEMENT_APPROVAL;
-DROP TABLE IF EXISTS CONSENT_PURPOSE_GROUP_CONSENT;
-DROP TABLE IF EXISTS CONSENT_PURPOSE_ELEMENT_MAPPING;
-DROP TABLE IF EXISTS CONSENT_PURPOSE_GROUP;
+DROP TABLE IF EXISTS PURPOSE_CONSENT_MAPPING;
+DROP TABLE IF EXISTS PURPOSE_ELEMENT_MAPPING;
+DROP TABLE IF EXISTS CONSENT_PURPOSE;
 DROP TABLE IF EXISTS CONSENT_ATTRIBUTE;
 DROP TABLE IF EXISTS CONSENT_STATUS_AUDIT;
 DROP TABLE IF EXISTS CONSENT_AUTH_RESOURCE;
@@ -121,47 +118,47 @@ CREATE TABLE IF NOT EXISTS CONSENT_ELEMENT_PROPERTY (
 ) ENGINE=INNODB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- Purpose group table to organize related purposes
-CREATE TABLE IF NOT EXISTS CONSENT_PURPOSE_GROUP (
+-- Purpose table to organize related elements with mandatory/optional flags
+CREATE TABLE IF NOT EXISTS CONSENT_PURPOSE (
   ID           VARCHAR(255) NOT NULL,
   NAME         VARCHAR(255) NOT NULL,
   DESCRIPTION  VARCHAR(1024) DEFAULT NULL,
-  CLIENT_ID    VARCHAR(255) NOT NULL,   -- group ownership (TPP / client)
+  CLIENT_ID    VARCHAR(255) NOT NULL,   -- purpose ownership (TPP / client)
   CREATED_TIME BIGINT NOT NULL,
   UPDATED_TIME BIGINT NOT NULL,
   ORG_ID       VARCHAR(255) DEFAULT 'DEFAULT_ORG',
 
   PRIMARY KEY (ID, ORG_ID),
-  UNIQUE KEY uk_group_name_per_client (NAME, CLIENT_ID, ORG_ID),
+  UNIQUE KEY uk_purpose_name_per_client (NAME, CLIENT_ID, ORG_ID),
 
-  INDEX idx_group_client_id (CLIENT_ID),
-  INDEX idx_group_org_id (ORG_ID),
-  INDEX idx_group_name (NAME),
-  INDEX idx_group_created_time (CREATED_TIME),
-  INDEX idx_group_org_client (ORG_ID, CLIENT_ID)
+  INDEX idx_purpose_client_id (CLIENT_ID),
+  INDEX idx_purpose_org_id (ORG_ID),
+  INDEX idx_purpose_name (NAME),
+  INDEX idx_purpose_created_time (CREATED_TIME),
+  INDEX idx_purpose_org_client (ORG_ID, CLIENT_ID)
 ) ENGINE=INNODB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- Maps elements to groups with mandatory flag (defines group structure)
-CREATE TABLE IF NOT EXISTS CONSENT_PURPOSE_ELEMENT_MAPPING (
-  GROUP_ID     VARCHAR(255) NOT NULL,
+-- Maps elements to purposes with mandatory flag (defines purpose structure)
+CREATE TABLE IF NOT EXISTS PURPOSE_ELEMENT_MAPPING (
+  PURPOSE_ID   VARCHAR(255) NOT NULL,
   ELEMENT_ID   VARCHAR(255) NOT NULL,
   IS_MANDATORY BOOLEAN NOT NULL DEFAULT FALSE,
   ORG_ID       VARCHAR(255) DEFAULT 'DEFAULT_ORG',
 
-  PRIMARY KEY (GROUP_ID, ELEMENT_ID, ORG_ID),
+  PRIMARY KEY (PURPOSE_ID, ELEMENT_ID, ORG_ID),
 
-  INDEX idx_group_mapping_group (GROUP_ID),
-  INDEX idx_group_mapping_element (ELEMENT_ID),
-  INDEX idx_group_mapping_org (ORG_ID),
+  INDEX idx_purpose_element_purpose (PURPOSE_ID),
+  INDEX idx_purpose_element_element (ELEMENT_ID),
+  INDEX idx_purpose_element_org (ORG_ID),
 
-  CONSTRAINT fk_group_mapping_group
-    FOREIGN KEY (GROUP_ID, ORG_ID)
-    REFERENCES CONSENT_PURPOSE_GROUP (ID, ORG_ID)
+  CONSTRAINT fk_purpose_element_purpose
+    FOREIGN KEY (PURPOSE_ID, ORG_ID)
+    REFERENCES CONSENT_PURPOSE (ID, ORG_ID)
     ON DELETE CASCADE,
 
-  CONSTRAINT fk_group_mapping_element
+  CONSTRAINT fk_purpose_element_element
     FOREIGN KEY (ELEMENT_ID, ORG_ID)
     REFERENCES CONSENT_ELEMENT (ID, ORG_ID)
     ON DELETE RESTRICT
@@ -170,35 +167,35 @@ CREATE TABLE IF NOT EXISTS CONSENT_PURPOSE_ELEMENT_MAPPING (
   COLLATE=utf8mb4_unicode_ci;
 
 
-CREATE TABLE IF NOT EXISTS CONSENT_PURPOSE_GROUP_CONSENT (
+CREATE TABLE IF NOT EXISTS PURPOSE_CONSENT_MAPPING (
   CONSENT_ID VARCHAR(255) NOT NULL,
-  GROUP_ID   VARCHAR(255) NOT NULL,
+  PURPOSE_ID VARCHAR(255) NOT NULL,
   ORG_ID     VARCHAR(255) DEFAULT 'DEFAULT_ORG',
 
-  PRIMARY KEY (CONSENT_ID, GROUP_ID, ORG_ID),
+  PRIMARY KEY (CONSENT_ID, PURPOSE_ID, ORG_ID),
 
-  INDEX idx_group_consent_consent (CONSENT_ID),
-  INDEX idx_group_consent_group (GROUP_ID),
-  INDEX idx_group_consent_org (ORG_ID),
+  INDEX idx_purpose_consent_consent (CONSENT_ID),
+  INDEX idx_purpose_consent_purpose (PURPOSE_ID),
+  INDEX idx_purpose_consent_org (ORG_ID),
 
-  CONSTRAINT fk_group_consent_consent
+  CONSTRAINT fk_purpose_consent_consent
     FOREIGN KEY (CONSENT_ID, ORG_ID)
     REFERENCES CONSENT (CONSENT_ID, ORG_ID)
     ON DELETE CASCADE,
 
-  CONSTRAINT fk_group_consent_group
-    FOREIGN KEY (GROUP_ID, ORG_ID)
-    REFERENCES CONSENT_PURPOSE_GROUP (ID, ORG_ID)
+  CONSTRAINT fk_purpose_consent_purpose
+    FOREIGN KEY (PURPOSE_ID, ORG_ID)
+    REFERENCES CONSENT_PURPOSE (ID, ORG_ID)
     ON DELETE RESTRICT
 ) ENGINE=INNODB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
 -- Stores user approval status and value for each element in a consent
--- Replaces the old CONSENT_PURPOSE_MAPPING when using groups
+-- Replaces the old CONSENT_PURPOSE_MAPPING when using purposes
 CREATE TABLE IF NOT EXISTS CONSENT_ELEMENT_APPROVAL (
   CONSENT_ID       VARCHAR(255) NOT NULL,
-  GROUP_ID         VARCHAR(255) NOT NULL,
+  PURPOSE_ID       VARCHAR(255) NOT NULL,
   ELEMENT_ID       VARCHAR(255) NOT NULL,
   IS_USER_APPROVED BOOLEAN NOT NULL DEFAULT FALSE,
   VALUE            JSON DEFAULT NULL,  -- user-provided value for this element
@@ -208,20 +205,20 @@ CREATE TABLE IF NOT EXISTS CONSENT_ELEMENT_APPROVAL (
   PRIMARY KEY (CONSENT_ID, ELEMENT_ID, ORG_ID),
 
   INDEX idx_approval_consent (CONSENT_ID, ORG_ID),
-  INDEX idx_approval_group (GROUP_ID, ORG_ID),
+  INDEX idx_approval_purpose (PURPOSE_ID, ORG_ID),
   INDEX idx_approval_element (ELEMENT_ID, ORG_ID),
   INDEX idx_approval_status (IS_USER_APPROVED),
 
-  -- Element must belong to the group
-  CONSTRAINT fk_approval_group_mapping
-    FOREIGN KEY (GROUP_ID, ELEMENT_ID, ORG_ID)
-    REFERENCES CONSENT_PURPOSE_ELEMENT_MAPPING (GROUP_ID, ELEMENT_ID, ORG_ID)
+  -- Element must belong to the purpose
+  CONSTRAINT fk_approval_purpose_element
+    FOREIGN KEY (PURPOSE_ID, ELEMENT_ID, ORG_ID)
+    REFERENCES PURPOSE_ELEMENT_MAPPING (PURPOSE_ID, ELEMENT_ID, ORG_ID)
     ON DELETE RESTRICT,
 
-  -- Group must belong to the consent
-  CONSTRAINT fk_approval_consent_group
-    FOREIGN KEY (CONSENT_ID, GROUP_ID, ORG_ID)
-    REFERENCES CONSENT_PURPOSE_GROUP_CONSENT (CONSENT_ID, GROUP_ID, ORG_ID)
+  -- Purpose must belong to the consent
+  CONSTRAINT fk_approval_consent_purpose
+    FOREIGN KEY (CONSENT_ID, PURPOSE_ID, ORG_ID)
+    REFERENCES PURPOSE_CONSENT_MAPPING (CONSENT_ID, PURPOSE_ID, ORG_ID)
     ON DELETE CASCADE
 ) ENGINE=INNODB
   DEFAULT CHARSET=utf8mb4

@@ -360,8 +360,8 @@ func (s *consentElementService) UpdateElement(ctx context.Context, elementID str
 		}
 	}
 
-	// Check if element is used in any element groups
-	isUsed, err := s.stores.ConsentPurposeGroup.IsPurposeUsedInGroups(ctx, elementID, orgID)
+	// Check if element is used in any consent purposes
+	isUsed, err := s.stores.ConsentPurpose.IsElementUsedInPurposes(ctx, elementID, orgID)
 	if err != nil {
 		logger.Error("Failed to check if element is used in groups",
 			log.Error(err),
@@ -370,11 +370,11 @@ func (s *consentElementService) UpdateElement(ctx context.Context, elementID str
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to check element usage: %v", err))
 	}
 	if isUsed {
-		logger.Warn("Cannot update element that is used in element groups",
+		logger.Warn("Cannot update element that is used in consent purposes",
 			log.String("element_id", elementID),
 			log.String("element_name", existing.Name),
 		)
-		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("cannot update element '%s' as it is being used in one or more element groups", existing.Name))
+		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("cannot update element '%s' as it is being used in one or more consent purposes", existing.Name))
 	}
 
 	// Update element fields
@@ -459,8 +459,8 @@ func (s *consentElementService) DeleteElement(ctx context.Context, elementID, or
 		return serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("element with ID '%s' not found", elementID))
 	}
 
-	// Check if element is used in any element groups
-	isUsed, err := s.stores.ConsentPurposeGroup.IsPurposeUsedInGroups(ctx, elementID, orgID)
+	// Check if element is used in any consent purposes
+	isUsed, err := s.stores.ConsentPurpose.IsElementUsedInPurposes(ctx, elementID, orgID)
 	if err != nil {
 		logger.Error("Failed to check if element is used in groups",
 			log.Error(err),
@@ -469,11 +469,11 @@ func (s *consentElementService) DeleteElement(ctx context.Context, elementID, or
 		return serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to check element usage: %v", err))
 	}
 	if isUsed {
-		logger.Warn("Cannot delete element that is used in element groups",
+		logger.Warn("Cannot delete element that is used in consent purposes",
 			log.String("element_id", elementID),
 			log.String("element_name", existing.Name),
 		)
-		return serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("cannot delete element '%s' as it is being used in one or more element groups", existing.Name))
+		return serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("cannot delete element '%s' as it is being used in one or more consent purposes", existing.Name))
 	}
 
 	// Delete properties and element in a transaction

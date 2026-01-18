@@ -73,15 +73,15 @@ func (s *consentPurposeService) CreatePurpose(ctx context.Context, req model.Cre
 		Description: &desc,
 		Type:        req.Type,
 		OrgID:       orgID,
-		Attributes:  req.Attributes,
+		Properties:  req.Properties,
 	}
 
 	// Prepare attributes if provided
 	var attributes []model.ConsentPurposeAttribute
-	if len(req.Attributes) > 0 {
-		logger.Debug("Adding purpose attributes", log.Int("attribute_count", len(req.Attributes)))
-		attributes = make([]model.ConsentPurposeAttribute, 0, len(req.Attributes))
-		for key, value := range req.Attributes {
+	if len(req.Properties) > 0 {
+		logger.Debug("Adding purpose properties", log.Int("property_count", len(req.Properties)))
+		attributes = make([]model.ConsentPurposeAttribute, 0, len(req.Properties))
+		for key, value := range req.Properties {
 			attr := model.ConsentPurposeAttribute{
 				ID:        utils.GenerateUUID(),
 				PurposeID: purposeID,
@@ -170,7 +170,7 @@ func (s *consentPurposeService) CreatePurposesInBatch(ctx context.Context, reque
 			Description: &desc,
 			Type:        req.Type,
 			OrgID:       orgID,
-			Attributes:  req.Attributes,
+			Properties:  req.Properties,
 		}
 
 		// Add purpose creation to transaction
@@ -180,9 +180,9 @@ func (s *consentPurposeService) CreatePurposesInBatch(ctx context.Context, reque
 		})
 
 		// Add attributes if provided
-		if len(req.Attributes) > 0 {
-			attributes := make([]model.ConsentPurposeAttribute, 0, len(req.Attributes))
-			for key, value := range req.Attributes {
+		if len(req.Properties) > 0 {
+			attributes := make([]model.ConsentPurposeAttribute, 0, len(req.Properties))
+			for key, value := range req.Properties {
 				attr := model.ConsentPurposeAttribute{
 					PurposeID: purposeID,
 					Key:       key,
@@ -243,11 +243,11 @@ func (s *consentPurposeService) GetPurpose(ctx context.Context, purposeID, orgID
 	}
 
 	// Convert attributes to map
-	if purpose.Attributes == nil {
-		purpose.Attributes = make(map[string]string)
+	if purpose.Properties == nil {
+		purpose.Properties = make(map[string]string)
 	}
 	for _, attr := range attributes {
-		purpose.Attributes[attr.Key] = attr.Value
+		purpose.Properties[attr.Key] = attr.Value
 	}
 
 	logger.Debug("Purpose retrieved successfully",
@@ -296,11 +296,11 @@ func (s *consentPurposeService) ListPurposes(ctx context.Context, orgID string, 
 			return nil, 0, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to load attributes: %v", attrErr))
 		}
 
-		if purposes[i].Attributes == nil {
-			purposes[i].Attributes = make(map[string]string)
+		if purposes[i].Properties == nil {
+			purposes[i].Properties = make(map[string]string)
 		}
 		for _, attr := range attributes {
-			purposes[i].Attributes[attr.Key] = attr.Value
+			purposes[i].Properties[attr.Key] = attr.Value
 		}
 	}
 
@@ -369,9 +369,9 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 
 	// Prepare attributes if provided
 	var attributes []model.ConsentPurposeAttribute
-	if len(req.Attributes) > 0 {
-		attributes = make([]model.ConsentPurposeAttribute, 0, len(req.Attributes))
-		for key, value := range req.Attributes {
+	if len(req.Properties) > 0 {
+		attributes = make([]model.ConsentPurposeAttribute, 0, len(req.Properties))
+		for key, value := range req.Properties {
 			attr := model.ConsentPurposeAttribute{
 				PurposeID: purposeID,
 				Key:       key,
@@ -380,7 +380,7 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 			}
 			attributes = append(attributes, attr)
 		}
-		purpose.Attributes = req.Attributes
+		purpose.Properties = req.Properties
 	}
 
 	// Execute all updates in a transaction
@@ -548,9 +548,9 @@ func (s *consentPurposeService) validateCreateRequest(req model.CreateRequest) *
 		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("invalid purpose type: %s", req.Type))
 	}
 
-	// Validate attributes using type handler
-	if validationErr := handler.ValidateAttributes(req.Attributes); validationErr != nil {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("attribute validation failed: %v", validationErr))
+	// Validate properties using type handler
+	if validationErr := handler.ValidateProperties(req.Properties); validationErr != nil {
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("property validation failed: %v", validationErr))
 	}
 
 	return nil
@@ -578,8 +578,8 @@ func (s *consentPurposeService) validateUpdateRequest(req model.UpdateRequest) *
 	}
 
 	// Validate attributes using type handler
-	if validationErr := handler.ValidateAttributes(req.Attributes); validationErr != nil {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("attribute validation failed: %v", validationErr))
+	if validationErr := handler.ValidateProperties(req.Properties); validationErr != nil {
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("property validation failed: %v", validationErr))
 	}
 
 	return nil

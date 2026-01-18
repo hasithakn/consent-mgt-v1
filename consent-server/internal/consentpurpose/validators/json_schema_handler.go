@@ -1,25 +1,25 @@
 package validators
 
-// JsonSchemaPurposeTypeHandler handles "json-schema" type consent purposes
-// JSON schema type requires validationSchema attribute to be present and valid JSON
+// JsonSchemaPurposeTypeHandler handles "json-payload-type" consent purposes
+// JSON payload type requires validationSchema property to be present and valid JSON
 type JsonSchemaPurposeTypeHandler struct{}
 
 // GetType returns the type identifier
 func (h *JsonSchemaPurposeTypeHandler) GetType() string {
-	return "json-schema"
+	return "json-payload-type"
 }
 
-// ValidateAttributes validates attributes for json-schema type
+// ValidateProperties validates properties for json-payload-type
 // Mandatory: validationSchema must be present and valid JSON
-func (h *JsonSchemaPurposeTypeHandler) ValidateAttributes(attributes map[string]string) []ValidationError {
+func (h *JsonSchemaPurposeTypeHandler) ValidateProperties(properties map[string]string) []ValidationError {
 	var errors []ValidationError
 
 	// validationSchema is MANDATORY
-	schema, exists := attributes["validationSchema"]
+	schema, exists := properties["validationSchema"]
 	if !exists || schema == "" {
 		errors = append(errors, ValidationError{
 			Field:   "validationSchema",
-			Message: "validationSchema is required for json-schema type",
+			Message: "validationSchema is required for json-payload-type",
 		})
 		return errors
 	}
@@ -35,16 +35,16 @@ func (h *JsonSchemaPurposeTypeHandler) ValidateAttributes(attributes map[string]
 	return errors
 }
 
-// ProcessAttributes processes attributes for json-schema type
+// ProcessProperties processes properties for json-payload-type
 // Could normalize JSON, add defaults, etc.
-func (h *JsonSchemaPurposeTypeHandler) ProcessAttributes(attributes map[string]string) map[string]string {
+func (h *JsonSchemaPurposeTypeHandler) ProcessProperties(properties map[string]string) map[string]string {
 	// Return as-is, basic processing
-	return attributes
+	return properties
 }
 
-// GetAttributeSpec returns the attribute specification for json-schema type
-func (h *JsonSchemaPurposeTypeHandler) GetAttributeSpec() []PurposeAttributeSpec {
-	return []PurposeAttributeSpec{
+// GetPropertySpec returns the property specification for json-payload-type
+func (h *JsonSchemaPurposeTypeHandler) GetPropertySpec() []PurposePropertySpec {
+	return []PurposePropertySpec{
 		{
 			Name:        "validationSchema",
 			Required:    true,

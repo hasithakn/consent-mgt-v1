@@ -1,32 +1,32 @@
 package validators
 
-// StringPurposeTypeHandler handles "string" type consent purposes
-// String type has no mandatory attributes - all attributes are optional
+// StringPurposeTypeHandler handles "string-type" consent purposes
+// String type has no mandatory properties - all properties are optional
 type StringPurposeTypeHandler struct{}
 
 // GetType returns the type identifier
 func (h *StringPurposeTypeHandler) GetType() string {
-	return "string"
+	return "string-type"
 }
 
-// ValidateAttributes validates attributes for string type
-// String type has no mandatory attributes, so validation always passes
-func (h *StringPurposeTypeHandler) ValidateAttributes(attributes map[string]string) []ValidationError {
-	// String type: no mandatory attributes
-	// All attributes are optional
+// ValidateProperties validates properties for string type
+// String type has no mandatory properties, so validation always passes
+func (h *StringPurposeTypeHandler) ValidateProperties(properties map[string]string) []ValidationError {
+	// String type: no mandatory properties
+	// All properties are optional
 	return nil
 }
 
-// ProcessAttributes processes attributes for string type
+// ProcessProperties processes properties for string type
 // No special processing needed for string type
-func (h *StringPurposeTypeHandler) ProcessAttributes(attributes map[string]string) map[string]string {
+func (h *StringPurposeTypeHandler) ProcessProperties(properties map[string]string) map[string]string {
 	// Return as-is, no transformation needed
-	return attributes
+	return properties
 }
 
-// GetAttributeSpec returns the attribute specification for string type
-func (h *StringPurposeTypeHandler) GetAttributeSpec() []PurposeAttributeSpec {
-	return []PurposeAttributeSpec{
+// GetPropertySpec returns the property specification for string type
+func (h *StringPurposeTypeHandler) GetPropertySpec() []PurposePropertySpec {
+	return []PurposePropertySpec{
 		{
 			Name:        "validationSchema",
 			Required:    false,

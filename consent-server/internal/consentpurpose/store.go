@@ -318,7 +318,7 @@ func mapToConsentPurpose(row map[string]interface{}) *model.ConsentPurpose {
 	}
 
 	// Initialize empty attributes map
-	purpose.Attributes = make(map[string]string)
+	purpose.Properties = make(map[string]string)
 
 	return purpose
 }

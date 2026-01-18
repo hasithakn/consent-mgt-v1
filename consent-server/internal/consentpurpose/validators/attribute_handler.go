@@ -1,48 +1,48 @@
 package validators
 
-// AttributePurposeTypeHandler handles "attribute" type consent purposes
-// Attribute type requires resourcePath and jsonPath to be present
+// AttributePurposeTypeHandler handles "resource-field-type" consent purposes
+// Resource field type requires resourcePath and jsonPath to be present
 type AttributePurposeTypeHandler struct{}
 
 // GetType returns the type identifier
 func (h *AttributePurposeTypeHandler) GetType() string {
-	return "attribute"
+	return "resource-field-type"
 }
 
-// ValidateAttributes validates attributes for attribute type
+// ValidateProperties validates properties for resource-field-type
 // Mandatory: resourcePath and jsonPath must be present
-func (h *AttributePurposeTypeHandler) ValidateAttributes(attributes map[string]string) []ValidationError {
+func (h *AttributePurposeTypeHandler) ValidateProperties(properties map[string]string) []ValidationError {
 	var errors []ValidationError
 
 	// resourcePath is MANDATORY
-	if path, exists := attributes["resourcePath"]; !exists || path == "" {
+	if path, exists := properties["resourcePath"]; !exists || path == "" {
 		errors = append(errors, ValidationError{
 			Field:   "resourcePath",
-			Message: "resourcePath is required for attribute type",
+			Message: "resourcePath is required for resource-field-type",
 		})
 	}
 
 	// jsonPath is MANDATORY
-	if path, exists := attributes["jsonPath"]; !exists || path == "" {
+	if path, exists := properties["jsonPath"]; !exists || path == "" {
 		errors = append(errors, ValidationError{
 			Field:   "jsonPath",
-			Message: "jsonPath is required for attribute type",
+			Message: "jsonPath is required for resource-field-type",
 		})
 	}
 
 	return errors
 }
 
-// ProcessAttributes processes attributes for attribute type
+// ProcessProperties processes properties for resource-field-type
 // Basic processing, could add defaults or validation
-func (h *AttributePurposeTypeHandler) ProcessAttributes(attributes map[string]string) map[string]string {
+func (h *AttributePurposeTypeHandler) ProcessProperties(properties map[string]string) map[string]string {
 	// Return as-is
-	return attributes
+	return properties
 }
 
-// GetAttributeSpec returns the attribute specification for attribute type
-func (h *AttributePurposeTypeHandler) GetAttributeSpec() []PurposeAttributeSpec {
-	return []PurposeAttributeSpec{
+// GetPropertySpec returns the property specification for resource-field-type
+func (h *AttributePurposeTypeHandler) GetPropertySpec() []PurposePropertySpec {
+	return []PurposePropertySpec{
 		{
 			Name:        "resourcePath",
 			Required:    true,

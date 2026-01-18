@@ -63,7 +63,7 @@ func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Req
 			Name:        p.Name,
 			Description: p.Description,
 			Type:        p.Type,
-			Attributes:  p.Attributes,
+			Properties:  p.Properties,
 		})
 	}
 
@@ -100,7 +100,7 @@ func (h *consentPurposeHandler) getPurpose(w http.ResponseWriter, r *http.Reques
 		Name:        purpose.Name,
 		Description: purpose.Description,
 		Type:        purpose.Type,
-		Attributes:  purpose.Attributes,
+		Properties:  purpose.Properties,
 	}
 
 	w.Header().Set(constants.HeaderContentType, "application/json")
@@ -150,7 +150,7 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 			Name:        p.Name,
 			Description: p.Description,
 			Type:        p.Type,
-			Attributes:  p.Attributes,
+			Properties:  p.Properties,
 		})
 	}
 
@@ -198,7 +198,7 @@ func (h *consentPurposeHandler) updatePurpose(w http.ResponseWriter, r *http.Req
 		Name:        purpose.Name,
 		Description: purpose.Description,
 		Type:        purpose.Type,
-		Attributes:  purpose.Attributes,
+		Properties:  purpose.Properties,
 	}
 
 	w.Header().Set(constants.HeaderContentType, "application/json")

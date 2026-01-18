@@ -2,14 +2,14 @@ package validators
 
 import "encoding/json"
 
-// ValidationError represents a single validation error for an attribute
+// ValidationError represents a single validation error for a property
 type ValidationError struct {
 	Field   string `json:"field"`
 	Message string `json:"message"`
 }
 
-// PurposeAttributeSpec defines metadata about an attribute for a purpose type
-type PurposeAttributeSpec struct {
+// PurposePropertySpec defines metadata about a property for a purpose type
+type PurposePropertySpec struct {
 	Name        string `json:"name"`
 	Required    bool   `json:"required"`
 	Type        string `json:"type"` // "string", "json", etc.
@@ -19,20 +19,20 @@ type PurposeAttributeSpec struct {
 
 // PurposeTypeHandler defines behavior for a specific consent purpose type
 type PurposeTypeHandler interface {
-	// GetType returns the type string this handler manages (e.g., "string", "json-schema", "attribute")
+	// GetType returns the type string this handler manages (e.g., "string-type", "json-payload-type", "resource-field-type")
 	GetType() string
 
-	// ValidateAttributes checks if required attributes are present and valid
+	// ValidateProperties checks if required properties are present and valid
 	// Returns ValidationErrors if validation fails, empty slice if valid
-	ValidateAttributes(attributes map[string]string) []ValidationError
+	ValidateProperties(properties map[string]string) []ValidationError
 
-	// ProcessAttributes transforms/normalizes attributes before storage
+	// ProcessProperties transforms/normalizes properties before storage
 	// Useful for sanitization, defaults, or derived values
-	ProcessAttributes(attributes map[string]string) map[string]string
+	ProcessProperties(properties map[string]string) map[string]string
 
-	// GetAttributeSpec returns the schema/spec for this handler's attributes
+	// GetPropertySpec returns the schema/spec for this handler's properties
 	// Useful for documentation and dynamic UI generation
-	GetAttributeSpec() []PurposeAttributeSpec
+	GetPropertySpec() []PurposePropertySpec
 }
 
 // Helper function to validate JSON string

@@ -56,7 +56,7 @@ type ConsentPurpose struct {
 	Name        string            `json:"name" db:"NAME"`
 	Description *string           `json:"description,omitempty" db:"DESCRIPTION"`
 	Type        string            `json:"type" db:"TYPE"`
-	Attributes  map[string]string `json:"attributes,omitempty" db:"-"`
+	Properties  map[string]string `json:"properties,omitempty" db:"-"`
 	OrgID       string            `json:"orgId" db:"ORG_ID"`
 }
 
@@ -76,7 +76,7 @@ type ConsentPurposeCreateRequest struct {
 	Name        string            `json:"name" binding:"required"`
 	Description string            `json:"description,omitempty"`
 	Type        string            `json:"type" binding:"required"`
-	Attributes  map[string]string `json:"attributes,omitempty"`
+	Properties  map[string]string `json:"properties,omitempty"`
 }
 
 // ConsentPurposeUpdateRequest represents the request to update a consent purpose
@@ -85,7 +85,7 @@ type ConsentPurposeUpdateRequest struct {
 	Name        string            `json:"name" binding:"required,max=255"`
 	Description *string           `json:"description,omitempty" binding:"omitempty,max=1024"`
 	Type        string            `json:"type" binding:"required"`
-	Attributes  map[string]string `json:"attributes,omitempty"`
+	Properties  map[string]string `json:"properties,omitempty"`
 }
 
 // ConsentPurposeResponse represents the response for consent purpose operations
@@ -94,7 +94,7 @@ type ConsentPurposeResponse struct {
 	Name        string            `json:"name"`
 	Description *string           `json:"description,omitempty"`
 	Type        string            `json:"type"`
-	Attributes  map[string]string `json:"attributes,omitempty"`
+	Properties  map[string]string `json:"properties,omitempty"`
 }
 
 // ConsentPurposeListResponse represents a list of consent purposes
@@ -110,7 +110,7 @@ func (cp *ConsentPurpose) ToConsentPurposeResponse() *ConsentPurposeResponse {
 		Name:        cp.Name,
 		Description: cp.Description,
 		Type:        cp.Type,
-		Attributes:  cp.Attributes,
+		Properties:  cp.Properties,
 	}
 }
 

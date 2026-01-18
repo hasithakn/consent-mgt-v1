@@ -341,6 +341,25 @@ func (s *consentElementService) UpdateElement(ctx context.Context, elementID str
 		return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("element with ID '%s' not found", elementID))
 	}
 
+	// Check if the new name conflicts with another element (only if name is changing)
+	if req.Name != existing.Name {
+		exists, dbErr := store.CheckNameExists(ctx, req.Name, orgID)
+		if dbErr != nil {
+			logger.Error("Failed to check element name existence during update",
+				log.Error(dbErr),
+				log.String("name", req.Name),
+			)
+			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to check name existence: %v", dbErr))
+		}
+		if exists {
+			logger.Warn("Element name already exists for another element",
+				log.String("name", req.Name),
+				log.String("element_id", elementID),
+			)
+			return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("element with name '%s' already exists", req.Name))
+		}
+	}
+
 	// Check if element is used in any element groups
 	isUsed, err := s.stores.ConsentPurposeGroup.IsPurposeUsedInGroups(ctx, elementID, orgID)
 	if err != nil {

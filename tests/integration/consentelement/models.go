@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2025, WSO2 LLC. (https://www.wso2.com).
+ *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License.
@@ -14,37 +16,37 @@
  * under the License.
  */
 
-package consentpurpose
+package consentelement
 
-// Request models - API expects an array of ConsentPurposeCreateRequest
-type ConsentPurposeCreateRequest struct {
+// Request models - API expects an array of ConsentElementCreateRequest
+type ConsentElementCreateRequest struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description,omitempty"`
 	Type        string            `json:"type"`
-	Attributes  map[string]string `json:"attributes,omitempty"`
+	Properties  map[string]string `json:"properties,omitempty"`
 }
 
-// Update request model - PUT /consent-purposes/{id}
-type ConsentPurposeUpdateRequest struct {
+// Update request model - PUT /consent-elements/{id}
+type ConsentElementUpdateRequest struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description,omitempty"`
 	Type        string            `json:"type"`
-	Attributes  map[string]string `json:"attributes,omitempty"`
+	Properties  map[string]string `json:"properties,omitempty"`
 }
 
 // Response models
-type PurposeResponse struct {
+type ElementResponse struct {
 	ID          string            `json:"id"`
 	Name        string            `json:"name"`
 	Description *string           `json:"description,omitempty"`
 	Type        string            `json:"type"`
-	Attributes  map[string]string `json:"attributes,omitempty"`
+	Properties  map[string]string `json:"properties,omitempty"`
 	CreatedAt   string            `json:"createdAt,omitempty"`
 	UpdatedAt   string            `json:"updatedAt,omitempty"`
 }
 
-type PurposeListResponse struct {
-	Data     []PurposeResponse `json:"data"`
+type ElementListResponse struct {
+	Data     []ElementResponse `json:"data"`
 	Metadata Metadata          `json:"metadata"`
 }
 
@@ -55,8 +57,8 @@ type Metadata struct {
 	Limit  int `json:"limit"`
 }
 
-type PurposeCreateResponse struct {
-	Data    []PurposeResponse `json:"data"`
+type ElementCreateResponse struct {
+	Data    []ElementResponse `json:"data"`
 	Message string            `json:"message"`
 }
 

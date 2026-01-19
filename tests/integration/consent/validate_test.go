@@ -361,18 +361,26 @@ func (ts *ConsentAPITestSuite) TestValidateConsent_FullConsentInformation_Return
 		ValidityTime:       validityTime,
 		Frequency:          frequency,
 		RecurringIndicator: recurringIndicator,
-		ConsentPurpose: []ConsentPurposeItem{
+		Purposes: []ConsentPurposeItem{
 			{
-				Name:           "marketing-purpose",
-				Value:          "Marketing consent value",
-				IsUserApproved: true,
-				IsMandatory:    true,
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{
+						Name:           "marketing-purpose",
+						Value:          "Marketing consent value",
+						IsUserApproved: true,
+					},
+				},
 			},
 			{
-				Name:           "analytics-purpose",
-				Value:          "Analytics consent value",
-				IsUserApproved: true,
-				IsMandatory:    false,
+				Name: "analytics-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{
+						Name:           "analytics-purpose",
+						Value:          "Analytics consent value",
+						IsUserApproved: true,
+					},
+				},
 			},
 		},
 		Attributes: map[string]string{
@@ -468,17 +476,17 @@ func (ts *ConsentAPITestSuite) TestValidateConsent_FullConsentInformation_Return
 	}
 
 	// 5. Consent Purposes - comprehensive validation
-	ts.Require().Len(consentInfo.ConsentPurpose, len(getResponse.ConsentPurpose), "ConsentPurpose count must match")
-	ts.Equal(2, len(consentInfo.ConsentPurpose), "Should have 2 consent purposes")
+	ts.Require().Len(consentInfo.Purposes, len(getResponse.Purposes), "ConsentPurpose count must match")
+	ts.Equal(2, len(consentInfo.Purposes), "Should have 2 consent purposes")
 
 	// Create map for easier comparison
 	validatePurposeMap := make(map[string]ConsentPurposeItem)
-	for _, cp := range consentInfo.ConsentPurpose {
+	for _, cp := range consentInfo.Purposes {
 		validatePurposeMap[cp.Name] = cp
 	}
 
 	getPurposeMap := make(map[string]ConsentPurposeItem)
-	for _, cp := range getResponse.ConsentPurpose {
+	for _, cp := range getResponse.Purposes {
 		getPurposeMap[cp.Name] = cp
 	}
 
@@ -487,13 +495,22 @@ func (ts *ConsentAPITestSuite) TestValidateConsent_FullConsentInformation_Return
 		ts.True(exists, "Purpose '%s' should exist in validate response", purposeName)
 
 		ts.Equal(getCP.Name, validateCP.Name, "Purpose name must match")
-		ts.Equal(getCP.IsUserApproved, validateCP.IsUserApproved, "Purpose IsUserApproved must match for %s", purposeName)
-		ts.Equal(getCP.IsMandatory, validateCP.IsMandatory, "Purpose IsMandatory must match for %s", purposeName)
 
-		// Verify value matches if present
-		if getCP.Value != nil {
-			ts.NotNil(validateCP.Value, "Purpose value should be present for %s", purposeName)
-			ts.Equal(getCP.Value, validateCP.Value, "Purpose value must match for %s", purposeName)
+		// Verify elements array
+		ts.Require().Len(validateCP.Elements, len(getCP.Elements), "Elements count must match for purpose %s", purposeName)
+		if len(getCP.Elements) > 0 && len(validateCP.Elements) > 0 {
+			// Check first element (in these tests, each purpose has one element)
+			getElem := getCP.Elements[0]
+			validateElem := validateCP.Elements[0]
+
+			ts.Equal(getElem.Name, validateElem.Name, "Element name must match for %s", purposeName)
+			ts.Equal(getElem.IsUserApproved, validateElem.IsUserApproved, "Element IsUserApproved must match for %s", purposeName)
+
+			// Verify value matches if present
+			if getElem.Value != nil {
+				ts.NotNil(validateElem.Value, "Element value should be present for %s", purposeName)
+				ts.Equal(getElem.Value, validateElem.Value, "Element value must match for %s", purposeName)
+			}
 		}
 	}
 

@@ -43,16 +43,19 @@ const (
 type ConsentAPITestSuite struct {
 	suite.Suite
 	createdConsentIDs []string // Track created consents for cleanup
+	testElementIDs    []string // Track test elements for cleanup
 	testPurposeIDs    []string // Track test purposes for cleanup
 }
 
 // SetupSuite runs once before all tests
 func (ts *ConsentAPITestSuite) SetupSuite() {
 	ts.createdConsentIDs = make([]string, 0)
+	ts.testElementIDs = make([]string, 0)
 	ts.testPurposeIDs = make([]string, 0)
 	ts.T().Logf("=== Consent Test Suite Starting ===")
 
-	// Create test purposes needed for consent tests
+	// Create test elements and purposes needed for consent tests
+	ts.createTestElements()
 	ts.createTestPurposes()
 }
 
@@ -72,8 +75,9 @@ func (ts *ConsentAPITestSuite) TearDownSuite() {
 	}
 	ts.T().Logf("=== Cleanup complete: %d deleted, %d failed ===", deleted, failed)
 
-	// Cleanup test purposes
+	// Cleanup test purposes and elements
 	ts.cleanupTestPurposes()
+	ts.cleanupTestElements()
 }
 
 // createConsent is a helper to create a consent and returns response and body
@@ -409,70 +413,168 @@ func (ts *ConsentAPITestSuite) trackConsent(consentID string) {
 	ts.createdConsentIDs = append(ts.createdConsentIDs, consentID)
 }
 
-// createTestPurposes creates consent purposes needed for testing
+// createTestElements creates consent elements needed for testing
+func (ts *ConsentAPITestSuite) createTestElements() {
+	ts.T().Logf("Setting up test elements...")
+
+	elements := []map[string]interface{}{
+		{
+			"name":        "marketing-purpose",
+			"description": "Marketing consent element",
+			"type":        "string-type",
+			"attributes":  map[string]string{},
+		},
+		{
+			"name":        "analytics-purpose",
+			"description": "Analytics consent element",
+			"type":        "string-type",
+			"attributes":  map[string]string{},
+		},
+		{
+			"name":        "terms-purpose",
+			"description": "Terms and conditions element",
+			"type":        "string-type",
+			"attributes":  map[string]string{},
+		},
+	}
+
+	reqBody, err := json.Marshal(elements)
+	if err != nil {
+		ts.T().Logf("Warning: failed to marshal elements: %v", err)
+		return
+	}
+
+	httpReq, _ := http.NewRequest("POST", testServerURL+"/api/v1/consent-elements",
+		bytes.NewBuffer(reqBody))
+	httpReq.Header.Set(testutils.HeaderContentType, "application/json")
+	httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
+
+	client := testutils.GetHTTPClient()
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		ts.T().Logf("Warning: failed to create elements: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusCreated {
+		var result struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+		body, _ := io.ReadAll(resp.Body)
+		if json.Unmarshal(body, &result) == nil {
+			for _, item := range result.Data {
+				ts.testElementIDs = append(ts.testElementIDs, item.ID)
+			}
+		}
+		ts.T().Logf("Created %d test elements", len(ts.testElementIDs))
+	} else {
+		body, _ := io.ReadAll(resp.Body)
+		ts.T().Logf("Warning: failed to create elements: %d - %s", resp.StatusCode, string(body))
+	}
+}
+
+// cleanupTestElements removes test elements created in SetupSuite
+func (ts *ConsentAPITestSuite) cleanupTestElements() {
+	ts.T().Logf("Cleaning up test elements...")
+	for _, elementID := range ts.testElementIDs {
+		url := fmt.Sprintf("%s/api/v1/consent-elements/%s", testServerURL, elementID)
+		httpReq, _ := http.NewRequest("DELETE", url, nil)
+		httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
+
+		client := testutils.GetHTTPClient()
+		resp, err := client.Do(httpReq)
+		if err != nil {
+			ts.T().Logf("Warning: failed to delete element %s: %v", elementID, err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+			body, _ := io.ReadAll(resp.Body)
+			ts.T().Logf("Warning: failed to delete element %s: %d - %s", elementID, resp.StatusCode, string(body))
+		}
+	}
+}
+
+// createTestPurposes creates purposes that group elements for testing
 func (ts *ConsentAPITestSuite) createTestPurposes() {
 	ts.T().Logf("Setting up test purposes...")
 
 	purposes := []map[string]interface{}{
 		{
 			"name":        "marketing-purpose",
-			"description": "Marketing consent purpose",
-			"type":        "string",
-			"attributes":  map[string]string{},
+			"description": "Marketing related consents",
+			"elements": []map[string]interface{}{
+				{
+					"name":        "marketing-purpose",
+					"isMandatory": false,
+				},
+			},
+			"attributes": map[string]string{},
 		},
 		{
 			"name":        "analytics-purpose",
-			"description": "Analytics consent purpose",
-			"type":        "string",
-			"attributes":  map[string]string{},
+			"description": "Analytics and tracking consents",
+			"elements": []map[string]interface{}{
+				{
+					"name":        "analytics-purpose",
+					"isMandatory": false,
+				},
+			},
+			"attributes": map[string]string{},
 		},
 		{
 			"name":        "terms-purpose",
-			"description": "Terms and conditions purpose",
-			"type":        "string",
-			"attributes":  map[string]string{},
+			"description": "Terms and conditions acceptance",
+			"elements": []map[string]interface{}{
+				{
+					"name":        "terms-purpose",
+					"isMandatory": true,
+				},
+			},
+			"attributes": map[string]string{},
 		},
 	}
 
-	reqBody, err := json.Marshal(purposes)
-	if err != nil {
-		ts.T().Logf("Warning: failed to marshal purposes: %v", err)
-		return
-	}
-
-	httpReq, _ := http.NewRequest("POST", testServerURL+"/api/v1/consent-purposes",
-		bytes.NewBuffer(reqBody))
-	httpReq.Header.Set(testutils.HeaderContentType, "application/json")
-	httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
-	httpReq.Header.Set(testutils.HeaderClientID, testClientID)
-
-	client := testutils.GetHTTPClient()
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		ts.T().Logf("Warning: failed to create purposes: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusCreated {
-		var result map[string]interface{}
-		body, _ := io.ReadAll(resp.Body)
-		if json.Unmarshal(body, &result) == nil {
-			if data, ok := result["data"].([]interface{}); ok {
-				for _, item := range data {
-					if purposeMap, ok := item.(map[string]interface{}); ok {
-						if id, ok := purposeMap["purposeId"].(string); ok {
-							ts.testPurposeIDs = append(ts.testPurposeIDs, id)
-						}
-					}
-				}
-			}
+	for _, purpose := range purposes {
+		reqBody, err := json.Marshal(purpose)
+		if err != nil {
+			ts.T().Logf("Warning: failed to marshal purpose: %v", err)
+			continue
 		}
-		ts.T().Logf("Created %d test purposes", len(ts.testPurposeIDs))
-	} else {
-		body, _ := io.ReadAll(resp.Body)
-		ts.T().Logf("Warning: failed to create purposes: %d - %s", resp.StatusCode, string(body))
+
+		httpReq, _ := http.NewRequest("POST", testServerURL+"/api/v1/consent-purposes",
+			bytes.NewBuffer(reqBody))
+		httpReq.Header.Set(testutils.HeaderContentType, "application/json")
+		httpReq.Header.Set(testutils.HeaderOrgID, testOrgID)
+		httpReq.Header.Set(testutils.HeaderClientID, testClientID)
+
+		client := testutils.GetHTTPClient()
+		resp, err := client.Do(httpReq)
+		if err != nil {
+			ts.T().Logf("Warning: failed to create purpose: %v", err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusCreated {
+			var result struct {
+				ID string `json:"id"`
+			}
+			body, _ := io.ReadAll(resp.Body)
+			if json.Unmarshal(body, &result) == nil {
+				ts.testPurposeIDs = append(ts.testPurposeIDs, result.ID)
+			}
+		} else {
+			body, _ := io.ReadAll(resp.Body)
+			ts.T().Logf("Warning: failed to create purpose: %d - %s", resp.StatusCode, string(body))
+		}
 	}
+
+	ts.T().Logf("Created %d test purposes", len(ts.testPurposeIDs))
 }
 
 // cleanupTestPurposes removes test purposes created in SetupSuite

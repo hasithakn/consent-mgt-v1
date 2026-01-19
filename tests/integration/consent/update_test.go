@@ -32,12 +32,16 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_AddPurpose_Succeeds() {
 	// Create consent with one purpose
 	createPayload := ConsentCreateRequest{
 		Type: "accounts",
-		ConsentPurpose: []ConsentPurposeItem{
+		Purposes: []ConsentPurposeItem{
 			{
-				Name:           "marketing-purpose",
-				Value:          "yes",
-				IsUserApproved: true,
-				IsMandatory:    false,
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{
+						Name:           "marketing-purpose",
+						Value:          "yes",
+						IsUserApproved: true,
+					},
+				},
 			},
 		},
 		Authorizations: []AuthorizationRequest{
@@ -55,18 +59,26 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_AddPurpose_Succeeds() {
 
 	// Update to add another purpose
 	updatePayload := ConsentUpdateRequest{
-		ConsentPurpose: []ConsentPurposeItem{
+		Purposes: []ConsentPurposeItem{
 			{
-				Name:           "marketing-purpose",
-				Value:          "yes",
-				IsUserApproved: true,
-				IsMandatory:    false,
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{
+						Name:           "marketing-purpose",
+						Value:          "yes",
+						IsUserApproved: true,
+					},
+				},
 			},
 			{
-				Name:           "analytics-purpose",
-				Value:          "approved",
-				IsUserApproved: true,
-				IsMandatory:    true,
+				Name: "analytics-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{
+						Name:           "analytics-purpose",
+						Value:          "approved",
+						IsUserApproved: true,
+					},
+				},
 			},
 		},
 	}
@@ -83,8 +95,8 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_AddPurpose_Succeeds() {
 	var updated ConsentResponse
 	ts.NoError(json.Unmarshal(getBody, &updated))
 
-	ts.Len(updated.ConsentPurpose, 2)
-	purposeNames := []string{updated.ConsentPurpose[0].Name, updated.ConsentPurpose[1].Name}
+	ts.Len(updated.Purposes, 2)
+	purposeNames := []string{updated.Purposes[0].Name, updated.Purposes[1].Name}
 	ts.Contains(purposeNames, "marketing-purpose")
 	ts.Contains(purposeNames, "analytics-purpose")
 }
@@ -94,18 +106,26 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_RemovePurpose_Succeeds() {
 	// Create consent with two purposes
 	createPayload := ConsentCreateRequest{
 		Type: "accounts",
-		ConsentPurpose: []ConsentPurposeItem{
+		Purposes: []ConsentPurposeItem{
 			{
-				Name:           "marketing-purpose",
-				Value:          "yes",
-				IsUserApproved: true,
-				IsMandatory:    false,
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{
+						Name:           "marketing-purpose",
+						Value:          "yes",
+						IsUserApproved: true,
+					},
+				},
 			},
 			{
-				Name:           "analytics-purpose",
-				Value:          "approved",
-				IsUserApproved: true,
-				IsMandatory:    true,
+				Name: "analytics-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{
+						Name:           "analytics-purpose",
+						Value:          "approved",
+						IsUserApproved: true,
+					},
+				},
 			},
 		},
 		Authorizations: []AuthorizationRequest{
@@ -123,12 +143,16 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_RemovePurpose_Succeeds() {
 
 	// Update to keep only one purpose
 	updatePayload := ConsentUpdateRequest{
-		ConsentPurpose: []ConsentPurposeItem{
+		Purposes: []ConsentPurposeItem{
 			{
-				Name:           "marketing-purpose",
-				Value:          "yes",
-				IsUserApproved: true,
-				IsMandatory:    false,
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{
+						Name:           "marketing-purpose",
+						Value:          "yes",
+						IsUserApproved: true,
+					},
+				},
 			},
 		},
 	}
@@ -145,8 +169,8 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_RemovePurpose_Succeeds() {
 	var updated ConsentResponse
 	ts.NoError(json.Unmarshal(getBody, &updated))
 
-	ts.Len(updated.ConsentPurpose, 1)
-	ts.Equal("marketing-purpose", updated.ConsentPurpose[0].Name)
+	ts.Len(updated.Purposes, 1)
+	ts.Equal("marketing-purpose", updated.Purposes[0].Name)
 }
 
 // TestUpdateConsent_UpdateAttributes_Succeeds changes attribute values
@@ -329,8 +353,13 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_FullUpdate_Succeeds() {
 	newFrequency := 5
 	newRecurringIndicator := true
 	updatePayload := ConsentUpdateRequest{
-		ConsentPurpose: []ConsentPurposeItem{
-			{Name: "marketing-purpose", Value: "yes", IsUserApproved: true, IsMandatory: false},
+		Purposes: []ConsentPurposeItem{
+			{
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{Name: "marketing-purpose", Value: "yes", IsUserApproved: true},
+				},
+			},
 		},
 		Attributes: map[string]string{
 			"accountType": "savings",
@@ -354,7 +383,7 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_FullUpdate_Succeeds() {
 
 	var updated ConsentResponse
 	ts.NoError(json.Unmarshal(getBody, &updated))
-	ts.Equal(1, len(updated.ConsentPurpose))
+	ts.Equal(1, len(updated.Purposes))
 	ts.Equal(1, len(updated.Attributes))
 	ts.NotNil(updated.ValidityTime)
 	ts.Equal(int64(7200), *updated.ValidityTime)
@@ -792,8 +821,13 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_InvalidPurposeName_ReturnsNotFo
 
 	// Try to add non-existent purpose
 	updatePayload := ConsentUpdateRequest{
-		ConsentPurpose: []ConsentPurposeItem{
-			{Name: "non-existent-purpose", Value: "yes", IsUserApproved: true, IsMandatory: false},
+		Purposes: []ConsentPurposeItem{
+			{
+				Name: "non-existent-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{Name: "non-existent-purpose", Value: "yes", IsUserApproved: true},
+				},
+			},
 		},
 	}
 
@@ -878,9 +912,19 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_RemoveAllPurposes_Succeeds() {
 	// Create consent with purposes
 	createPayload := ConsentCreateRequest{
 		Type: "accounts",
-		ConsentPurpose: []ConsentPurposeItem{
-			{Name: "marketing-purpose", Value: "yes", IsUserApproved: true, IsMandatory: false},
-			{Name: "analytics-purpose", Value: "approved", IsUserApproved: true, IsMandatory: true},
+		Purposes: []ConsentPurposeItem{
+			{
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{Name: "marketing-purpose", Value: "yes", IsUserApproved: true},
+				},
+			},
+			{
+				Name: "analytics-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{Name: "analytics-purpose", Value: "approved", IsUserApproved: true},
+				},
+			},
 		},
 		Authorizations: []AuthorizationRequest{
 			{UserID: "user1", Type: "auth", Status: "APPROVED"},
@@ -894,11 +938,11 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_RemoveAllPurposes_Succeeds() {
 	var created ConsentResponse
 	ts.NoError(json.Unmarshal(createBody, &created))
 	ts.trackConsent(created.ID)
-	ts.Equal(2, len(created.ConsentPurpose))
+	ts.Equal(2, len(created.Purposes))
 
 	// Update to remove all purposes
 	updatePayload := ConsentUpdateRequest{
-		ConsentPurpose: []ConsentPurposeItem{},
+		Purposes: []ConsentPurposeItem{},
 	}
 
 	updateResp, _ := ts.updateConsent(created.ID, updatePayload)
@@ -912,7 +956,7 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_RemoveAllPurposes_Succeeds() {
 
 	var updated ConsentResponse
 	ts.NoError(json.Unmarshal(getBody, &updated))
-	ts.Empty(updated.ConsentPurpose, "All purposes should be removed")
+	ts.Empty(updated.Purposes, "All purposes should be removed")
 }
 
 // TestUpdateConsent_RemoveAllAttributes_Succeeds removes all attributes
@@ -963,8 +1007,13 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_RemoveAllItems_Succeeds() {
 	// Create consent with everything
 	createPayload := ConsentCreateRequest{
 		Type: "accounts",
-		ConsentPurpose: []ConsentPurposeItem{
-			{Name: "marketing-purpose", Value: "yes", IsUserApproved: true, IsMandatory: false},
+		Purposes: []ConsentPurposeItem{
+			{
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{Name: "marketing-purpose", Value: "yes", IsUserApproved: true},
+				},
+			},
 		},
 		Authorizations: []AuthorizationRequest{
 			{UserID: "user1", Type: "auth", Status: "APPROVED"},
@@ -982,9 +1031,10 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_RemoveAllItems_Succeeds() {
 	ts.NoError(json.Unmarshal(createBody, &created))
 	ts.trackConsent(created.ID)
 
-	// Update to remove everything
+	// Update to remove everything (but keep type)
 	updatePayload := ConsentUpdateRequest{
-		ConsentPurpose: []ConsentPurposeItem{},
+		Type:           "accounts", // Preserve type
+		Purposes:       []ConsentPurposeItem{},
 		Authorizations: []AuthorizationRequest{},
 		Attributes:     map[string]string{},
 	}
@@ -1000,7 +1050,7 @@ func (ts *ConsentAPITestSuite) TestUpdateConsent_RemoveAllItems_Succeeds() {
 
 	var updated ConsentResponse
 	ts.NoError(json.Unmarshal(getBody, &updated))
-	ts.Empty(updated.ConsentPurpose, "All purposes should be removed")
+	ts.Empty(updated.Purposes, "All purposes should be removed")
 	ts.Empty(updated.Authorizations, "All authorizations should be removed")
 	ts.Empty(updated.Attributes, "All attributes should be removed")
 	ts.Equal("accounts", updated.Type, "Type should remain")

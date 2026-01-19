@@ -66,10 +66,25 @@ func (ts *ConsentAPITestSuite) TestGetConsent_MinimalConsent_ReturnsAllFields() 
 func (ts *ConsentAPITestSuite) TestGetConsent_WithPurposes_ReturnsAllPurposes() {
 	createPayload := ConsentCreateRequest{
 		Type: "accounts",
-		ConsentPurpose: []ConsentPurposeItem{
-			{Name: "marketing-purpose", Value: "yes", IsUserApproved: true, IsMandatory: false},
-			{Name: "analytics-purpose", Value: true, IsUserApproved: true, IsMandatory: false},
-			{Name: "terms-purpose", IsUserApproved: true, IsMandatory: true},
+		Purposes: []ConsentPurposeItem{
+			{
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{Name: "marketing-purpose", Value: "yes", IsUserApproved: true},
+				},
+			},
+			{
+				Name: "analytics-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{Name: "analytics-purpose", Value: true, IsUserApproved: true},
+				},
+			},
+			{
+				Name: "terms-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{Name: "terms-purpose", IsUserApproved: true},
+				},
+			},
 		},
 		Authorizations: []AuthorizationRequest{
 			{UserID: "user1", Type: "auth", Status: "APPROVED"},
@@ -93,7 +108,7 @@ func (ts *ConsentAPITestSuite) TestGetConsent_WithPurposes_ReturnsAllPurposes() 
 	var retrieved ConsentResponse
 	ts.NoError(json.Unmarshal(getBody, &retrieved))
 
-	ts.Len(retrieved.ConsentPurpose, 3)
+	ts.Len(retrieved.Purposes, 3)
 }
 
 // TestGetConsent_WithAttributes_ReturnsAllAttributes retrieves a consent with attributes
@@ -170,8 +185,13 @@ func (ts *ConsentAPITestSuite) TestGetConsent_AfterCreate_ReturnsCompleteData() 
 
 	createPayload := ConsentCreateRequest{
 		Type: "accounts",
-		ConsentPurpose: []ConsentPurposeItem{
-			{Name: "marketing-purpose", Value: "yes", IsUserApproved: true, IsMandatory: false},
+		Purposes: []ConsentPurposeItem{
+			{
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{Name: "marketing-purpose", Value: "yes", IsUserApproved: true},
+				},
+			},
 		},
 		Attributes: map[string]string{
 			"merchantId": "MERCH123",
@@ -204,7 +224,7 @@ func (ts *ConsentAPITestSuite) TestGetConsent_AfterCreate_ReturnsCompleteData() 
 	// Verify all data matches
 	ts.Equal(created.ID, retrieved.ID)
 	ts.Equal("accounts", retrieved.Type)
-	ts.Len(retrieved.ConsentPurpose, 1)
+	ts.Len(retrieved.Purposes, 1)
 	ts.NotNil(retrieved.Attributes)
 	ts.Require().NotNil(retrieved.ValidityTime)
 	ts.Equal(validityTime, *retrieved.ValidityTime)
@@ -244,7 +264,7 @@ func (ts *ConsentAPITestSuite) TestGetConsent_MissingOrgID_Returns400() {
 	ts.Equal(http.StatusBadRequest, resp.StatusCode)
 }
 
-// TestGetConsent_MissingClientID_Returns400 verifies missing client-id header returns 400
+// TestGetConsent_MissingClientID_Returns400 verifies GET works without client-id (not required for GET)
 func (ts *ConsentAPITestSuite) TestGetConsent_MissingClientID_Returns400() {
 	// Create a consent first
 	createPayload := ConsentCreateRequest{
@@ -262,11 +282,14 @@ func (ts *ConsentAPITestSuite) TestGetConsent_MissingClientID_Returns400() {
 	ts.NoError(json.Unmarshal(createBody, &created))
 	ts.trackConsent(created.ID)
 
-	// Try to get without client-id header
-	resp, _ := ts.getConsentWithHeaders(created.ID, testOrgID, "")
+	// GET without client-id header should work (client-id not required for GET per API spec)
+	resp, body := ts.getConsentWithHeaders(created.ID, testOrgID, "")
 	defer resp.Body.Close()
 
-	ts.Equal(http.StatusBadRequest, resp.StatusCode)
+	ts.Equal(http.StatusOK, resp.StatusCode)
+	var retrieved ConsentResponse
+	ts.NoError(json.Unmarshal(body, &retrieved))
+	ts.Equal(created.ID, retrieved.ID)
 }
 
 // TestGetConsent_NonExistentConsentID_ReturnsNotFound verifies non-existent consent returns 404

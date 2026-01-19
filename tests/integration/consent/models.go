@@ -1,11 +1,16 @@
 package consent
 
-// ConsentPurposeItem represents a consent purpose in the request/response
+// ConsentPurposeItem represents a consent purpose (logical grouping of elements) in the request/response
 type ConsentPurposeItem struct {
+	Name     string                       `json:"name"`
+	Elements []ConsentPurposeApprovalItem `json:"elements"`
+}
+
+// ConsentPurposeApprovalItem represents an element approval within a purpose
+type ConsentPurposeApprovalItem struct {
 	Name           string      `json:"name"`
 	Value          interface{} `json:"value,omitempty"`
 	IsUserApproved bool        `json:"isUserApproved"`
-	IsMandatory    bool        `json:"isMandatory"`
 }
 
 // AuthorizationRequest represents authorization data in consent creation/update
@@ -21,7 +26,7 @@ type AuthorizationRequest struct {
 // ConsentCreateRequest represents the payload for creating a consent
 type ConsentCreateRequest struct {
 	Type               string                 `json:"type"`
-	ConsentPurpose     []ConsentPurposeItem   `json:"consentPurpose,omitempty"`
+	Purposes           []ConsentPurposeItem   `json:"purposes,omitempty"`
 	Authorizations     []AuthorizationRequest `json:"authorizations"`
 	Attributes         map[string]string      `json:"attributes,omitempty"`
 	ValidityTime       int64                  `json:"validityTime,omitempty"`
@@ -32,7 +37,7 @@ type ConsentCreateRequest struct {
 // ConsentUpdateRequest represents the payload for updating a consent
 type ConsentUpdateRequest struct {
 	Type               string                 `json:"type,omitempty"`
-	ConsentPurpose     []ConsentPurposeItem   `json:"consentPurpose"` // Remove omitempty to allow empty arrays for removal
+	Purposes           []ConsentPurposeItem   `json:"purposes"`       // Remove omitempty to allow empty arrays for removal
 	Authorizations     []AuthorizationRequest `json:"authorizations"` // Remove omitempty to allow empty arrays for removal
 	Attributes         map[string]string      `json:"attributes"`     // Remove omitempty to allow empty maps for removal
 	ValidityTime       *int64                 `json:"validityTime,omitempty"`
@@ -62,7 +67,7 @@ type ConsentResponse struct {
 	ClientID                   string                  `json:"clientId"`
 	Type                       string                  `json:"type"`
 	Status                     string                  `json:"status"`
-	ConsentPurpose             []ConsentPurposeItem    `json:"consentPurpose"`
+	Purposes                   []ConsentPurposeItem    `json:"purposes"`
 	Authorizations             []AuthorizationResponse `json:"authorizations"`
 	Attributes                 map[string]string       `json:"attributes"`
 	ValidityTime               *int64                  `json:"validityTime,omitempty"`
@@ -123,7 +128,7 @@ type ConsentValidateDetail struct {
 	Status                     string                  `json:"status"`
 	CreatedTime                int64                   `json:"createdTime"`
 	UpdatedTime                int64                   `json:"updatedTime"`
-	ConsentPurpose             []ConsentPurposeItem    `json:"consentPurpose"`
+	Purposes                   []ConsentPurposeItem    `json:"purposes"`
 	Authorizations             []AuthorizationResponse `json:"authorizations"`
 	Attributes                 map[string]string       `json:"attributes"`
 	ValidityTime               *int64                  `json:"validityTime,omitempty"`

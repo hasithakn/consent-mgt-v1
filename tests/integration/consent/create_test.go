@@ -63,12 +63,16 @@ func (ts *ConsentAPITestSuite) TestCreateConsent_MinimalPayload_Succeeds() {
 func (ts *ConsentAPITestSuite) TestCreateConsent_WithSinglePurpose_Succeeds() {
 	payload := ConsentCreateRequest{
 		Type: "accounts",
-		ConsentPurpose: []ConsentPurposeItem{
+		Purposes: []ConsentPurposeItem{
 			{
-				Name:           "marketing-purpose",
-				Value:          "yes",
-				IsUserApproved: true,
-				IsMandatory:    false,
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{
+						Name:           "marketing-purpose",
+						Value:          "yes",
+						IsUserApproved: true,
+					},
+				},
 			},
 		},
 		Authorizations: []AuthorizationRequest{
@@ -88,8 +92,10 @@ func (ts *ConsentAPITestSuite) TestCreateConsent_WithSinglePurpose_Succeeds() {
 	var consentResp ConsentResponse
 	ts.NoError(json.Unmarshal(body, &consentResp))
 
-	ts.Len(consentResp.ConsentPurpose, 1)
-	ts.Equal("marketing-purpose", consentResp.ConsentPurpose[0].Name)
+	ts.Len(consentResp.Purposes, 1)
+	ts.Equal("marketing-purpose", consentResp.Purposes[0].Name)
+	ts.Len(consentResp.Purposes[0].Elements, 1)
+	ts.Equal("marketing-purpose", consentResp.Purposes[0].Elements[0].Name)
 
 	ts.trackConsent(consentResp.ID)
 }
@@ -98,23 +104,35 @@ func (ts *ConsentAPITestSuite) TestCreateConsent_WithSinglePurpose_Succeeds() {
 func (ts *ConsentAPITestSuite) TestCreateConsent_WithMultiplePurposes_Succeeds() {
 	payload := ConsentCreateRequest{
 		Type: "accounts",
-		ConsentPurpose: []ConsentPurposeItem{
+		Purposes: []ConsentPurposeItem{
 			{
-				Name:           "marketing-purpose",
-				Value:          "yes",
-				IsUserApproved: true,
-				IsMandatory:    false,
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{
+						Name:           "marketing-purpose",
+						Value:          "yes",
+						IsUserApproved: true,
+					},
+				},
 			},
 			{
-				Name:           "analytics-purpose",
-				Value:          true,
-				IsUserApproved: true,
-				IsMandatory:    false,
+				Name: "analytics-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{
+						Name:           "analytics-purpose",
+						Value:          true,
+						IsUserApproved: true,
+					},
+				},
 			},
 			{
-				Name:           "terms-purpose",
-				IsUserApproved: true,
-				IsMandatory:    true,
+				Name: "terms-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{
+						Name:           "terms-purpose",
+						IsUserApproved: true,
+					},
+				},
 			},
 		},
 		Authorizations: []AuthorizationRequest{
@@ -134,7 +152,7 @@ func (ts *ConsentAPITestSuite) TestCreateConsent_WithMultiplePurposes_Succeeds()
 	var consentResp ConsentResponse
 	ts.NoError(json.Unmarshal(body, &consentResp))
 
-	ts.Len(consentResp.ConsentPurpose, 3)
+	ts.Len(consentResp.Purposes, 3)
 
 	ts.trackConsent(consentResp.ID)
 }
@@ -298,9 +316,19 @@ func (ts *ConsentAPITestSuite) TestCreateConsent_WithMultipleAuthorizations_Succ
 func (ts *ConsentAPITestSuite) TestCreateConsent_FullPayload_Succeeds() {
 	payload := ConsentCreateRequest{
 		Type: "accounts",
-		ConsentPurpose: []ConsentPurposeItem{
-			{Name: "marketing-purpose", Value: "yes", IsUserApproved: true, IsMandatory: false},
-			{Name: "analytics-purpose", Value: true, IsUserApproved: true, IsMandatory: false},
+		Purposes: []ConsentPurposeItem{
+			{
+				Name: "marketing-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{Name: "marketing-purpose", Value: "yes", IsUserApproved: true},
+				},
+			},
+			{
+				Name: "analytics-purpose",
+				Elements: []ConsentPurposeApprovalItem{
+					{Name: "analytics-purpose", Value: true, IsUserApproved: true},
+				},
+			},
 		},
 		Attributes: map[string]string{
 			"merchantId":  "MERCH123",
@@ -330,7 +358,7 @@ func (ts *ConsentAPITestSuite) TestCreateConsent_FullPayload_Succeeds() {
 
 	ts.NotEmpty(consentResp.ID)
 	ts.Equal("accounts", consentResp.Type)
-	ts.Len(consentResp.ConsentPurpose, 2)
+	ts.Len(consentResp.Purposes, 2)
 	ts.Len(consentResp.Authorizations, 1)
 	ts.NotNil(consentResp.Attributes)
 	ts.Require().NotNil(consentResp.ValidityTime)
@@ -627,7 +655,7 @@ func (ts *ConsentAPITestSuite) TestCreateConsent_AuthMissingType_Returns400() {
 func (ts *ConsentAPITestSuite) TestCreateConsent_AllFieldsEmpty_Succeeds() {
 	payload := ConsentCreateRequest{
 		Type:           "accounts",
-		ConsentPurpose: []ConsentPurposeItem{},
+		Purposes:       []ConsentPurposeItem{},
 		Authorizations: []AuthorizationRequest{},
 		Attributes:     map[string]string{},
 	}
@@ -641,7 +669,7 @@ func (ts *ConsentAPITestSuite) TestCreateConsent_AllFieldsEmpty_Succeeds() {
 	ts.NoError(json.Unmarshal(body, &consentResp))
 	ts.NotEmpty(consentResp.ID)
 	ts.Equal("accounts", consentResp.Type)
-	ts.Empty(consentResp.ConsentPurpose, "Should have no purposes")
+	ts.Empty(consentResp.Purposes, "Should have no purposes")
 	ts.Empty(consentResp.Authorizations, "Should have no authorizations")
 	ts.Empty(consentResp.Attributes, "Should have no attributes")
 

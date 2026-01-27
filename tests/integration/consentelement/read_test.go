@@ -153,7 +153,7 @@ func (ts *ElementAPITestSuite) TestGetElementByID_NonExistent_ReturnsNotFound() 
 	var errResp ErrorResponse
 	err := json.Unmarshal([]byte(body), &errResp)
 	require.NoError(t, err)
-	require.Equal(t, "CSE-4004", errResp.Code)
+	require.Equal(t, "CE-1016", errResp.Code)
 	require.Contains(t, strings.ToLower(errResp.Description), "not found")
 }
 
@@ -187,7 +187,7 @@ func (ts *ElementAPITestSuite) TestGetElementByID_AfterDelete_ReturnsNotFound() 
 
 	var errResp ErrorResponse
 	json.Unmarshal([]byte(body), &errResp)
-	require.Equal(t, "CSE-4004", errResp.Code)
+	require.Equal(t, "CE-1016", errResp.Code)
 }
 
 // TestGetElementByID_ErrorCases tests error scenarios for GET by ID
@@ -205,7 +205,7 @@ func (ts *ElementAPITestSuite) TestGetElementByID_ErrorCases() {
 			elementID:       "00000000-0000-0000-0000-000000000000",
 			setOrgHeader:    false,
 			expectedStatus:  http.StatusBadRequest,
-			expectedCode:    "CSE-4001",
+			expectedCode:    "CE-1003",
 			messageContains: "organization ID is required",
 		},
 		{
@@ -213,7 +213,7 @@ func (ts *ElementAPITestSuite) TestGetElementByID_ErrorCases() {
 			elementID:       "invalid-uuid-format",
 			setOrgHeader:    true,
 			expectedStatus:  http.StatusNotFound,
-			expectedCode:    "CSE-4004",
+			expectedCode:    "CE-1016",
 			messageContains: "not found",
 		},
 	}
@@ -527,7 +527,7 @@ func (ts *ElementAPITestSuite) TestListElements_ErrorCases() {
 			name:            "MissingOrgID_ReturnsValidationError",
 			setOrgHeader:    false,
 			expectedStatus:  http.StatusBadRequest,
-			expectedCode:    "CSE-4001",
+			expectedCode:    "CE-1003",
 			messageContains: "organization ID is required",
 		},
 	}

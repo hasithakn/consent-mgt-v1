@@ -144,7 +144,7 @@ func (service *consentElementService) CreateElement(ctx context.Context, req mod
 func (service *consentElementService) CreateElementsInBatch(ctx context.Context, requests []model.ConsentElementCreateRequest, orgID string) ([]model.ConsentElement, *serviceerror.ServiceError) {
 	// Validate inputs
 	if len(requests) == 0 {
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorAtLeastOneElement.Message)
+		return nil, &ErrorAtLeastOneElement
 	}
 
 	store := service.stores.ConsentElement
@@ -155,22 +155,22 @@ func (service *consentElementService) CreateElementsInBatch(ctx context.Context,
 		// Validate request
 		if valErr := service.validateCreateRequest(req); valErr != nil {
 			// Return error with index information
-			return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("invalid request at index %d: %v", i, valErr))
+			return nil, serviceerror.CustomServiceError(*valErr, fmt.Sprintf("invalid request at index %d: %s", i, valErr.Description))
 		}
 
 		// Check for duplicate names within the batch
 		if namesSeen[req.Name] {
-			return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("duplicate element name '%s' in request batch at index %d", req.Name, i))
+			return nil, serviceerror.CustomServiceError(ErrorDuplicateNameInBatch, fmt.Sprintf("duplicate element name '%s' in request batch at index %d", req.Name, i))
 		}
 		namesSeen[req.Name] = true
 
 		// Check if element name already exists in database
 		exists, dbErr := store.CheckNameExists(ctx, req.Name, orgID)
 		if dbErr != nil {
-			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to validate element name at index %d: %v", i, dbErr))
+			return nil, serviceerror.CustomServiceError(ErrorCheckNameExistence, fmt.Sprintf("failed to validate element name at index %d: %v", i, dbErr))
 		}
 		if exists {
-			return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("element name '%s' already exists for this organization (at index %d)", req.Name, i))
+			return nil, serviceerror.CustomServiceError(ErrorElementNameExists, fmt.Sprintf("element name '%s' already exists for this organization (at index %d)", req.Name, i))
 		}
 	}
 
@@ -248,7 +248,7 @@ func (service *consentElementService) GetElement(ctx context.Context, elementID,
 	}
 	if element == nil {
 		logger.Warn("Element not found", log.String("element_id", elementID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("element with ID '%s' not found", elementID))
+		return nil, serviceerror.CustomServiceError(ErrorElementNotFound, fmt.Sprintf("element with ID '%s' not found", elementID))
 	}
 
 	// Load properties
@@ -357,7 +357,7 @@ func (service *consentElementService) UpdateElement(ctx context.Context, element
 	}
 	if existing == nil {
 		logger.Warn("Element not found for update", log.String("element_id", elementID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("element with ID '%s' not found", elementID))
+		return nil, serviceerror.CustomServiceError(ErrorElementNotFound, fmt.Sprintf("element with ID '%s' not found", elementID))
 	}
 
 	// Check if the new name conflicts with another element (only if name is changing)
@@ -475,7 +475,7 @@ func (service *consentElementService) DeleteElement(ctx context.Context, element
 	}
 	if existing == nil {
 		logger.Warn("Element not found for deletion", log.String("element_id", elementID))
-		return serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("element with ID '%s' not found", elementID))
+		return serviceerror.CustomServiceError(ErrorElementNotFound, fmt.Sprintf("element with ID '%s' not found", elementID))
 	}
 
 	// Check if element is used in any consent purposes
@@ -543,7 +543,7 @@ func (service *consentElementService) ValidateElementNames(ctx context.Context, 
 			log.Error(err),
 			log.String("org_id", orgID),
 		)
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to validate element names: %v", err))
+		return nil, serviceerror.CustomServiceError(ErrorCheckNameExistence, fmt.Sprintf("failed to validate element names: %v", err))
 	}
 
 	// Extract valid names from the map
@@ -555,7 +555,7 @@ func (service *consentElementService) ValidateElementNames(ctx context.Context, 
 	// Return error if no valid elements found
 	if len(validNames) == 0 {
 		logger.Warn("No valid elements found")
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorNoValidElements.Message)
+		return nil, &ErrorNoValidElements
 	}
 
 	logger.Debug("Element names validated",
@@ -568,27 +568,27 @@ func (service *consentElementService) ValidateElementNames(ctx context.Context, 
 // validateCreateRequest validates create request
 func (service *consentElementService) validateCreateRequest(req model.ConsentElementCreateRequest) *serviceerror.ServiceError {
 	if req.Name == "" {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementNameRequired.Message)
+		return &ErrorElementNameRequired
 	}
 	if len(req.Name) > 255 {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementNameTooLong.Message)
+		return &ErrorElementNameTooLong
 	}
 	if len(req.Description) > 1024 {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementDescriptionTooLong.Message)
+		return &ErrorElementDescriptionTooLong
 	}
 	if req.Type == "" {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementTypeRequired.Message)
+		return &ErrorElementTypeRequired
 	}
 
 	// Validate element type using validators
 	handler, err := validators.GetHandler(req.Type)
 	if err != nil {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("invalid element type: %s", req.Type))
+		return serviceerror.CustomServiceError(ErrorInvalidElementType, fmt.Sprintf("invalid element type: %s", req.Type))
 	}
 
 	// Validate properties using type handler
 	if validationErr := handler.ValidateProperties(req.Properties); validationErr != nil {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("property validation failed: %v", err))
+		return serviceerror.CustomServiceError(ErrorPropertyValidationFailed, fmt.Sprintf("property validation failed: %v", validationErr))
 	}
 
 	return nil
@@ -597,27 +597,27 @@ func (service *consentElementService) validateCreateRequest(req model.ConsentEle
 // validateUpdateRequest validates update request
 func (service *consentElementService) validateUpdateRequest(req model.ConsentElementUpdateRequest) *serviceerror.ServiceError {
 	if req.Name == "" {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementNameRequired.Message)
+		return &ErrorElementNameRequired
 	}
 	if len(req.Name) > 255 {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementNameTooLong.Message)
+		return &ErrorElementNameTooLong
 	}
 	if req.Description != nil && len(*req.Description) > 1024 {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementDescriptionTooLong.Message)
+		return &ErrorElementDescriptionTooLong
 	}
 	if req.Type == "" {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementTypeRequired.Message)
+		return &ErrorElementTypeRequired
 	}
 
 	// Validate element type using validators
 	handler, err := validators.GetHandler(req.Type)
 	if err != nil {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("invalid element type: %s", req.Type))
+		return serviceerror.CustomServiceError(ErrorInvalidElementType, fmt.Sprintf("invalid element type: %s", req.Type))
 	}
 
 	// Validate properties using type handler
 	if validationErr := handler.ValidateProperties(req.Properties); validationErr != nil {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("property validation failed: %v", err))
+		return serviceerror.CustomServiceError(ErrorPropertyValidationFailed, fmt.Sprintf("property validation failed: %v", validationErr))
 	}
 
 	return nil

@@ -204,7 +204,7 @@ func (ts *ElementAPITestSuite) TestDeleteElement_ErrorCases() {
 			elementID:       "00000000-0000-0000-0000-000000000000",
 			setHeaders:      false,
 			expectedStatus:  http.StatusBadRequest,
-			expectedCode:    "CSE-4001",
+			expectedCode:    "CE-1003",
 			messageContains: "organization ID is required",
 		},
 		{
@@ -212,7 +212,7 @@ func (ts *ElementAPITestSuite) TestDeleteElement_ErrorCases() {
 			elementID:       "invalid-uuid-format",
 			setHeaders:      true,
 			expectedStatus:  http.StatusNotFound,
-			expectedCode:    "CSE-4004",
+			expectedCode:    "CE-1016",
 			messageContains: "not found",
 		},
 	}

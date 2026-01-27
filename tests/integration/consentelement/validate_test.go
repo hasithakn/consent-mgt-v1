@@ -136,7 +136,7 @@ func (ts *ElementAPITestSuite) TestValidateElements_NoneValid_ReturnsEmpty() {
 
 	var errResp ErrorResponse
 	json.NewDecoder(resp.Body).Decode(&errResp)
-	require.Equal(t, "CSE-4001", errResp.Code)
+	require.Equal(t, "CE-1015", errResp.Code)
 	require.Contains(t, strings.ToLower(errResp.Description), "no valid elements found")
 }
 
@@ -271,7 +271,7 @@ func (ts *ElementAPITestSuite) TestValidateElements_EmptyArray_ReturnsBadRequest
 
 	var errResp ErrorResponse
 	json.NewDecoder(resp.Body).Decode(&errResp)
-	require.Equal(t, "CSE-4001", errResp.Code)
+	require.Equal(t, "CE-1014", errResp.Code)
 	require.Contains(t, strings.ToLower(errResp.Description), "at least one element name must be provided")
 }
 
@@ -290,7 +290,7 @@ func (ts *ElementAPITestSuite) TestValidateElements_ErrorCases() {
 			payload:         []string{"test_element"},
 			setHeaders:      false,
 			expectedStatus:  http.StatusBadRequest,
-			expectedCode:    "CSE-4001",
+			expectedCode:    "CE-1003",
 			messageContains: "organization ID is required",
 		},
 		{
@@ -298,15 +298,15 @@ func (ts *ElementAPITestSuite) TestValidateElements_ErrorCases() {
 			payload:         "invalid{{{json",
 			setHeaders:      true,
 			expectedStatus:  http.StatusBadRequest,
-			expectedCode:    "CSE-4000",
-			messageContains: "invalid request body",
+			expectedCode:    "CE-1001",
+			messageContains: "invalid character",
 		},
 		{
 			name:            "NullPayload_ReturnsBadRequest",
 			payload:         nil,
 			setHeaders:      true,
 			expectedStatus:  http.StatusBadRequest,
-			expectedCode:    "CSE-4001",
+			expectedCode:    "CE-1014",
 			messageContains: "at least one element name must be provided",
 		},
 	}

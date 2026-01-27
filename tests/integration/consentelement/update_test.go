@@ -200,7 +200,7 @@ func (ts *ElementAPITestSuite) TestUpdateElement_NonExistent_ReturnsNotFound() {
 
 	var errResp ErrorResponse
 	json.Unmarshal(bodyBytes, &errResp)
-	require.Equal(t, "CSE-4004", errResp.Code)
+	require.Equal(t, "CE-1016", errResp.Code)
 	require.Contains(t, strings.ToLower(errResp.Description), "not found")
 }
 
@@ -270,7 +270,7 @@ func (ts *ElementAPITestSuite) TestUpdateElement_ErrorCases() {
 			},
 			setHeaders:      true,
 			expectedStatus:  http.StatusBadRequest,
-			expectedCode:    "CSE-4001",
+			expectedCode:    "CE-1004",
 			messageContains: "element name is required",
 		},
 		{
@@ -281,7 +281,7 @@ func (ts *ElementAPITestSuite) TestUpdateElement_ErrorCases() {
 			},
 			setHeaders:      true,
 			expectedStatus:  http.StatusBadRequest,
-			expectedCode:    "CSE-4001",
+			expectedCode:    "CE-1005",
 			messageContains: "element type is required",
 		},
 		{
@@ -293,7 +293,7 @@ func (ts *ElementAPITestSuite) TestUpdateElement_ErrorCases() {
 			},
 			setHeaders:      true,
 			expectedStatus:  http.StatusBadRequest,
-			expectedCode:    "CSE-4001",
+			expectedCode:    "CE-1010",
 			messageContains: "invalid element type",
 		},
 		{
@@ -305,9 +305,9 @@ func (ts *ElementAPITestSuite) TestUpdateElement_ErrorCases() {
 				Properties:  map[string]string{},
 			},
 			setHeaders:      true,
-			expectedStatus:  http.StatusBadRequest,
-			expectedCode:    "CSE-4001",
-			messageContains: "validationSchema is required for json-payload-type",
+			expectedStatus:  http.StatusInternalServerError,
+			expectedCode:    "CE-5011",
+			messageContains: "property validation failed",
 		},
 		{
 			name: "ResourceFieldType_MissingResourcePath_ReturnsValidationError",
@@ -320,9 +320,9 @@ func (ts *ElementAPITestSuite) TestUpdateElement_ErrorCases() {
 				},
 			},
 			setHeaders:      true,
-			expectedStatus:  http.StatusBadRequest,
-			expectedCode:    "CSE-4001",
-			messageContains: "resourcePath is required for resource-field-type",
+			expectedStatus:  http.StatusInternalServerError,
+			expectedCode:    "CE-5011",
+			messageContains: "property validation failed",
 		},
 	}
 

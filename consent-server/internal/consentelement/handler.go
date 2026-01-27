@@ -50,7 +50,7 @@ func (handler *consentElementHandler) createElement(w http.ResponseWriter, r *ht
 
 	// Validate required headers
 	if err := utils.ValidateOrgID(orgID); err != nil {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
+		utils.SendError(w, r, &ErrorOrgIDRequired)
 		return
 	}
 
@@ -196,7 +196,7 @@ func (handler *consentElementHandler) updateElement(w http.ResponseWriter, r *ht
 
 	// Validate required headers
 	if err := utils.ValidateOrgID(orgID); err != nil {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, err.Error()))
+		utils.SendError(w, r, &ErrorOrgIDRequired)
 		return
 	}
 

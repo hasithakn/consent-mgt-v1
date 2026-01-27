@@ -98,9 +98,9 @@ func mapErrorToStatusCode(err *serviceerror.ServiceError) int {
 
 	// Client error type - map specific codes
 	switch err.Code {
-	case codes.ResourceNotFound, codes.ConsentNotFound, codes.PurposeNotFound, codes.AuthResourceNotFound:
+	case codes.ResourceNotFound, codes.ConsentNotFound, codes.PurposeNotFound, codes.AuthResourceNotFound, "CE-1016":
 		return http.StatusNotFound
-	case codes.ConflictError, codes.PurposeInUse:
+	case codes.ConflictError, codes.PurposeInUse, "CE-1011", "CE-1012", "CE-1013":
 		return http.StatusConflict
 	case codes.ValidationError, codes.InvalidRequest:
 		return http.StatusBadRequest

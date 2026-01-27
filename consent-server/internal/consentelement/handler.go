@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+// Package consentelement provides consent element management functionality.
 package consentelement
 
 import (
@@ -25,7 +44,7 @@ func newConsentElementHandler(service ConsentElementService) *consentElementHand
 
 // createElement handles POST /consent-elements
 // Supports both single and batch creation (array input)
-func (h *consentElementHandler) createElement(w http.ResponseWriter, r *http.Request) {
+func (handler *consentElementHandler) createElement(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
@@ -38,18 +57,18 @@ func (h *consentElementHandler) createElement(w http.ResponseWriter, r *http.Req
 	// Decode as array of requests (batch creation)
 	var requests []model.ConsentElementCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, err.Error()))
 		return
 	}
 
 	// Validate at least one element provided
 	if len(requests) == 0 {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "at least one element must be provided"))
+		utils.SendError(w, r, &ErrorAtLeastOneElement)
 		return
 	}
 
 	// Create elements in batch (atomic transaction)
-	elements, serviceErr := h.service.CreateElementsInBatch(ctx, requests, orgID)
+	elements, serviceErr := handler.service.CreateElementsInBatch(ctx, requests, orgID)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
@@ -57,13 +76,13 @@ func (h *consentElementHandler) createElement(w http.ResponseWriter, r *http.Req
 
 	// Convert to response format
 	responses := make([]model.ConsentElementResponse, 0, len(elements))
-	for _, p := range elements {
+	for _, element := range elements {
 		responses = append(responses, model.ConsentElementResponse{
-			ID:          p.ID,
-			Name:        p.Name,
-			Description: p.Description,
-			Type:        p.Type,
-			Properties:  p.Properties,
+			ID:          element.ID,
+			Name:        element.Name,
+			Description: element.Description,
+			Type:        element.Type,
+			Properties:  element.Properties,
 		})
 	}
 
@@ -79,17 +98,17 @@ func (h *consentElementHandler) createElement(w http.ResponseWriter, r *http.Req
 }
 
 // getElement handles GET /consent-elements/{elementId}
-func (h *consentElementHandler) getElement(w http.ResponseWriter, r *http.Request) {
+func (handler *consentElementHandler) getElement(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	elementID := r.PathValue("elementId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, r, &ErrorOrgIDRequired)
 		return
 	}
 
-	element, serviceErr := h.service.GetElement(ctx, elementID, orgID)
+	element, serviceErr := handler.service.GetElement(ctx, elementID, orgID)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
@@ -108,12 +127,12 @@ func (h *consentElementHandler) getElement(w http.ResponseWriter, r *http.Reques
 }
 
 // listElements handles GET /consent-elements
-func (h *consentElementHandler) listElements(w http.ResponseWriter, r *http.Request) {
+func (handler *consentElementHandler) listElements(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, r, &ErrorOrgIDRequired)
 		return
 	}
 
@@ -136,7 +155,7 @@ func (h *consentElementHandler) listElements(w http.ResponseWriter, r *http.Requ
 	// Parse optional name filter
 	name := r.URL.Query().Get("name")
 
-	elements, total, serviceErr := h.service.ListElements(ctx, orgID, limit, offset, name)
+	elements, total, serviceErr := handler.service.ListElements(ctx, orgID, limit, offset, name)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
@@ -144,13 +163,13 @@ func (h *consentElementHandler) listElements(w http.ResponseWriter, r *http.Requ
 
 	// Convert to response models
 	elementResponses := make([]model.ConsentElementResponse, 0, len(elements))
-	for _, p := range elements {
+	for _, element := range elements {
 		elementResponses = append(elementResponses, model.ConsentElementResponse{
-			ID:          p.ID,
-			Name:        p.Name,
-			Description: p.Description,
-			Type:        p.Type,
-			Properties:  p.Properties,
+			ID:          element.ID,
+			Name:        element.Name,
+			Description: element.Description,
+			Type:        element.Type,
+			Properties:  element.Properties,
 		})
 	}
 
@@ -170,7 +189,7 @@ func (h *consentElementHandler) listElements(w http.ResponseWriter, r *http.Requ
 }
 
 // updateElement handles PUT /consent-elements/{elementId}
-func (h *consentElementHandler) updateElement(w http.ResponseWriter, r *http.Request) {
+func (handler *consentElementHandler) updateElement(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	elementID := r.PathValue("elementId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
@@ -183,11 +202,11 @@ func (h *consentElementHandler) updateElement(w http.ResponseWriter, r *http.Req
 
 	var req model.ConsentElementUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, err.Error()))
 		return
 	}
 
-	element, serviceErr := h.service.UpdateElement(ctx, elementID, req, orgID)
+	element, serviceErr := handler.service.UpdateElement(ctx, elementID, req, orgID)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
@@ -206,17 +225,17 @@ func (h *consentElementHandler) updateElement(w http.ResponseWriter, r *http.Req
 }
 
 // deleteElement handles DELETE /consent-elements/{elementId}
-func (h *consentElementHandler) deleteElement(w http.ResponseWriter, r *http.Request) {
+func (handler *consentElementHandler) deleteElement(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	elementID := r.PathValue("elementId")
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, r, &ErrorOrgIDRequired)
 		return
 	}
 
-	if serviceErr := h.service.DeleteElement(ctx, elementID, orgID); serviceErr != nil {
+	if serviceErr := handler.service.DeleteElement(ctx, elementID, orgID); serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return
 	}
@@ -225,22 +244,22 @@ func (h *consentElementHandler) deleteElement(w http.ResponseWriter, r *http.Req
 }
 
 // validateElements handles POST /consent-elements/validate
-func (h *consentElementHandler) validateElements(w http.ResponseWriter, r *http.Request) {
+func (handler *consentElementHandler) validateElements(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgID := r.Header.Get(constants.HeaderOrgID)
 
 	if orgID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.ValidationError, "organization ID is required"))
+		utils.SendError(w, r, &ErrorOrgIDRequired)
 		return
 	}
 
 	var elementNames []string
 	if err := json.NewDecoder(r.Body).Decode(&elementNames); err != nil {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, err.Error()))
 		return
 	}
 
-	validNames, serviceErr := h.service.ValidateElementNames(ctx, orgID, elementNames)
+	validNames, serviceErr := handler.service.ValidateElementNames(ctx, orgID, elementNames)
 	if serviceErr != nil {
 		utils.SendError(w, r, serviceErr)
 		return

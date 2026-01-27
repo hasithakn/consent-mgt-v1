@@ -52,7 +52,6 @@ logs/
 # Temporary files
 /tmp/
 *.tmp
-/ref_to_delete_later/
 
 # Database files
 *.db

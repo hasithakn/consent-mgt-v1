@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+// Package consentelement provides consent element management functionality.
 package consentelement
 
 import (
@@ -37,7 +56,7 @@ func newConsentElementService(registry *stores.StoreRegistry) ConsentElementServ
 }
 
 // CreateElement creates a new consent element
-func (s *consentElementService) CreateElement(ctx context.Context, req model.ConsentElementCreateRequest, orgID string) (*model.ConsentElement, *serviceerror.ServiceError) {
+func (service *consentElementService) CreateElement(ctx context.Context, req model.ConsentElementCreateRequest, orgID string) (*model.ConsentElement, *serviceerror.ServiceError) {
 	logger := log.GetLogger().WithContext(ctx)
 
 	logger.Info("Creating consent element",
@@ -46,21 +65,21 @@ func (s *consentElementService) CreateElement(ctx context.Context, req model.Con
 		log.String("org_id", orgID))
 
 	// Validate request
-	if err := s.validateCreateRequest(req); err != nil {
+	if err := service.validateCreateRequest(req); err != nil {
 		logger.Warn("Consent element create request validation failed", log.String("error", err.Error()))
 		return nil, err
 	}
 
 	// Check if element name already exists
-	store := s.stores.ConsentElement
+	store := service.stores.ConsentElement
 	exists, dbErr := store.CheckNameExists(ctx, req.Name, orgID)
 	if dbErr != nil {
 		logger.Error("Failed to check element name existence", log.Error(dbErr), log.String("name", req.Name))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to check name existence: %v", dbErr))
+		return nil, serviceerror.CustomServiceError(ErrorCheckNameExistence, fmt.Sprintf("failed to check name existence: %v", dbErr))
 	}
 	if exists {
 		logger.Warn("Element name already exists", log.String("name", req.Name))
-		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("element with name '%s' already exists", req.Name))
+		return nil, serviceerror.CustomServiceError(ErrorElementNameExists, fmt.Sprintf("element with name '%s' already exists", req.Name))
 	}
 
 	// Create element entity
@@ -106,7 +125,7 @@ func (s *consentElementService) CreateElement(ctx context.Context, req model.Con
 	}
 
 	logger.Debug("Executing transaction", log.Int("operation_count", len(queries)))
-	err := s.stores.ExecuteTransaction(queries)
+	err := service.stores.ExecuteTransaction(queries)
 	if err != nil {
 		logger.Error("Failed to create element in transaction", log.Error(err), log.String("element_id", elementID))
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create element: %v", err))
@@ -122,19 +141,19 @@ func (s *consentElementService) CreateElement(ctx context.Context, req model.Con
 
 // CreateElementsInBatch creates multiple consent elements in a single transaction
 // Either all elements are created or none (atomic operation)
-func (s *consentElementService) CreateElementsInBatch(ctx context.Context, requests []model.ConsentElementCreateRequest, orgID string) ([]model.ConsentElement, *serviceerror.ServiceError) {
+func (service *consentElementService) CreateElementsInBatch(ctx context.Context, requests []model.ConsentElementCreateRequest, orgID string) ([]model.ConsentElement, *serviceerror.ServiceError) {
 	// Validate inputs
 	if len(requests) == 0 {
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "at least one element must be provided")
+		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorAtLeastOneElement.Message)
 	}
 
-	store := s.stores.ConsentElement
+	store := service.stores.ConsentElement
 
 	// Pre-validate all requests and check for duplicate names within the batch
 	namesSeen := make(map[string]bool)
 	for i, req := range requests {
 		// Validate request
-		if valErr := s.validateCreateRequest(req); valErr != nil {
+		if valErr := service.validateCreateRequest(req); valErr != nil {
 			// Return error with index information
 			return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("invalid request at index %d: %v", i, valErr))
 		}
@@ -203,7 +222,7 @@ func (s *consentElementService) CreateElementsInBatch(ctx context.Context, reque
 	}
 
 	// Execute all operations in a single transaction
-	if err := s.stores.ExecuteTransaction(queries); err != nil {
+	if err := service.stores.ExecuteTransaction(queries); err != nil {
 		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create elements in batch: %v", err))
 	}
 
@@ -211,14 +230,14 @@ func (s *consentElementService) CreateElementsInBatch(ctx context.Context, reque
 }
 
 // GetElement retrieves a consent element by ID
-func (s *consentElementService) GetElement(ctx context.Context, elementID, orgID string) (*model.ConsentElement, *serviceerror.ServiceError) {
+func (service *consentElementService) GetElement(ctx context.Context, elementID, orgID string) (*model.ConsentElement, *serviceerror.ServiceError) {
 	logger := log.GetLogger().WithContext(ctx)
 	logger.Debug("Retrieving consent element",
 		log.String("element_id", elementID),
 		log.String("org_id", orgID),
 	)
 
-	store := s.stores.ConsentElement
+	store := service.stores.ConsentElement
 	element, err := store.GetByID(ctx, elementID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve element",
@@ -259,7 +278,7 @@ func (s *consentElementService) GetElement(ctx context.Context, elementID, orgID
 }
 
 // ListElements retrieves paginated list of consent elements with optional name filter
-func (s *consentElementService) ListElements(ctx context.Context, orgID string, limit, offset int, name string) ([]model.ConsentElement, int, *serviceerror.ServiceError) {
+func (service *consentElementService) ListElements(ctx context.Context, orgID string, limit, offset int, name string) ([]model.ConsentElement, int, *serviceerror.ServiceError) {
 	logger := log.GetLogger().WithContext(ctx)
 	logger.Debug("Listing consent elements",
 		log.String("org_id", orgID),
@@ -275,7 +294,7 @@ func (s *consentElementService) ListElements(ctx context.Context, orgID string, 
 		offset = 0
 	}
 
-	store := s.stores.ConsentElement
+	store := service.stores.ConsentElement
 	elements, total, err := store.List(ctx, orgID, limit, offset, name)
 	if err != nil {
 		logger.Error("Failed to list elements",
@@ -312,7 +331,7 @@ func (s *consentElementService) ListElements(ctx context.Context, orgID string, 
 }
 
 // UpdateElement updates an existing consent element
-func (s *consentElementService) UpdateElement(ctx context.Context, elementID string, req model.ConsentElementUpdateRequest, orgID string) (*model.ConsentElement, *serviceerror.ServiceError) {
+func (service *consentElementService) UpdateElement(ctx context.Context, elementID string, req model.ConsentElementUpdateRequest, orgID string) (*model.ConsentElement, *serviceerror.ServiceError) {
 	logger := log.GetLogger().WithContext(ctx)
 	logger.Info("Updating consent element",
 		log.String("element_id", elementID),
@@ -321,13 +340,13 @@ func (s *consentElementService) UpdateElement(ctx context.Context, elementID str
 	)
 
 	// Validate request
-	if err := s.validateUpdateRequest(req); err != nil {
+	if err := service.validateUpdateRequest(req); err != nil {
 		logger.Warn("Update element request validation failed", log.String("error", err.Error()))
 		return nil, err
 	}
 
 	// Check if element exists
-	store := s.stores.ConsentElement
+	store := service.stores.ConsentElement
 	existing, err := store.GetByID(ctx, elementID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve existing element",
@@ -361,7 +380,7 @@ func (s *consentElementService) UpdateElement(ctx context.Context, elementID str
 	}
 
 	// Check if element is used in any consent purposes
-	isUsed, err := s.stores.ConsentPurpose.IsElementUsedInPurposes(ctx, elementID, orgID)
+	isUsed, err := service.stores.ConsentPurpose.IsElementUsedInPurposes(ctx, elementID, orgID)
 	if err != nil {
 		logger.Error("Failed to check if element is used in groups",
 			log.Error(err),
@@ -420,7 +439,7 @@ func (s *consentElementService) UpdateElement(ctx context.Context, elementID str
 	logger.Debug("Executing transaction for element update",
 		log.Int("properties_count", len(properties)),
 	)
-	err = s.stores.ExecuteTransaction(queries)
+	err = service.stores.ExecuteTransaction(queries)
 	if err != nil {
 		logger.Error("Transaction failed for element update",
 			log.Error(err),
@@ -437,7 +456,7 @@ func (s *consentElementService) UpdateElement(ctx context.Context, elementID str
 }
 
 // DeleteElement deletes a consent element
-func (s *consentElementService) DeleteElement(ctx context.Context, elementID, orgID string) *serviceerror.ServiceError {
+func (service *consentElementService) DeleteElement(ctx context.Context, elementID, orgID string) *serviceerror.ServiceError {
 	logger := log.GetLogger().WithContext(ctx)
 	logger.Info("Deleting consent element",
 		log.String("element_id", elementID),
@@ -445,7 +464,7 @@ func (s *consentElementService) DeleteElement(ctx context.Context, elementID, or
 	)
 
 	// Check if element exists
-	store := s.stores.ConsentElement
+	store := service.stores.ConsentElement
 	existing, err := store.GetByID(ctx, elementID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve element for deletion",
@@ -460,7 +479,7 @@ func (s *consentElementService) DeleteElement(ctx context.Context, elementID, or
 	}
 
 	// Check if element is used in any consent purposes
-	isUsed, err := s.stores.ConsentPurpose.IsElementUsedInPurposes(ctx, elementID, orgID)
+	isUsed, err := service.stores.ConsentPurpose.IsElementUsedInPurposes(ctx, elementID, orgID)
 	if err != nil {
 		logger.Error("Failed to check if element is used in groups",
 			log.Error(err),
@@ -478,7 +497,7 @@ func (s *consentElementService) DeleteElement(ctx context.Context, elementID, or
 
 	// Delete properties and element in a transaction
 	logger.Debug("Executing transaction for element deletion")
-	err = s.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
+	err = service.stores.ExecuteTransaction([]func(tx dbmodel.TxInterface) error{
 		func(tx dbmodel.TxInterface) error {
 			return store.DeletePropertiesByElementID(tx, elementID, orgID)
 		},
@@ -502,7 +521,7 @@ func (s *consentElementService) DeleteElement(ctx context.Context, elementID, or
 }
 
 // ValidateElementNames validates a list of element names and returns only the valid ones
-func (s *consentElementService) ValidateElementNames(ctx context.Context, orgID string, elementNames []string) ([]string, *serviceerror.ServiceError) {
+func (service *consentElementService) ValidateElementNames(ctx context.Context, orgID string, elementNames []string) ([]string, *serviceerror.ServiceError) {
 	logger := log.GetLogger().WithContext(ctx)
 	logger.Debug("Validating element names",
 		log.String("org_id", orgID),
@@ -512,10 +531,10 @@ func (s *consentElementService) ValidateElementNames(ctx context.Context, orgID 
 	// Validate input
 	if len(elementNames) == 0 {
 		logger.Warn("No element names provided for validation")
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "at least one element name must be provided")
+		return nil, &ErrorAtLeastOneElementName
 	}
 
-	store := s.stores.ConsentElement
+	store := service.stores.ConsentElement
 
 	// Get elements that exist
 	elementIDMap, err := store.GetIDsByNames(ctx, elementNames, orgID)
@@ -536,7 +555,7 @@ func (s *consentElementService) ValidateElementNames(ctx context.Context, orgID 
 	// Return error if no valid elements found
 	if len(validNames) == 0 {
 		logger.Warn("No valid elements found")
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "no valid elements found")
+		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorNoValidElements.Message)
 	}
 
 	logger.Debug("Element names validated",
@@ -547,18 +566,18 @@ func (s *consentElementService) ValidateElementNames(ctx context.Context, orgID 
 }
 
 // validateCreateRequest validates create request
-func (s *consentElementService) validateCreateRequest(req model.ConsentElementCreateRequest) *serviceerror.ServiceError {
+func (service *consentElementService) validateCreateRequest(req model.ConsentElementCreateRequest) *serviceerror.ServiceError {
 	if req.Name == "" {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, "element name is required")
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementNameRequired.Message)
 	}
 	if len(req.Name) > 255 {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, "element name must not exceed 255 characters")
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementNameTooLong.Message)
 	}
 	if len(req.Description) > 1024 {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, "element description must not exceed 1024 characters")
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementDescriptionTooLong.Message)
 	}
 	if req.Type == "" {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, "element type is required")
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementTypeRequired.Message)
 	}
 
 	// Validate element type using validators
@@ -569,25 +588,25 @@ func (s *consentElementService) validateCreateRequest(req model.ConsentElementCr
 
 	// Validate properties using type handler
 	if validationErr := handler.ValidateProperties(req.Properties); validationErr != nil {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("property validation failed: %v", validationErr))
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("property validation failed: %v", err))
 	}
 
 	return nil
 }
 
 // validateUpdateRequest validates update request
-func (s *consentElementService) validateUpdateRequest(req model.ConsentElementUpdateRequest) *serviceerror.ServiceError {
+func (service *consentElementService) validateUpdateRequest(req model.ConsentElementUpdateRequest) *serviceerror.ServiceError {
 	if req.Name == "" {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, "element name is required")
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementNameRequired.Message)
 	}
 	if len(req.Name) > 255 {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, "element name must not exceed 255 characters")
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementNameTooLong.Message)
 	}
 	if req.Description != nil && len(*req.Description) > 1024 {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, "element description must not exceed 1024 characters")
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementDescriptionTooLong.Message)
 	}
 	if req.Type == "" {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, "element type is required")
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, ErrorElementTypeRequired.Message)
 	}
 
 	// Validate element type using validators
@@ -598,7 +617,7 @@ func (s *consentElementService) validateUpdateRequest(req model.ConsentElementUp
 
 	// Validate properties using type handler
 	if validationErr := handler.ValidateProperties(req.Properties); validationErr != nil {
-		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("property validation failed: %v", validationErr))
+		return serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("property validation failed: %v", err))
 	}
 
 	return nil

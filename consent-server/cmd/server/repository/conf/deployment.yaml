@@ -17,20 +17,6 @@ database:
     user: root
     password: password
 
-service_extension:
-  enabled: false
-  base_url: http://localhost:3001/api/services
-  timeout: 30s
-  retry_attempts: 3
-  endpoints:
-    pre_process_consent_creation: /pre-process-consent-creation
-    # enrich_consent_creation_response: /enrich-consent-creation-response
-    # pre_process_consent_retrieval: /pre-process-consent-retrieval
-    pre_process_consent_update: /pre-process-consent-update
-    # enrich_consent_update_response: /enrich-consent-update-response
-    # pre_process_consent_revoke: /pre-process-consent-revoke
-    # map_accelerator_error_response: /map-accelerator-error-response
-
 logging:
   level: info
 
@@ -58,15 +44,3 @@ consent:
     system_expired_state: SYS_EXPIRED
     # Authorization state indicating authorization was system-revoked due to consent revocation
     system_revoked_state: SYS_REVOKED
-
-security:
-  basic_auth:
-    enabled: true
-    # Default credentials for development (should be changed in production)
-    users:
-      - username: admin
-        password: admin
-
-cors:
-  allowed_origins:
-    - "https://localhost:3000"

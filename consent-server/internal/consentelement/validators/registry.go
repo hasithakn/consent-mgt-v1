@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package validators
 
 import "fmt"
@@ -31,19 +49,19 @@ func NewElementTypeHandlerRegistry() *ElementTypeHandlerRegistry {
 
 // Register adds a handler to the registry
 // Returns error if a handler for this type is already registered
-func (r *ElementTypeHandlerRegistry) Register(handler ElementTypeHandler) error {
+func (registry *ElementTypeHandlerRegistry) Register(handler ElementTypeHandler) error {
 	typeStr := handler.GetType()
-	if _, exists := r.handlers[typeStr]; exists {
+	if _, exists := registry.handlers[typeStr]; exists {
 		return fmt.Errorf("handler for type %q already registered", typeStr)
 	}
-	r.handlers[typeStr] = handler
+	registry.handlers[typeStr] = handler
 	return nil
 }
 
 // Get retrieves a handler by type string
 // Returns error if no handler is registered for the type
-func (r *ElementTypeHandlerRegistry) Get(typeStr string) (ElementTypeHandler, error) {
-	handler, exists := r.handlers[typeStr]
+func (registry *ElementTypeHandlerRegistry) Get(typeStr string) (ElementTypeHandler, error) {
+	handler, exists := registry.handlers[typeStr]
 	if !exists {
 		return nil, fmt.Errorf("no handler registered for the element type %q", typeStr)
 	}
@@ -51,9 +69,9 @@ func (r *ElementTypeHandlerRegistry) Get(typeStr string) (ElementTypeHandler, er
 }
 
 // GetAllTypes returns a list of all registered element types
-func (r *ElementTypeHandlerRegistry) GetAllTypes() []string {
-	types := make([]string, 0, len(r.handlers))
-	for typeStr := range r.handlers {
+func (registry *ElementTypeHandlerRegistry) GetAllTypes() []string {
+	types := make([]string, 0, len(registry.handlers))
+	for typeStr := range registry.handlers {
 		types = append(types, typeStr)
 	}
 	return types

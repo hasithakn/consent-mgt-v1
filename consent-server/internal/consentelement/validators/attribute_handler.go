@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package validators
 
 // AttributeElementTypeHandler handles "resource-field-type" consent elements
@@ -5,13 +23,13 @@ package validators
 type AttributeElementTypeHandler struct{}
 
 // GetType returns the type identifier
-func (h *AttributeElementTypeHandler) GetType() string {
+func (handler *AttributeElementTypeHandler) GetType() string {
 	return "resource-field-type"
 }
 
-// ValidateProperties validates properties for resource-field-type
+// validates properties for resource-field-type
 // Mandatory: resourcePath and jsonPath must be present
-func (h *AttributeElementTypeHandler) ValidateProperties(properties map[string]string) []ValidationError {
+func (handler *AttributeElementTypeHandler) ValidateProperties(properties map[string]string) []ValidationError {
 	var errors []ValidationError
 
 	// resourcePath is MANDATORY
@@ -35,13 +53,13 @@ func (h *AttributeElementTypeHandler) ValidateProperties(properties map[string]s
 
 // ProcessProperties processes properties for resource-field-type
 // Basic processing, could add defaults or validation
-func (h *AttributeElementTypeHandler) ProcessProperties(properties map[string]string) map[string]string {
+func (handler *AttributeElementTypeHandler) ProcessProperties(properties map[string]string) map[string]string {
 	// Return as-is
 	return properties
 }
 
 // GetPropertySpec returns the property specification for resource-field-type
-func (h *AttributeElementTypeHandler) GetPropertySpec() []ElementPropertySpec {
+func (handler *AttributeElementTypeHandler) GetPropertySpec() []ElementPropertySpec {
 	return []ElementPropertySpec{
 		{
 			Name:        "resourcePath",

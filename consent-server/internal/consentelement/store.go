@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+// Package consentelement provides consent element management functionality.
 package consentelement
 
 import (
@@ -119,15 +138,15 @@ func NewConsentElementStore(dbClient provider.DBClientInterface) interfaces.Cons
 }
 
 // Create creates a new consent element within a transaction
-func (s *store) Create(tx dbmodel.TxInterface, element *model.ConsentElement) error {
+func (elementStore *store) Create(tx dbmodel.TxInterface, element *model.ConsentElement) error {
 	_, err := tx.Exec(QueryCreateElement.Query,
 		element.ID, element.Name, element.Description, element.Type, element.OrgID)
 	return err
 }
 
 // GetByID retrieves a consent element by ID
-func (s *store) GetByID(ctx context.Context, elementID, orgID string) (*model.ConsentElement, error) {
-	rows, err := s.dbClient.Query(QueryGetElementByID, elementID, orgID)
+func (elementStore *store) GetByID(ctx context.Context, elementID, orgID string) (*model.ConsentElement, error) {
+	rows, err := elementStore.dbClient.Query(QueryGetElementByID, elementID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -138,8 +157,8 @@ func (s *store) GetByID(ctx context.Context, elementID, orgID string) (*model.Co
 }
 
 // GetByName retrieves a consent element by name
-func (s *store) GetByName(ctx context.Context, name, orgID string) (*model.ConsentElement, error) {
-	rows, err := s.dbClient.Query(QueryGetElementByName, name, orgID)
+func (elementStore *store) GetByName(ctx context.Context, name, orgID string) (*model.ConsentElement, error) {
+	rows, err := elementStore.dbClient.Query(QueryGetElementByName, name, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +169,7 @@ func (s *store) GetByName(ctx context.Context, name, orgID string) (*model.Conse
 }
 
 // List retrieves a paginated list of consent elements
-func (s *store) List(ctx context.Context, orgID string, limit, offset int, name string) ([]model.ConsentElement, int, error) {
+func (elementStore *store) List(ctx context.Context, orgID string, limit, offset int, name string) ([]model.ConsentElement, int, error) {
 	var countRows []map[string]interface{}
 	var rows []map[string]interface{}
 	var err error
@@ -161,25 +180,25 @@ func (s *store) List(ctx context.Context, orgID string, limit, offset int, name 
 		namePattern := "%" + name + "%"
 
 		// Get total count with name filter
-		countRows, err = s.dbClient.Query(QueryCountElementsWithName, orgID, namePattern)
+		countRows, err = elementStore.dbClient.Query(QueryCountElementsWithName, orgID, namePattern)
 		if err != nil {
 			return nil, 0, err
 		}
 
 		// Get paginated results with name filter
-		rows, err = s.dbClient.Query(QueryListElementsWithName, orgID, namePattern, limit, offset)
+		rows, err = elementStore.dbClient.Query(QueryListElementsWithName, orgID, namePattern, limit, offset)
 		if err != nil {
 			return nil, 0, err
 		}
 	} else {
 		// Get total count without name filter
-		countRows, err = s.dbClient.Query(QueryCountElements, orgID)
+		countRows, err = elementStore.dbClient.Query(QueryCountElements, orgID)
 		if err != nil {
 			return nil, 0, err
 		}
 
 		// Get paginated results without name filter
-		rows, err = s.dbClient.Query(QueryListElements, orgID, limit, offset)
+		rows, err = elementStore.dbClient.Query(QueryListElements, orgID, limit, offset)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -204,21 +223,21 @@ func (s *store) List(ctx context.Context, orgID string, limit, offset int, name 
 }
 
 // Update updates an existing consent element within a transaction
-func (s *store) Update(tx dbmodel.TxInterface, element *model.ConsentElement) error {
+func (elementStore *store) Update(tx dbmodel.TxInterface, element *model.ConsentElement) error {
 	_, err := tx.Exec(QueryUpdateElement.Query,
 		element.Name, element.Description, element.Type, element.ID, element.OrgID)
 	return err
 }
 
 // Delete deletes a consent element within a transaction
-func (s *store) Delete(tx dbmodel.TxInterface, elementID, orgID string) error {
+func (elementStore *store) Delete(tx dbmodel.TxInterface, elementID, orgID string) error {
 	_, err := tx.Exec(QueryDeleteElement.Query, elementID, orgID)
 	return err
 }
 
 // CheckNameExists checks if a element name already exists
-func (s *store) CheckNameExists(ctx context.Context, name, orgID string) (bool, error) {
-	rows, err := s.dbClient.Query(QueryCheckElementNameExists, name, orgID)
+func (elementStore *store) CheckNameExists(ctx context.Context, name, orgID string) (bool, error) {
+	rows, err := elementStore.dbClient.Query(QueryCheckElementNameExists, name, orgID)
 	if err != nil {
 		return false, err
 	}
@@ -232,7 +251,7 @@ func (s *store) CheckNameExists(ctx context.Context, name, orgID string) (bool, 
 }
 
 // CreateProperties creates multiple element properties within a transaction
-func (s *store) CreateProperties(tx dbmodel.TxInterface, properties []model.ConsentElementProperty) error {
+func (elementStore *store) CreateProperties(tx dbmodel.TxInterface, properties []model.ConsentElementProperty) error {
 	for _, prop := range properties {
 		_, err := tx.Exec(QueryCreateProperty.Query,
 			prop.ElementID, prop.Key, prop.Value, prop.OrgID)
@@ -244,8 +263,8 @@ func (s *store) CreateProperties(tx dbmodel.TxInterface, properties []model.Cons
 }
 
 // GetPropertiesByElementID retrieves all properties for an element
-func (s *store) GetPropertiesByElementID(ctx context.Context, elementID, orgID string) ([]model.ConsentElementProperty, error) {
-	rows, err := s.dbClient.Query(QueryGetPropertiesByElementID, elementID, orgID)
+func (elementStore *store) GetPropertiesByElementID(ctx context.Context, elementID, orgID string) ([]model.ConsentElementProperty, error) {
+	rows, err := elementStore.dbClient.Query(QueryGetPropertiesByElementID, elementID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +281,7 @@ func (s *store) GetPropertiesByElementID(ctx context.Context, elementID, orgID s
 }
 
 // DeletePropertiesByElementID deletes all properties for an element within a transaction
-func (s *store) DeletePropertiesByElementID(tx dbmodel.TxInterface, elementID, orgID string) error {
+func (elementStore *store) DeletePropertiesByElementID(tx dbmodel.TxInterface, elementID, orgID string) error {
 	_, err := tx.Exec(QueryDeletePropertiesByElementID.Query, elementID, orgID)
 	return err
 }
@@ -376,15 +395,15 @@ func mapToConsentElementProperty(row map[string]interface{}) *model.ConsentEleme
 }
 
 // LinkElementToConsent links an element to a consent within a transaction
-func (s *store) LinkElementToConsent(tx dbmodel.TxInterface, consentID, elementID, orgID string, value *string, isUserApproved, isMandatory bool) error {
+func (elementStore *store) LinkElementToConsent(tx dbmodel.TxInterface, consentID, elementID, orgID string, value *string, isUserApproved, isMandatory bool) error {
 	_, err := tx.Exec(QueryLinkElementToConsent.Query,
 		consentID, elementID, orgID, value, isUserApproved, isMandatory)
 	return err
 }
 
 // GetMappingsByConsentID retrieves all element mappings for a consent with their values
-func (s *store) GetMappingsByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentElementMapping, error) {
-	rows, err := s.dbClient.Query(QueryGetMappingsByConsentID, consentID, orgID)
+func (elementStore *store) GetMappingsByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentElementMapping, error) {
+	rows, err := elementStore.dbClient.Query(QueryGetMappingsByConsentID, consentID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -401,7 +420,7 @@ func (s *store) GetMappingsByConsentID(ctx context.Context, consentID, orgID str
 }
 
 // GetMappingsByConsentIDs retrieves element mappings for multiple consents with their values
-func (s *store) GetMappingsByConsentIDs(ctx context.Context, consentIDs []string, orgID string) ([]model.ConsentElementMapping, error) {
+func (elementStore *store) GetMappingsByConsentIDs(ctx context.Context, consentIDs []string, orgID string) ([]model.ConsentElementMapping, error) {
 	if len(consentIDs) == 0 {
 		return []model.ConsentElementMapping{}, nil
 	}
@@ -427,7 +446,7 @@ func (s *store) GetMappingsByConsentIDs(ctx context.Context, consentIDs []string
 				WHERE cpm.CONSENT_ID IN (%s) AND cpm.ORG_ID = ?`, placeholders),
 	}
 
-	rows, err := s.dbClient.Query(query, args...)
+	rows, err := elementStore.dbClient.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +463,7 @@ func (s *store) GetMappingsByConsentIDs(ctx context.Context, consentIDs []string
 }
 
 // GetIDsByNames retrieves element IDs by their names (batch lookup)
-func (s *store) GetIDsByNames(ctx context.Context, names []string, orgID string) (map[string]string, error) {
+func (elementStore *store) GetIDsByNames(ctx context.Context, names []string, orgID string) (map[string]string, error) {
 	if len(names) == 0 {
 		return make(map[string]string), nil
 	}
@@ -471,7 +490,7 @@ func (s *store) GetIDsByNames(ctx context.Context, names []string, orgID string)
 		Query: query,
 	}
 
-	rows, err := s.dbClient.Query(formattedQuery, args...)
+	rows, err := elementStore.dbClient.Query(formattedQuery, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -563,7 +582,7 @@ func mapToConsentElementMapping(row map[string]interface{}) *model.ConsentElemen
 }
 
 // DeleteMappingsByConsentID deletes all consent element mappings for a consent within a transaction
-func (s *store) DeleteMappingsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
+func (elementStore *store) DeleteMappingsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
 	_, err := tx.Exec(QueryDeleteMappingsByConsentID.Query, consentID, orgID)
 	return err
 }

@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+// Package model provides data models for consent elements.
 package model
 
 import (
@@ -12,41 +31,41 @@ import (
 type JSONValue json.RawMessage
 
 // Scan implements the sql.Scanner interface for JSONValue
-func (j *JSONValue) Scan(value interface{}) error {
+func (jsonValue *JSONValue) Scan(value interface{}) error {
 	if value == nil {
-		*j = nil
+		*jsonValue = nil
 		return nil
 	}
 	bytes, ok := value.([]byte)
 	if !ok {
 		return fmt.Errorf("failed to unmarshal JSON value: %v", value)
 	}
-	*j = JSONValue(bytes)
+	*jsonValue = JSONValue(bytes)
 	return nil
 }
 
 // Value implements the driver.Valuer interface for JSONValue
-func (j JSONValue) Value() (driver.Value, error) {
-	if len(j) == 0 {
+func (jsonValue JSONValue) Value() (driver.Value, error) {
+	if len(jsonValue) == 0 {
 		return nil, nil
 	}
-	return []byte(j), nil
+	return []byte(jsonValue), nil
 }
 
 // MarshalJSON implements the json.Marshaler interface
-func (j JSONValue) MarshalJSON() ([]byte, error) {
-	if len(j) == 0 {
+func (jsonValue JSONValue) MarshalJSON() ([]byte, error) {
+	if len(jsonValue) == 0 {
 		return []byte("null"), nil
 	}
-	return j, nil
+	return jsonValue, nil
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface
-func (j *JSONValue) UnmarshalJSON(data []byte) error {
-	if j == nil {
+func (jsonValue *JSONValue) UnmarshalJSON(data []byte) error {
+	if jsonValue == nil {
 		return fmt.Errorf("JSONValue: UnmarshalJSON on nil pointer")
 	}
-	*j = append((*j)[0:0], data...)
+	*jsonValue = append((*jsonValue)[0:0], data...)
 	return nil
 }
 

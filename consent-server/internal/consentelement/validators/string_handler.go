@@ -1,3 +1,21 @@
+/*
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package validators
 
 // StringElementTypeHandler handles "string-type" consent elements
@@ -5,13 +23,13 @@ package validators
 type StringElementTypeHandler struct{}
 
 // GetType returns the type identifier
-func (h *StringElementTypeHandler) GetType() string {
+func (handler *StringElementTypeHandler) GetType() string {
 	return "string-type"
 }
 
 // ValidateProperties validates properties for string type
 // String type has no mandatory properties, so validation always passes
-func (h *StringElementTypeHandler) ValidateProperties(properties map[string]string) []ValidationError {
+func (handler *StringElementTypeHandler) ValidateProperties(properties map[string]string) []ValidationError {
 	// String type: no mandatory properties
 	// All properties are optional
 	return nil
@@ -19,13 +37,13 @@ func (h *StringElementTypeHandler) ValidateProperties(properties map[string]stri
 
 // ProcessProperties processes properties for string type
 // No special processing needed for string type
-func (h *StringElementTypeHandler) ProcessProperties(properties map[string]string) map[string]string {
+func (handler *StringElementTypeHandler) ProcessProperties(properties map[string]string) map[string]string {
 	// Return as-is, no transformation needed
 	return properties
 }
 
 // GetPropertySpec returns the property specification for string type
-func (h *StringElementTypeHandler) GetPropertySpec() []ElementPropertySpec {
+func (handler *StringElementTypeHandler) GetPropertySpec() []ElementPropertySpec {
 	return []ElementPropertySpec{
 		{
 			Name:        "validationSchema",

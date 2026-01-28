@@ -91,6 +91,7 @@ paths:
               frequency: 0
               purposes:
                 - name: "marketing_communication_preferences"
+                  version: "1"
                   elements:
                     - name: "user_email"
                       isUserApproved: true
@@ -167,6 +168,12 @@ paths:
           schema:
             type: string
           example: "user1@example.com,user2@example.com"
+        - name: purposeNames
+          in: query
+          description: A comma-separated list of consent purpose names to filter by. Returns consents that contain ANY of the specified purposes.
+          schema:
+            type: string
+          example: "marketing_communication_preferences,profile_access"
         - name: fromTime
           in: query
           description: The start of the time window for the search, as a Unix timestamp in seconds (integer).
@@ -370,6 +377,7 @@ paths:
               frequency: 0
               purposes:
                 - name: "profile_access"
+                  version: "1"
                   elements:
                     - name: "first_name"
                       isUserApproved: true
@@ -718,12 +726,15 @@ paths:
                   dataAccessValidityDuration: 86400
                   purposes:
                     - name: "marketing_communication_preferences"
+                      version: "1.0"
                       elements:
                         - name: "first_name"
                           value: {}
                           isUserApproved: true
                           isMandatory: true
-                          type: "resource-field-type"
+                          type: "basic"
+                          displayName: "First Name"
+                          version: "1.0"
                           description: "Allows access to the user's first name"
                           properties:
                             jsonPath: "$.personal.firstName"
@@ -770,22 +781,12 @@ paths:
         Creates one or more consent elements in a single request. Supports batch creation by accepting
         an array of element definitions.
 
-        **Type Handlers:**
-        Each element has a type that determines which properties are mandatory:
-        - **string-type**: No mandatory properties (any properties are optional)
-        - **json-payload-type**: Requires `validationSchema` property
-        - **resource-field-type**: Requires both `resourcePath` and `jsonPath` properties
-
-        **Transactional Behavior:**
-        Batch creation is atomic - either all elements in the request are created successfully, or none
-        are created. If any validation fails (e.g., duplicate name, invalid type, missing required attribute),
-        the entire batch is rolled back and no elements are persisted to the database.
-
         **Validation Rules:**
         - Name is required and must not exceed 255 characters
         - Name must be unique within the organization (checked against existing elements and within the batch)
-        - Type is required and must be one of: `string`, `json-schema`, `attribute`
-        - Properties validation depends on type (see Type Handlers above)
+        - Type is required and must be one of: `basic`, `json`, `xml`
+        - displayName is optional
+        - version is optional
         - Description is optional but must not exceed 1024 characters if provided
         - At least one element must be provided in the request array
         - Duplicate names within the same batch are not allowed
@@ -811,60 +812,61 @@ paths:
               items:
                 $ref: "#/components/schemas/ConsentPurposeCreateRequest"
             examples:
-              stringType:
-                summary: String type with optional properties
+              basicType:
+                summary: Basic type with resourcePath and jsonPath
                 value:
-                  - name: "license_read"
-                    description: "Allows accessing license API"
-                    type: "string-type"
-                    properties:
-                      value: "license:read"
-              stringTypeNoAttributes:
-                summary: String type without properties (valid)
-                value:
-                  - name: "basic_access"
-                    type: "string-type"
-              jsonPayloadType:
-                summary: JSON payload type with validationSchema
-                value:
-                  - name: "account_schema"
-                    description: "Account access schema validation"
-                    type: "json-payload-type"
-                    properties:
-                      validationSchema: |
-                        {
-                          "type": "object",
-                          "properties": {
-                            "accountId": {"type": "string"},
-                            "permissions": {"type": "array", "items": {"type": "string"}}
-                          },
-                          "required": ["accountId"]
-                        }
-              resourceFieldType:
-                summary: Resource field type with resource and json paths
-                value:
-                  - name: "first_name"
+                  - type: "basic"
+                    name: "first_name"
+                    displayName: "To be used in UIs etc."
                     description: "Allows access to the user's first name"
-                    type: "resource-field-type"
                     properties:
-                      resourcePath: "/user/{nic}"
-                      jsonPath: "$.personal.firstName"
-              multiplePurposes:
+                      resourcePath: "/Patient/{firstName}"
+                      jsonPath: "$.patient.firstName"
+              jsonType:
+                summary: JSON type with validationSchema
+                value:
+                  - type: "json"
+                    name: "account_schema"
+                    displayName: "To be used in UIs etc."
+                    description: "Account access schema validation"
+                    validationSchema: "<Schema>"
+                    properties:
+                      abc: "<ABC>"
+                      def: "<DEF>"
+              xmlType:
+                summary: XML type with validationSchema
+                value:
+                  - type: "xml"
+                    name: "account_schema"
+                    displayName: "To be used in UIs etc."
+                    description: "Account access schema validation"
+                    validationSchema: "<Schema>"
+                    version: "1.0"
+                    properties:
+                      abc: "<ABC>"
+                      def: "<DEF>"
+              multipleElements:
                 summary: Create multiple elements with different types
                 value:
-                  - name: "license_read"
-                    type: "string-type"
+                  - type: "basic"
+                    name: "first_name"
+                    displayName: "First Name"
                     properties:
-                      value: "license:read"
-                  - name: "tax_schema"
-                    type: "json-payload-type"
+                      resourcePath: "/Patient/{firstName}"
+                      jsonPath: "$.patient.firstName"
+                  - type: "json"
+                    name: "json_schema"
+                    displayName: "JSON Schema"
+                    validationSchema: "<Schema>"
                     properties:
-                      validationSchema: '{"type":"object"}'
-                  - name: "dynamic_roles"
-                    type: "resource-field-type"
+                      abc: "<ABC>"
+                  - type: "xml"
+                    name: "xml_schema"
+                    displayName: "XML Schema"
+                    validationSchema: "<Schema>"
+                    version: "1.0"
                     properties:
-                      resourcePath: "/api/roles"
-                      jsonPath: "$.data.roles"
+                      def: "<DEF>"
       responses:
         "201":
           description: Successfully created consent element(s)
@@ -881,39 +883,49 @@ paths:
                     type: string
                     example: "Consent elements created successfully"
               examples:
-                stringType:
-                  summary: String type element created
+                basicType:
+                  summary: Basic type element created
                   value:
                     data:
                       - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                        name: "license_read"
-                        description: "Allows accessing license API"
-                        type: "string-type"
-                        properties:
-                          value: "license:read"
-                    message: "Consent elements created successfully"
-                jsonPayloadType:
-                  summary: JSON payload type element created
-                  value:
-                    data:
-                      - id: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
-                        name: "account_schema"
-                        description: "Account access schema validation"
-                        type: "json-payload-type"
-                        properties:
-                          validationSchema: '{"type":"object","properties":{"accountId":{"type":"string"}}}'
-                    message: "Consent elements created successfully"
-                resourceFieldType:
-                  summary: Resource field type element created
-                  value:
-                    data:
-                      - id: "c3d4e5f6-a7b8-9012-cdef-123456789012"
+                        type: "basic"
                         name: "first_name"
+                        displayName: "To be used in UIs etc."
                         description: "Allows access to the user's first name"
-                        type: "resource-field-type"
+                        version: "1.0"
                         properties:
-                          resourcePath: "/user/{nic}"
-                          jsonPath: "$.personal.firstName"
+                          resourcePath: "/Patient/{firstName}"
+                          jsonPath: "$.patient.firstName"
+                    message: "Consent elements created successfully"
+                jsonType:
+                  summary: JSON type element created
+                  value:
+                    data:
+                      - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                        type: "json"
+                        name: "account_schema"
+                        displayName: "To be used in UIs etc."
+                        description: "Account access schema validation"
+                        validationSchema: "<Schema>"
+                        version: "1.0"
+                        properties:
+                          abc: "<ABC>"
+                          def: "<DEF>"
+                    message: "Consent elements created successfully"
+                xmlType:
+                  summary: XML type element created
+                  value:
+                    data:
+                      - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                        type: "xml"
+                        name: "account_schema"
+                        displayName: "To be used in UIs etc."
+                        description: "Account access schema validation"
+                        validationSchema: "<Schema>"
+                        version: "1.0"
+                        properties:
+                          abc: "<ABC>"
+                          def: "<DEF>"
                     message: "Consent elements created successfully"
         "400":
           description: Bad Request - Invalid input or validation error
@@ -941,10 +953,10 @@ paths:
                   value:
                     code: "BAD_REQUEST"
                     message: "Invalid element type"
-                    description: "Type must be one of: string, json-schema, attribute"
+                    description: "Type must be one of: basic, json, xml"
                     traceId: "20260107T123456Z-abc123"
-                jsonSchemaMissingValidationSchema:
-                  summary: JSON payload type missing validationSchema attribute
+                jsonMissingValidationSchema:
+                  summary: JSON type missing validationSchema field
                   value:
                     code: "BAD_REQUEST"
                     message: "Validation failed"
@@ -1009,6 +1021,13 @@ paths:
           schema:
             type: string
             example: "account"
+        - name: version
+          in: query
+          description: Filter elements by version (exact match)
+          required: false
+          schema:
+            type: string
+            example: "1.0"
         - name: limit
           in: query
           description: The maximum number of results to return in a single page. Used for pagination.
@@ -1040,24 +1059,32 @@ paths:
               example:
                 data:
                   - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    type: "basic"
                     name: "first_name"
+                    displayName: "First Name"
                     description: "Allows access to the user's first name"
-                    type: "resource-field-type"
+                    version: "1.0"
                     properties:
-                      jsonPath: "$.personal.firstName"
-                      resourcePath: "/user/{nic}"
+                      resourcePath: "/Patient/{firstName}"
+                      jsonPath: "$.patient.firstName"
                   - id: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
-                    name: "readAccountBasic"
-                    description: "Allows reading basic account information"
-                    type: "string-type"
+                    type: "json"
+                    name: "json_schema"
+                    displayName: "JSON Schema"
+                    description: "JSON schema validation"
+                    validationSchema: "<Schema>"
+                    version: "1.0"
                     properties:
-                      value: "account:read:basic"
+                      abc: "<ABC>"
                   - id: "c3d4e5f6-a7b8-9012-cdef-123456789012"
-                    name: "readTransactions"
-                    description: "Allows reading transaction history"
-                    type: "string-type"
+                    type: "xml"
+                    name: "xml_schema"
+                    displayName: "XML Schema"
+                    description: "XML schema validation"
+                    validationSchema: "<Schema>"
+                    version: "1.0"
                     properties:
-                      value: "account:read:transactions"
+                      def: "<DEF>"
                 metadata:
                   total: 3
                   offset: 0
@@ -1078,6 +1105,7 @@ paths:
         - basicAuth: []
   /consent-elements/validate:
     post:
+      deprecated: true
       summary: Validate consent element names
       description: |
         Validates a list of consent element names and returns only the valid ones that exist in the database.
@@ -1195,11 +1223,19 @@ paths:
                 traceId: "20260107T123456Z-abc123"
       security:
         - basicAuth: []
-  /consent-elements/{elementId}:
-    get:
-      summary: Get a specific consent element
-      description: Retrieves the details of a specific consent element by its ID
-      operationId: getConsentPurpose
+  /consent-elements/{elementName}/versions:
+    post:
+      summary: Create a new version of an existing consent element
+      description: |
+        Creates a new version for an existing consent element. The element must already exist.
+
+        **Validation Rules:**
+        - Element with the specified name must exist
+        - Type is required and must be one of: `basic`, `json`, `xml`
+        - displayName is optional
+        - version will be auto-incremented from the latest version
+        - Description is optional but must not exceed 1024 characters if provided
+      operationId: createElementVersion
       tags:
         - Consent Elements
       parameters:
@@ -1210,30 +1246,150 @@ paths:
           schema:
             type: string
             example: "ORG-001"
-        - name: elementId
+        - name: elementName
           in: path
           required: true
-          description: The unique identifier of the consent element
+          description: The name of the consent element
           schema:
             type: string
-            example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            example: "first_name"
+      requestBody:
+        description: New version data for the consent element
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsentPurposeCreateRequest"
+            examples:
+              basicType:
+                summary: Create new version of basic type
+                value:
+                  type: "basic"
+                  name: "first_name"
+                  displayName: "First Name V2"
+                  description: "Updated first name access"
+                  properties:
+                    resourcePath: "/Patient/{firstName}"
+                    jsonPath: "$.patient.firstName"
+              jsonType:
+                summary: Create new version of JSON type
+                value:
+                  type: "json"
+                  name: "account_schema"
+                  displayName: "Account Schema V2"
+                  description: "Updated JSON schema validation"
+                  validationSchema: "<Updated Schema>"
+                  properties:
+                    abc: "<ABC>"
+                    def: "<DEF>"
       responses:
-        "200":
-          description: Successfully retrieved consent element
+        "201":
+          description: Successfully created new version
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConsentPurposeResponse"
               example:
-                id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                id: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+                type: "basic"
                 name: "first_name"
-                description: "Allows access to the user's first name"
-                type: "resource-field-type"
+                displayName: "First Name V2"
+                description: "Updated first name access"
+                version: "2.0"
                 properties:
-                  jsonPath: "$.personal.firstName"
-                  resourcePath: "/user/{nic}"
+                  resourcePath: "/Patient/{firstName}"
+                  jsonPath: "$.patient.firstName"
+        "400":
+          description: Bad Request - Invalid input or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
         "404":
-          description: Consent element not found
+          description: Element not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "NOT_FOUND"
+                message: "Element not found"
+                description: "Consent element with the specified name does not exist"
+                traceId: "20260107T123456Z-abc123"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+      security:
+        - basicAuth: []
+    get:
+      summary: List all versions of a consent element
+      description: |
+        Retrieves all versions of a specific consent element identified by its name.
+        Results are ordered by version number (newest first).
+      operationId: listElementVersions
+      tags:
+        - Consent Elements
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-001"
+        - name: elementName
+          in: path
+          required: true
+          description: The name of the consent element
+          schema:
+            type: string
+            example: "first_name"
+      responses:
+        "200":
+          description: Successfully retrieved element versions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ConsentPurposeResponse"
+              example:
+                data:
+                  - id: "c3d4e5f6-a7b8-9012-cdef-123456789012"
+                    type: "basic"
+                    name: "first_name"
+                    displayName: "First Name V3"
+                    description: "Latest first name access"
+                    version: "3.0"
+                    properties:
+                      resourcePath: "/Patient/{firstName}"
+                      jsonPath: "$.patient.firstName"
+                  - id: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+                    type: "basic"
+                    name: "first_name"
+                    displayName: "First Name V2"
+                    description: "Updated first name access"
+                    version: "2.0"
+                    properties:
+                      resourcePath: "/Patient/{firstName}"
+                      jsonPath: "$.patient.firstName"
+                  - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    type: "basic"
+                    name: "first_name"
+                    displayName: "First Name"
+                    description: "Allows access to the user's first name"
+                    version: "1.0"
+                    properties:
+                      resourcePath: "/Patient/{firstName}"
+                      jsonPath: "$.patient.firstName"
+        "404":
+          description: Element not found
           content:
             application/json:
               schema:
@@ -1249,37 +1405,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConsentErrorCommon"
-              example:
-                code: "INTERNAL_ERROR"
-                message: "Server error"
-                description: "An unexpected error occurred"
-                traceId: "20260107T123456Z-abc123"
       security:
         - basicAuth: []
-    put:
-      summary: Update a consent element
-      description: |
-        Updates an existing consent element. **All fields are required** - partial updates are not supported.
-
-        **Type Handlers:**
-        Each element has a type that determines which properties are mandatory:
-        - **string-type**: No mandatory properties (any properties are optional)
-        - **json-payload-type**: Requires `validationSchema` property
-        - **resource-field-type**: Requires both `resourcePath` and `jsonPath` properties
-
-        **Update Behavior:**
-        - All fields (name, description, type, properties) must be provided in the request
-        - The element type can be changed, but new type's property requirements must be satisfied
-        - Name must remain unique within the organization (or be the same as current name)
-        - The update is transactional - either all fields are updated or none
-
-        **Validation Rules:**
-        - Name is required and must not exceed 255 characters
-        - Name must be unique within the organization (excluding the current element)
-        - Type is required and must be one of: `string-type`, `json-payload-type`, `resource-field-type`
-        - Properties validation depends on type (see Type Handlers above)
-        - Description is optional but must not exceed 1024 characters if provided
-      operationId: updateConsentPurpose
+  /consent-elements/{elementName}/versions/{version}:
+    get:
+      summary: Get a specific version of a consent element
+      description: Retrieves the details of a specific version of a consent element
+      operationId: getElementVersion
       tags:
         - Consent Elements
       parameters:
@@ -1290,13 +1422,96 @@ paths:
           schema:
             type: string
             example: "ORG-001"
-        - name: elementId
+        - name: elementName
           in: path
           required: true
-          description: The unique identifier of the consent element to update
+          description: The name of the consent element
           schema:
             type: string
-            example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            example: "first_name"
+        - name: version
+          in: path
+          required: true
+          description: The version number (e.g., "1.0", "2.0")
+          schema:
+            type: string
+            example: "1.0"
+      responses:
+        "200":
+          description: Successfully retrieved consent element version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentPurposeResponse"
+              example:
+                id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                type: "basic"
+                name: "first_name"
+                displayName: "First Name"
+                description: "Allows access to the user's first name"
+                version: "1.0"
+                properties:
+                  resourcePath: "/Patient/{firstName}"
+                  jsonPath: "$.patient.firstName"
+        "404":
+          description: Element or version not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "NOT_FOUND"
+                message: "Version not found"
+                description: "Consent element version does not exist"
+                traceId: "20260107T123456Z-abc123"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+      security:
+        - basicAuth: []
+    put:
+      deprecated: true
+      summary: Update a specific version of a consent element
+      description: |
+        Updates an existing version of a consent element. **All fields are required** - partial updates are not supported.
+
+        **Update Behavior:**
+        - All fields (description, type, properties) must be provided in the request
+        - The element type can be changed, but new type's property requirements must be satisfied
+        - The update is transactional - either all fields are updated or none
+
+        **Validation Rules:**
+        - Type is required and must be one of: `basic`, `json`, `xml`
+        - displayName is optional
+        - Description is optional but must not exceed 1024 characters if provided
+      operationId: updateElementVersion
+      tags:
+        - Consent Elements
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-001"
+        - name: elementName
+          in: path
+          required: true
+          description: The name of the consent element
+          schema:
+            type: string
+            example: "first_name"
+        - name: version
+          in: path
+          required: true
+          description: The version number to update
+          schema:
+            type: string
+            example: "1.0"
       requestBody:
         description: Complete element data (all fields required - no partial updates)
         required: true
@@ -1305,127 +1520,60 @@ paths:
             schema:
               $ref: "#/components/schemas/ConsentPurposeUpdateRequest"
             examples:
-              updateToString:
-                summary: Update to string type (no mandatory properties)
-                value:
-                  name: "license_read_updated"
-                  description: "Updated license access permission"
-                  type: "string-type"
-                  properties:
-                    value: "license:read:v2"
-              updateToJsonSchema:
-                summary: Update to JSON Schema type (requires validationSchema)
-                value:
-                  name: "account_schema_v2"
-                  description: "Updated account schema validation"
-                  type: "json-payload-type"
-                  properties:
-                    validationSchema: |
-                      {
-                        "type": "object",
-                        "properties": {
-                          "accountId": {"type": "string"},
-                          "permissions": {"type": "array"}
-                        },
-                        "required": ["accountId"]
-                      }
-              updateToAttribute:
-                summary: Update to Attribute type (requires resourcePath and jsonPath)
+              updateToBasic:
+                summary: Update version to basic type
                 value:
                   name: "first_name"
-                  description: "Allows access to the user's first name"
-                  type: "resource-field-type"
+                  displayName: "First Name Updated"
+                  description: "Updated first name access"
+                  type: "basic"
                   properties:
-                    resourcePath: "/user/{nic}"
-                    jsonPath: "$.personal.firstName"
+                    resourcePath: "/Patient/{firstName}"
+                    jsonPath: "$.patient.firstName"
+              updateToJson:
+                summary: Update version to JSON type
+                value:
+                  name: "first_name"
+                  displayName: "First Name JSON"
+                  description: "Updated JSON schema validation"
+                  type: "json"
+                  validationSchema: "<Schema>"
+                  properties:
+                    abc: "<ABC>"
+                    def: "<DEF>"
       responses:
         "200":
-          description: Successfully updated consent element
+          description: Successfully updated consent element version
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConsentPurposeResponse"
-              examples:
-                stringType:
-                  summary: Updated to string type
-                  value:
-                    id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                    name: "license_read_updated"
-                    description: "Updated license access permission"
-                    type: "string-type"
-                    properties:
-                      value: "license:read:v2"
-                jsonPayloadType:
-                  summary: Updated to JSON Schema type
-                  value:
-                    id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                    name: "account_schema_v2"
-                    description: "Updated account schema validation"
-                    type: "json-payload-type"
-                    properties:
-                      validationSchema: '{"type":"object","properties":{"accountId":{"type":"string"}}}'
-                resourceFieldType:
-                  summary: Updated to Attribute type
-                  value:
-                    id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                    name: "first_name"
-                    description: "Allows access to the user's first name"
-                    type: "resource-field-type"
-                    properties:
-                      resourcePath: "/user/{nic}"
-                      jsonPath: "$.personal.firstName"
+              example:
+                id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                type: "basic"
+                name: "first_name"
+                displayName: "First Name Updated"
+                description: "Updated first name access"
+                version: "1.0"
+                properties:
+                  resourcePath: "/Patient/{firstName}"
+                  jsonPath: "$.patient.firstName"
         "400":
           description: Bad Request - Invalid input or validation error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConsentErrorCommon"
-              examples:
-                missingName:
-                  summary: Missing required field (name)
-                  value:
-                    code: "BAD_REQUEST"
-                    message: "Invalid request"
-                    description: "Element name is required"
-                    traceId: "20260107T123456Z-abc123"
-                invalidType:
-                  summary: Invalid type value
-                  value:
-                    code: "BAD_REQUEST"
-                    message: "Invalid element type"
-                    description: "Type must be one of: string, json-schema, attribute"
-                    traceId: "20260107T123456Z-abc123"
-                jsonSchemaMissingValidationSchema:
-                  summary: JSON payload type missing validationSchema
-                  value:
-                    code: "BAD_REQUEST"
-                    message: "Validation failed"
-                    description: "validationSchema is required for json-schema type"
-                    traceId: "20260107T123456Z-abc123"
-                attributeMissingResourcePath:
-                  summary: Resource field type missing resourcePath
-                  value:
-                    code: "BAD_REQUEST"
-                    message: "Validation failed"
-                    description: "resourcePath is required for attribute type"
-                    traceId: "20260107T123456Z-abc123"
-                duplicateName:
-                  summary: Name already exists in organization
-                  value:
-                    code: "CONFLICT"
-                    message: "Element already exists"
-                    description: "Element name already exists in organization"
-                    traceId: "20260107T123456Z-abc123"
         "404":
-          description: Consent element not found
+          description: Element or version not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConsentErrorCommon"
               example:
                 code: "NOT_FOUND"
-                message: "Element not found"
-                description: "Consent element does not exist"
+                message: "Version not found"
+                description: "Consent element version does not exist"
                 traceId: "20260107T123456Z-abc123"
         "500":
           description: Internal Server Error
@@ -1433,20 +1581,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConsentErrorCommon"
-              example:
-                code: "INTERNAL_ERROR"
-                message: "Server error"
-                description: "An unexpected error occurred"
-                traceId: "20260107T123456Z-abc123"
       security:
         - basicAuth: []
     delete:
-      summary: Delete a consent element
+      summary: Delete a specific version of a consent element
       description: |
-        Deletes a consent element. The element must exist and belong to the specified organization.
+        Deletes a specific version of a consent element.
 
-        **Note:** This operation will not delete any mappings if the element is currently linked to consents.
-      operationId: deleteConsentPurpose
+        **Deletion Rules:**
+        - Cannot delete a version if it's being referenced by active consents or purposes
+        - Cannot delete the only remaining version of an element (use element deletion instead)
+      operationId: deleteElementVersion
       tags:
         - Consent Elements
       parameters:
@@ -1457,26 +1602,54 @@ paths:
           schema:
             type: string
             example: "ORG-001"
-        - name: elementId
+        - name: elementName
           in: path
           required: true
-          description: The unique identifier of the consent element to delete
+          description: The name of the consent element
           schema:
             type: string
-            example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            example: "first_name"
+        - name: version
+          in: path
+          required: true
+          description: The version number to delete
+          schema:
+            type: string
+            example: "2.0"
       responses:
         "204":
-          description: Successfully deleted consent element (no content returned)
+          description: Successfully deleted consent element version
+        "400":
+          description: Bad Request - Version is in use or cannot be deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              examples:
+                versionInUse:
+                  summary: Version is referenced by active consents
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Version in use"
+                    description: "Cannot delete version that is referenced by active consents or purposes"
+                    traceId: "20260107T123456Z-abc123"
+                lastVersion:
+                  summary: Cannot delete the only version
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Cannot delete last version"
+                    description: "Cannot delete the only remaining version of an element"
+                    traceId: "20260107T123456Z-abc123"
         "404":
-          description: Consent element not found
+          description: Element or version not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConsentErrorCommon"
               example:
                 code: "NOT_FOUND"
-                message: "Element not found"
-                description: "Consent element does not exist"
+                message: "Version not found"
+                description: "Consent element version does not exist"
                 traceId: "20260107T123456Z-abc123"
         "500":
           description: Internal Server Error
@@ -1484,11 +1657,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConsentErrorCommon"
-              example:
-                code: "INTERNAL_ERROR"
-                message: "Server error"
-                description: "An unexpected error occurred"
-                traceId: "20260107T123456Z-abc123"
       security:
         - basicAuth: []
   /consent-purposes:
@@ -1543,24 +1711,33 @@ paths:
                 value:
                   name: "marketing_communication_preferences_purpose"
                   description: "User preferences related to marketing communications"
+                  displayName: "Marketing Communication Preferences"
                   elements:
                     - name: "user_email"
+                      version: "1"
                       isMandatory: true
                     - name: "user_phone"
+                      version: "1"
                       isMandatory: false
                     - name: "user_address"
+                      version: "1"
                       isMandatory: false
               govDataAccessPurpose:
                 summary: Government data access purpose
                 value:
                   name: "gov_data_access_purpose_attribute"
                   description: "User consent to access user data in government portal"
+                  displayName: "To be used in UIs etc."
+                  version: "1"
                   elements:
                     - name: "first_name"
+                      version: "1"
                       isMandatory: false
                     - name: "last_name"
+                      version: "1"
                       isMandatory: false
                     - name: "address"
+                      version: "1"
                       isMandatory: true
       responses:
         "201":
@@ -1575,14 +1752,19 @@ paths:
                   value:
                     id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                     name: "marketing_communication_preferences_purpose"
+                    displayName: "Marketing Communication Preferences"
                     description: "User preferences related to marketing communications"
+                    version: "1.0"
                     clientId: "CLIENT-456"
                     elements:
                       - name: "user_email"
+                        version: "1.0"
                         isMandatory: true
                       - name: "user_phone"
+                        version: "1.0"
                         isMandatory: false
                       - name: "user_address"
+                        version: "1.0"
                         isMandatory: false
                     createdTime: 1704153600
                     updatedTime: 1704153600
@@ -1692,6 +1874,13 @@ paths:
           schema:
             type: string
           example: "user_email,user_phone"
+        - name: version
+          in: query
+          description: Filter purposes by version (exact match)
+          required: false
+          schema:
+            type: string
+            example: "1.0"
         - name: limit
           in: query
           description: Maximum number of results to return (default 10, max 100)
@@ -1732,23 +1921,31 @@ paths:
                     data:
                       - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                         name: "marketing_communication_preferences_purpose"
+                        displayName: "Marketing Communication Preferences"
                         description: "User preferences related to marketing communications"
+                        version: "1.0"
                         clientId: "CLIENT-456"
                         elements:
                           - name: "user_email"
+                            version: "1.0"
                             isMandatory: true
                           - name: "user_phone"
+                            version: "1.0"
                             isMandatory: false
                         createdTime: 1704153600
                         updatedTime: 1704153600
                       - id: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
                         name: "account_access_permissions_purpose"
+                        displayName: "Account Access Permissions"
                         description: "Permissions for accessing account information"
+                        version: "1.0"
                         clientId: "CLIENT-789"
                         elements:
                           - name: "account_basic_info"
+                            version: "1.0"
                             isMandatory: true
                           - name: "account_balance"
+                            version: "1.0"
                             isMandatory: true
                         createdTime: 1704067200
                         updatedTime: 1704067200
@@ -1772,14 +1969,19 @@ paths:
                     data:
                       - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                         name: "marketing_communication_preferences_purpose"
+                        displayName: "Marketing Communication Preferences"
                         description: "User preferences related to marketing communications"
+                        version: "1.0"
                         clientId: "CLIENT-456"
                         elements:
                           - name: "user_email"
+                            version: "1.0"
                             isMandatory: true
                           - name: "user_phone"
+                            version: "1.0"
                             isMandatory: false
                           - name: "user_address"
+                            version: "1.0"
                             isMandatory: false
                         createdTime: 1704153600
                         updatedTime: 1704153600
@@ -1802,112 +2004,22 @@ paths:
                 $ref: "#/components/schemas/ConsentErrorCommon"
       security:
         - basicAuth: []
-  /consent-purposes/{purposeId}:
-    get:
-      summary: Get a specific purpose by ID
+  /consent-purposes/{purposeName}/versions:
+    post:
+      summary: Create a new version of an existing consent purpose
       description: |
-        Retrieves a single consent purpose by its unique identifier.
-
-        Returns complete purpose details including all associated elements with their
-        mandatory flags.
-      operationId: getPurposeGroupById
-      tags:
-        - Consent Purpose
-      parameters:
-        - in: header
-          name: org-id
-          required: true
-          description: The unique identifier for the organization
-          schema:
-            type: string
-            example: "ORG-001"
-        - name: purposeId
-          in: path
-          required: true
-          description: The unique identifier of the purpose
-          schema:
-            type: string
-          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-      responses:
-        "200":
-          description: Successfully retrieved purpose
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PurposeGroupResponse"
-              example:
-                id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                name: "marketing_communication_preferences_purpose"
-                description: "User preferences related to marketing communications"
-                clientId: "CLIENT-456"
-                elements:
-                  - name: "user_email"
-                    isMandatory: true
-                  - name: "user_phone"
-                    isMandatory: false
-                  - name: "user_address"
-                    isMandatory: false
-                createdTime: 1704153600
-                updatedTime: 1704153600
-        "404":
-          description: Purpose not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConsentErrorCommon"
-              example:
-                code: "NOT_FOUND"
-                message: "Purpose not found"
-                description: "Purpose does not exist"
-                traceId: "20260107T123456Z-abc123"
-        "400":
-          description: Bad Request - Invalid purpose ID format
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConsentErrorCommon"
-              example:
-                code: "BAD_REQUEST"
-                message: "Invalid request"
-                description: "Invalid purpose ID format"
-                traceId: "20260107T123456Z-abc123"
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConsentErrorCommon"
-              example:
-                code: "INTERNAL_ERROR"
-                message: "Server error"
-                description: "An unexpected error occurred"
-                traceId: "20260107T123456Z-abc123"
-      security:
-        - basicAuth: []
-    put:
-      summary: Update a purpose
-      description: |
-        Updates an existing consent purpose. This is a full replacement operation -
-        all fields must be provided in the request.
-
-        **Update Restrictions:**
-        - Updates are only allowed if the purpose is not currently bound to any active consents.
-        - If the purpose is referenced in any consent, the update will be rejected.
-
-        **Element Name Validation:**
-        All element names referenced in the updated `elements` array must already exist
-        in the organization's consent elements.
+        Creates a new version for an existing consent purpose. The purpose must already exist.
 
         **Validation Rules:**
-        - All fields from create request are required (full replacement)
-        - Purpose name must be unique within organization and client (can keep same name)
-        - All element names must reference existing consent elements
-        - At least one element must be provided
-        - Duplicate element names within the purpose are not allowed
-
-        **Note:** This operation replaces the entire elements list - any elements not
-        included in the update will be removed from the purpose.
-      operationId: updatePurposeGroup
+        - Purpose with the specified name must exist
+        - Purpose name must match an existing purpose in the organization and client
+        - Purpose name must not exceed 255 characters
+        - Description is optional but must not exceed 1024 characters if provided
+        - At least one element must be provided in the elements array
+        - All element names must reference existing valid consent elements
+        - Duplicate element names within the same purpose are not allowed
+        - version will be auto-incremented from the latest version
+      operationId: createPurposeVersion
       tags:
         - Consent Purpose
       parameters:
@@ -1925,13 +2037,341 @@ paths:
           schema:
             type: string
             example: "TPP-CLIENT-001"
-        - name: purposeId
+        - name: purposeName
           in: path
           required: true
-          description: The unique identifier of the purpose to update
+          description: The name of the consent purpose
           schema:
             type: string
-          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            example: "marketing_communication_preferences_purpose"
+      requestBody:
+        description: New version data for the consent purpose
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PurposeGroupCreateRequest"
+            examples:
+              updateElements:
+                summary: Create new version with updated elements
+                value:
+                  name: "marketing_communication_preferences_purpose"
+                  displayName: "Marketing Communication Preferences V2"
+                  description: "Updated marketing communication preferences"
+                  elements:
+                    - name: "user_email"
+                      version: "1"
+                      isMandatory: true
+                    - name: "user_phone"
+                      version: "1"
+                      isMandatory: true
+                    - name: "user_sms"
+                      version: "1"
+                      isMandatory: false
+      responses:
+        "201":
+          description: Successfully created new version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurposeGroupResponse"
+              example:
+                id: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+                name: "marketing_communication_preferences_purpose"
+                displayName: "Marketing Communication Preferences V2"
+                description: "Updated marketing communication preferences"
+                version: "2.0"
+                clientId: "CLIENT-456"
+                elements:
+                  - name: "user_email"
+                    version: "1.0"
+                    isMandatory: true
+                  - name: "user_phone"
+                    version: "1.0"
+                    isMandatory: true
+                  - name: "user_sms"
+                    version: "1.0"
+                    isMandatory: false
+                createdTime: 1704240000
+                updatedTime: 1704240000
+        "400":
+          description: Bad Request - Invalid input or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+        "404":
+          description: Purpose not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "NOT_FOUND"
+                message: "Purpose not found"
+                description: "Consent purpose with the specified name does not exist"
+                traceId: "20260107T123456Z-abc123"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+      security:
+        - basicAuth: []
+    get:
+      summary: List all versions of a consent purpose
+      description: |
+        Retrieves all versions of a specific consent purpose identified by its name.
+        Results are ordered by version number (newest first).
+      operationId: listPurposeVersions
+      tags:
+        - Consent Purpose
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-001"
+        - name: purposeName
+          in: path
+          required: true
+          description: The name of the consent purpose
+          schema:
+            type: string
+            example: "marketing_communication_preferences_purpose"
+      responses:
+        "200":
+          description: Successfully retrieved purpose versions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PurposeGroupResponse"
+              example:
+                data:
+                  - id: "c3d4e5f6-a7b8-9012-cdef-123456789012"
+                    name: "marketing_communication_preferences_purpose"
+                    displayName: "Marketing Communication Preferences V3"
+                    description: "Latest marketing preferences"
+                    version: "3.0"
+                    clientId: "CLIENT-456"
+                    elements:
+                      - name: "user_email"
+                        version: "1.0"
+                        isMandatory: true
+                      - name: "user_phone"
+                        version: "1.0"
+                        isMandatory: false
+                    createdTime: 1704326400
+                    updatedTime: 1704326400
+                  - id: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+                    name: "marketing_communication_preferences_purpose"
+                    displayName: "Marketing Communication Preferences V2"
+                    description: "Updated marketing preferences"
+                    version: "2.0"
+                    clientId: "CLIENT-456"
+                    elements:
+                      - name: "user_email"
+                        version: "1.0"
+                        isMandatory: true
+                      - name: "user_phone"
+                        version: "1.0"
+                        isMandatory: true
+                    createdTime: 1704240000
+                    updatedTime: 1704240000
+                  - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    name: "marketing_communication_preferences_purpose"
+                    displayName: "Marketing Communication Preferences"
+                    description: "User preferences related to marketing communications"
+                    version: "1.0"
+                    clientId: "CLIENT-456"
+                    elements:
+                      - name: "user_email"
+                        version: "1.0"
+                        isMandatory: true
+                      - name: "user_phone"
+                        version: "1.0"
+                        isMandatory: false
+                      - name: "user_address"
+                        version: "1.0"
+                        isMandatory: false
+                    createdTime: 1704153600
+                    updatedTime: 1704153600
+        "404":
+          description: Purpose not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "NOT_FOUND"
+                message: "Purpose not found"
+                description: "Consent purpose does not exist"
+                traceId: "20260107T123456Z-abc123"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+      security:
+        - basicAuth: []
+  /consent-purposes/{purposeName}/versions/{version}:
+    get:
+      summary: Get a specific version of a consent purpose
+      description: |
+        Retrieves the details of a specific version of a consent purpose.
+
+        Returns complete purpose details including all associated elements with their
+        mandatory flags.
+      operationId: getPurposeVersion
+      tags:
+        - Consent Purpose
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-001"
+        - name: purposeName
+          in: path
+          required: true
+          description: The name of the consent purpose
+          schema:
+            type: string
+            example: "marketing_communication_preferences_purpose"
+        - name: version
+          in: path
+          required: true
+          description: The version number (e.g., "1.0", "2.0")
+          schema:
+            type: string
+            example: "1.0"
+      responses:
+        "200":
+          description: Successfully retrieved purpose version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurposeGroupResponse"
+              example:
+                id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                name: "marketing_communication_preferences_purpose"
+                displayName: "Marketing Communication Preferences"
+                description: "User preferences related to marketing communications"
+                version: "1.0"
+                clientId: "CLIENT-456"
+                elements:
+                  - name: "user_email"
+                    version: "1.0"
+                    isMandatory: true
+                  - name: "user_phone"
+                    version: "1.0"
+                    isMandatory: false
+                  - name: "user_address"
+                    version: "1.0"
+                    isMandatory: false
+                createdTime: 1704153600
+                updatedTime: 1704153600
+        "404":
+          description: Purpose or version not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "NOT_FOUND"
+                message: "Version not found"
+                description: "Purpose version does not exist"
+                traceId: "20260107T123456Z-abc123"
+        "400":
+          description: Bad Request - Invalid purpose name or version format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "BAD_REQUEST"
+                message: "Invalid request"
+                description: "Invalid purpose name or version format"
+                traceId: "20260107T123456Z-abc123"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              example:
+                code: "INTERNAL_ERROR"
+                message: "Server error"
+                description: "An unexpected error occurred"
+                traceId: "20260107T123456Z-abc123"
+      security:
+        - basicAuth: []
+    put:
+      summary: Update a specific version of a consent purpose
+      description: |
+        Updates an existing version of a consent purpose. This is a full replacement operation -
+        all fields must be provided in the request.
+
+        **Update Restrictions:**
+        - Updates are only allowed if the purpose version is not currently bound to any active consents.
+        - If the purpose version is referenced in any consent, the update will be rejected.
+
+        **Element Name Validation:**
+        All element names referenced in the updated `elements` array must already exist
+        in the organization's consent elements.
+
+        **Validation Rules:**
+        - All fields from create request are required (full replacement)
+        - Purpose name must match the path parameter
+        - All element names must reference existing consent elements
+        - At least one element must be provided
+        - Duplicate element names within the purpose are not allowed
+
+        **Note:** This operation replaces the entire elements list - any elements not
+        included in the update will be removed from the purpose.
+      operationId: updatePurposeVersion
+      tags:
+        - Consent Purpose
+      parameters:
+        - in: header
+          name: org-id
+          required: true
+          description: The unique identifier for the organization
+          schema:
+            type: string
+            example: "ORG-001"
+        - in: header
+          name: TPP-client-id
+          required: true
+          description: The client ID of the Third-Party Provider (TPP) application making the request
+          schema:
+            type: string
+            example: "TPP-CLIENT-001"
+        - name: purposeName
+          in: path
+          required: true
+          description: The name of the consent purpose
+          schema:
+            type: string
+            example: "marketing_communication_preferences_purpose"
+        - name: version
+          in: path
+          required: true
+          description: The version number to update
+          schema:
+            type: string
+            example: "1.0"
       requestBody:
         description: Updated purpose definition
         required: true
@@ -1944,31 +2384,40 @@ paths:
                 summary: Update purpose description and elements
                 value:
                   name: "marketing_communication_preferences_purpose"
+                  displayName: "Marketing Communication Preferences"
                   description: "Updated preferences for all marketing communications"
                   elements:
                     - name: "user_email"
+                      version: "1"
                       isMandatory: true
                     - name: "user_phone"
+                      version: "1"
                       isMandatory: true
                     - name: "user_sms"
+                      version: "1"
                       isMandatory: false
               addElement:
                 summary: Add new element to purpose
                 value:
                   name: "marketing_communication_preferences_purpose"
+                  displayName: "Marketing Communication Preferences"
                   description: "User preferences related to marketing communications"
                   elements:
                     - name: "user_email"
+                      version: "1"
                       isMandatory: true
                     - name: "user_phone"
+                      version: "1"
                       isMandatory: false
                     - name: "user_address"
+                      version: "1"
                       isMandatory: false
                     - name: "user_push_notifications"
+                      version: "1"
                       isMandatory: false
       responses:
         "200":
-          description: Successfully updated purpose
+          description: Successfully updated purpose version
           content:
             application/json:
               schema:
@@ -1976,14 +2425,19 @@ paths:
               example:
                 id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                 name: "marketing_communication_preferences_purpose"
+                displayName: "Marketing Communication Preferences"
                 description: "Updated preferences for all marketing communications"
+                version: "1.0"
                 clientId: "CLIENT-456"
                 elements:
                   - name: "user_email"
+                    version: "1.0"
                     isMandatory: true
                   - name: "user_phone"
+                    version: "1.0"
                     isMandatory: true
                   - name: "user_sms"
+                    version: "1.0"
                     isMandatory: false
                 createdTime: 1704153600
                 updatedTime: 1704240000
@@ -2001,26 +2455,26 @@ paths:
                     message: "Invalid element reference"
                     description: "Element does not exist in organization"
                     traceId: "20260107T123456Z-abc123"
-                duplicateName:
-                  summary: Name conflicts with another purpose
+                nameMismatch:
+                  summary: Name doesn't match path parameter
                   value:
-                    code: "CONFLICT"
-                    message: "Purpose name conflict"
-                    description: "Purpose name already exists"
+                    code: "BAD_REQUEST"
+                    message: "Invalid request"
+                    description: "Purpose name in body must match path parameter"
                     traceId: "20260107T123456Z-abc123"
         "404":
-          description: Purpose not found
+          description: Purpose or version not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConsentErrorCommon"
               example:
                 code: "NOT_FOUND"
-                message: "Purpose not found"
-                description: "Purpose does not exist"
+                message: "Version not found"
+                description: "Purpose version does not exist"
                 traceId: "20260107T123456Z-abc123"
         "409":
-          description: Conflict - Purpose is bound to existing consents
+          description: Conflict - Purpose version is bound to existing consents
           content:
             application/json:
               schema:
@@ -2028,7 +2482,7 @@ paths:
               example:
                 code: "CONFLICT"
                 message: "Cannot update purpose"
-                description: "Purpose is currently bound to active consents and cannot be updated"
+                description: "Purpose version is currently bound to active consents and cannot be updated"
                 traceId: "20260107T123456Z-abc123"
         "500":
           description: Internal Server Error
@@ -2044,19 +2498,20 @@ paths:
       security:
         - basicAuth: []
     delete:
-      summary: Delete a purpose
+      summary: Delete a specific version of a consent purpose
       description: |
-        Deletes a consent purpose. The purpose must exist and belong to the specified organization.
+        Deletes a specific version of a consent purpose.
 
         **Delete Restrictions:**
-        - Deletion is only allowed if the purpose is not currently bound to any active consents.
-        - If the purpose is referenced in any consent, the deletion will be rejected.
+        - Deletion is only allowed if the purpose version is not currently bound to any active consents.
+        - If the purpose version is referenced in any consent, the deletion will be rejected.
+        - Cannot delete the only remaining version of a purpose (use purpose deletion instead)
 
         **Cascade Behavior:**
-        Deleting a purpose only removes the purpose definition itself. It does NOT delete
+        Deleting a purpose version only removes that specific version. It does NOT delete
         the individual consent elements that were part of the purpose - those remain available
         for use in other purposes or directly in consents.
-      operationId: deletePurposeGroup
+      operationId: deletePurposeVersion
       tags:
         - Consent Purpose
       parameters:
@@ -2067,37 +2522,54 @@ paths:
           schema:
             type: string
             example: "ORG-001"
-        - name: purposeId
+        - name: purposeName
           in: path
           required: true
-          description: The unique identifier of the purpose to delete
+          description: The name of the consent purpose
           schema:
             type: string
-          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            example: "marketing_communication_preferences_purpose"
+        - name: version
+          in: path
+          required: true
+          description: The version number to delete
+          schema:
+            type: string
+            example: "2.0"
       responses:
         "204":
-          description: Successfully deleted purpose (no content returned)
+          description: Successfully deleted purpose version
+        "400":
+          description: Bad Request - Version is in use or cannot be deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentErrorCommon"
+              examples:
+                versionInUse:
+                  summary: Version is referenced by active consents
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Version in use"
+                    description: "Cannot delete version that is referenced by active consents"
+                    traceId: "20260107T123456Z-abc123"
+                lastVersion:
+                  summary: Cannot delete the only version
+                  value:
+                    code: "BAD_REQUEST"
+                    message: "Cannot delete last version"
+                    description: "Cannot delete the only remaining version of a purpose"
+                    traceId: "20260107T123456Z-abc123"
         "404":
-          description: Purpose not found
+          description: Purpose or version not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConsentErrorCommon"
               example:
                 code: "NOT_FOUND"
-                message: "Purpose not found"
-                description: "Purpose does not exist"
-                traceId: "20260107T123456Z-abc123"
-        "409":
-          description: Conflict - Purpose is bound to existing consents
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConsentErrorCommon"
-              example:
-                code: "CONFLICT"
-                message: "Cannot delete purpose"
-                description: "Purpose is currently bound to active consents and cannot be deleted"
+                message: "Version not found"
+                description: "Purpose version does not exist"
                 traceId: "20260107T123456Z-abc123"
         "500":
           description: Internal Server Error
@@ -2137,6 +2609,10 @@ components:
             The name of an existing purpose to include in this consent.
             Must match the name of a purpose that has been previously created in the organization.
           example: "marketing_communication_preferences"
+        version:
+          type: string
+          description: Version of the purpose to reference
+          example: "1"
         elements:
           type: array
           minItems: 1
@@ -2504,6 +2980,7 @@ components:
         id: "123e4567-e89b-12d3-a456-426614174000"
         purposes:
           - name: "marketing_communication_preferences"
+            version: "1.0"
             elements:
               - name: "user_email"
                 isUserApproved: true
@@ -2599,6 +3076,7 @@ components:
         id: "123e4567-e89b-12d3-a456-426614174000"
         purposes:
           - name: "marketing_communication_preferences"
+            version: "1.0"
             elements:
               - name: "user_email"
                 isUserApproved: true
@@ -2713,6 +3191,7 @@ components:
         id: "123e4567-e89b-12d3-a456-426614174000"
         purposes:
           - name: "marketing_communication_preferences"
+            version: "1.0"
             elements:
               - name: "user_email"
                 isUserApproved: true
@@ -2809,6 +3288,7 @@ components:
         id: "123e4567-e89b-12d3-a456-426614174000"
         purposes:
           - name: "marketing_communication_preferences"
+            version: "1.0"
             elements:
               - name: "user_email"
                 isUserApproved: true
@@ -3116,9 +3596,9 @@ components:
                       properties:
                         type:
                           type: string
-                          enum: [string-type, json-payload-type, resource-field-type]
+                          enum: [basic, json, xml]
                           description: Element type from the consent element definition
-                          example: "resource-field-type"
+                          example: "basic"
                         description:
                           type: string
                           description: Element description from the consent element definition
@@ -3202,10 +3682,10 @@ components:
         Request object for creating a consent element. All fields marked as required must be provided.
 
         **Type Handler Architecture:**
-        Each element type has specific property requirements:
-        - **string-type**: No mandatory properties (any properties are optional)
-        - **json-payload-type**: Requires `validationSchema` property
-        - **resource-field-type**: Requires both `resourcePath` and `jsonPath` properties
+        Each element type has specific requirements:
+        - **basic**: Requires `resourcePath` and `jsonPath` in properties
+        - **json**: Requires `validationSchema` field and can have arbitrary properties
+        - **xml**: Requires `validationSchema` field and can have arbitrary properties
 
         **Batch Creation:**
         When creating multiple purposes in a batch:
@@ -3226,29 +3706,43 @@ components:
           maxLength: 1024
           description: Optional description providing additional context about the purpose
           example: "Allows accessing license API"
+        displayName:
+          type: string
+          description: Display name for the element, to be used in UIs etc.
+          example: "First Name"
+        version:
+          type: string
+          description: Version of the consent element
+          example: "1.0"
         type:
           type: string
           enum:
-            - string-type
-            - json-payload-type
-            - resource-field-type
+            - basic
+            - json
+            - xml
           description: |
-            The type of the element determines which properties are mandatory:
-            - 'string-type': No mandatory properties (any properties are optional)
-            - 'json-payload-type': Requires `validationSchema` property
-            - 'resource-field-type': Requires `resourcePath` and `jsonPath` properties
-          example: "string-type"
+            The type of the element determines requirements:
+            - 'basic': Requires `resourcePath` and `jsonPath` in properties
+            - 'json': Requires `validationSchema` field
+            - 'xml': Requires `validationSchema` field
+          example: "basic"
+        validationSchema:
+          type: string
+          description: |
+            Validation schema (required for json and xml types)
+          example: "<Schema>"
         properties:
           type: object
           additionalProperties:
             type: string
           description: |
             Key-value map of properties. Required properties depend on the type:
-            - **string-type**: No mandatory properties. Can have any properties (e.g., value: "license:read")
-            - **json-payload-type**: Must have `validationSchema` property containing JSON schema
-            - **resource-field-type**: Must have `resourcePath` and `jsonPath`, optionally `validationSchema`
+            - **basic**: Must have `resourcePath` and `jsonPath`
+            - **json**: Can have arbitrary key-value pairs
+            - **xml**: Can have arbitrary key-value pairs
           example:
-            value: "license:read"
+            resourcePath: "/Patient/{firstName}"
+            jsonPath: "$.patient.firstName"
     ConsentPurposeUpdateRequest:
       type: object
       required:
@@ -3265,30 +3759,43 @@ components:
           type: string
           maxLength: 1024
           description: Description for the consent element (optional)
-          example: "Updated description for license API access"
+          example: "Updated description for API access"
+        displayName:
+          type: string
+          description: Display name for the element
+          example: "Updated Display Name"
+        version:
+          type: string
+          description: Version of the consent element
+          example: "1.1"
         type:
           type: string
           enum:
-            - string-type
-            - json-payload-type
-            - resource-field-type
+            - basic
+            - json
+            - xml
           description: |
-            Type of the consent element (required). Determines mandatory properties:
-            - 'string-type': No mandatory properties
-            - 'json-payload-type': Requires `validationSchema` property
-            - 'resource-field-type': Requires `resourcePath` and `jsonPath` properties
-          example: "string-type"
+            Type of the consent element (required). Determines requirements:
+            - 'basic': Requires `resourcePath` and `jsonPath` in properties
+            - 'json': Requires `validationSchema` field
+            - 'xml': Requires `validationSchema` field
+          example: "basic"
+        validationSchema:
+          type: string
+          description: Validation schema (required for json and xml types)
+          example: "<Schema>"
         properties:
           type: object
           additionalProperties:
             type: string
           description: |
             Key-value map of properties (required). Required properties depend on type:
-            - **string-type**: No mandatory properties
-            - **json-payload-type**: Must have `validationSchema` property
-            - **resource-field-type**: Must have `resourcePath` and `jsonPath` properties
+            - **basic**: Must have `resourcePath` and `jsonPath`
+            - **json**: Can have arbitrary key-value pairs
+            - **xml**: Can have arbitrary key-value pairs
           example:
-            value: "license:read:v2"
+            resourcePath: "/Patient/{firstName}"
+            jsonPath: "$.patient.firstName"
       description: All fields except description are required - partial updates are not supported
     ConsentPurposeResponse:
       type: object
@@ -3304,30 +3811,43 @@ components:
         description:
           type: string
           description: Description of the consent element (optional)
-          example: "Allows accessing license API"
+          example: "Allows accessing API"
+        displayName:
+          type: string
+          description: Display name for the element
+          example: "First Name"
+        version:
+          type: string
+          description: Version of the consent element
+          example: "1.0"
         type:
           type: string
           enum:
-            - string-type
-            - json-payload-type
-            - resource-field-type
+            - basic
+            - json
+            - xml
           description: |
-            The type of the element. Determines which properties are mandatory:
-            - 'string-type': No mandatory properties
-            - 'json-payload-type': Requires `validationSchema` property
-            - 'resource-field-type': Requires `resourcePath` and `jsonPath` properties
-          example: "string-type"
+            The type of the element. Determines requirements:
+            - 'basic': Requires `resourcePath` and `jsonPath` in properties
+            - 'json': Requires `validationSchema` field
+            - 'xml': Requires `validationSchema` field
+          example: "basic"
+        validationSchema:
+          type: string
+          description: Validation schema (present for json and xml types)
+          example: "<Schema>"
         properties:
           type: object
           additionalProperties:
             type: string
           description: |
             Key-value map of properties (optional). Content depends on the element type:
-            - **string-type**: Can have any properties (e.g., value: "license:read")
-            - **json-payload-type**: Must have `validationSchema` property
-            - **resource-field-type**: Must have `resourcePath` and `jsonPath` properties
+            - **basic**: Must have `resourcePath` and `jsonPath`
+            - **json**: Can have arbitrary key-value pairs
+            - **xml**: Can have arbitrary key-value pairs
           example:
-            value: "license:read"
+            resourcePath: "/Patient/{firstName}"
+            jsonPath: "$.patient.firstName"
       required:
         - id
         - name
@@ -3370,11 +3890,19 @@ components:
             Use descriptive names that indicate the logical grouping (e.g., "marketing_preferences",
             "account_access_permissions").
           example: "marketing_communication_preferences"
+        displayName:
+          type: string
+          description: Display name for the purpose. To be used in UIs etc.
+          example: "Marketing Communication Preferences"
         description:
           type: string
           maxLength: 1024
           description: Optional description providing additional context about the purpose
           example: "User preferences related to marketing communications"
+        version:
+          type: string
+          description: Version of the purpose (optional in request)
+          example: "1"
         purposes:
           type: array
           minItems: 1
@@ -3385,8 +3913,10 @@ components:
             $ref: "#/components/schemas/PurposeGroupPurposeItem"
           example:
             - purposeName: "user_email"
+              version: "1"
               isMandatory: true
             - purposeName: "user_phone"
+              version: "1"
               isMandatory: false
     PurposeGroupUpdateRequest:
       type: object
@@ -3407,11 +3937,19 @@ components:
             The name/identifier of the purpose (can be changed or kept the same).
             Must remain unique within the organization.
           example: "marketing_communication_preferences"
+        displayName:
+          type: string
+          description: Display name for the purpose. To be used in UIs etc.
+          example: "Marketing Communication Preferences"
         description:
           type: string
           maxLength: 1024
           description: Optional description for the purpose
           example: "Updated preferences for all marketing communications"
+        version:
+          type: string
+          description: Version of the purpose (optional in request)
+          example: "1"
         purposes:
           type: array
           minItems: 1
@@ -3422,10 +3960,13 @@ components:
             $ref: "#/components/schemas/PurposeGroupPurposeItem"
           example:
             - purposeName: "user_email"
+              version: "1"
               isMandatory: true
             - purposeName: "user_phone"
+              version: "1"
               isMandatory: true
             - purposeName: "user_sms"
+              version: "1"
               isMandatory: false
     PurposeGroupPurposeItem:
       type: object
@@ -3446,6 +3987,10 @@ components:
             The name of an existing consent element to include in this group.
             Must match the name of a purpose that has been previously created in the organization.
           example: "user_email"
+        version:
+          type: string
+          description: Version of the element to reference
+          example: "1"
         isMandatory:
           type: boolean
           description: |
@@ -3475,10 +4020,18 @@ components:
           type: string
           description: The name/identifier of the purpose
           example: "marketing_communication_preferences"
+        displayName:
+          type: string
+          description: Display name for the purpose. To be used in UIs etc.
+          example: "Marketing Communication Preferences"
         description:
           type: string
           description: Description of the purpose (optional)
           example: "User preferences related to marketing communications"
+        version:
+          type: string
+          description: Version of the purpose (always present in response)
+          example: "1.0"
         clientId:
           type: string
           description: The client ID of the Third-Party Provider (TPP) that created this purpose
@@ -3490,10 +4043,13 @@ components:
             $ref: "#/components/schemas/PurposeGroupPurposeItem"
           example:
             - purposeName: "user_email"
+              version: "1.0"
               isMandatory: true
             - purposeName: "user_phone"
+              version: "1.0"
               isMandatory: false
             - purposeName: "user_address"
+              version: "1.0"
               isMandatory: false
         createdTime:
           type: integer

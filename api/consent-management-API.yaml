@@ -2318,7 +2318,6 @@ paths:
       security:
         - basicAuth: []
     put:
-      deprecated: true
       summary: Update a specific version of a consent purpose
       description: |
         Updates an existing version of a consent purpose. This is a full replacement operation -

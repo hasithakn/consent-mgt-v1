@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+// Package managers provides functionality for managing and registering system services.
 package main
 
 import (
@@ -32,7 +51,7 @@ func registerServices(
 	logger.Info("AuthResource module initialized")
 
 	consentelement.Initialize(mux, storeRegistry)
-	logger.Info("ConsentPurpose module initialized")
+	logger.Info("ConsentElement module initialized")
 
 	consentpurpose.Initialize(mux, storeRegistry)
 	logger.Info("ConsentPurpose module initialized")
@@ -59,7 +78,6 @@ func registerHealthCheckEndpoints(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", healthCheckHandler.HandleLivenessRequest)
 }
 
-// TODO : compare with tunder and see if we need to add anything below mwthod. if not needed we can remove it
 // unregisterServices performs cleanup of all services during shutdown.
 // Currently a placeholder for future service cleanup needs.
 func unregisterServices() {

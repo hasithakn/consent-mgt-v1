@@ -23,7 +23,6 @@ import (
 	"net/http"
 
 	"github.com/wso2/consent-management-api/internal/system/constants"
-	"github.com/wso2/consent-management-api/internal/system/middleware"
 	"github.com/wso2/consent-management-api/internal/system/stores"
 )
 
@@ -41,27 +40,21 @@ func Initialize(mux *http.ServeMux, registry *stores.StoreRegistry) ConsentEleme
 
 // registerRoutes registers all consent element routes
 func registerRoutes(mux *http.ServeMux, handler *consentElementHandler) {
-	corsOptions := middleware.CORSOptions{
-		AllowOrigin:  "*",
-		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders: []string{"Content-Type", "x-org-id", "Authorization"},
-	}
-
 	// POST /api/v1/consent-elements - Create element
-	mux.HandleFunc(middleware.WithCORS("POST "+constants.APIBasePath+"/consent-elements", handler.createElement, corsOptions))
+	mux.HandleFunc("POST "+constants.APIBasePath+"/consent-elements", handler.createElement)
 
 	// GET /api/v1/consent-elements/{elementId} - Get element by ID
-	mux.HandleFunc(middleware.WithCORS("GET "+constants.APIBasePath+"/consent-elements/{elementId}", handler.getElement, corsOptions))
+	mux.HandleFunc("GET "+constants.APIBasePath+"/consent-elements/{elementId}", handler.getElement)
 
 	// GET /api/v1/consent-elements - List elements
-	mux.HandleFunc(middleware.WithCORS("GET "+constants.APIBasePath+"/consent-elements", handler.listElements, corsOptions))
+	mux.HandleFunc("GET "+constants.APIBasePath+"/consent-elements", handler.listElements)
 
 	// POST /api/v1/consent-elements/validate - Validate element names
-	mux.HandleFunc(middleware.WithCORS("POST "+constants.APIBasePath+"/consent-elements/validate", handler.validateElements, corsOptions))
+	mux.HandleFunc("POST "+constants.APIBasePath+"/consent-elements/validate", handler.validateElements)
 
 	// PUT /api/v1/consent-elements/{elementId} - Update element
-	mux.HandleFunc(middleware.WithCORS("PUT "+constants.APIBasePath+"/consent-elements/{elementId}", handler.updateElement, corsOptions))
+	mux.HandleFunc("PUT "+constants.APIBasePath+"/consent-elements/{elementId}", handler.updateElement)
 
 	// DELETE /api/v1/consent-elements/{elementId} - Delete element
-	mux.HandleFunc(middleware.WithCORS("DELETE "+constants.APIBasePath+"/consent-elements/{elementId}", handler.deleteElement, corsOptions))
+	mux.HandleFunc("DELETE "+constants.APIBasePath+"/consent-elements/{elementId}", handler.deleteElement)
 }

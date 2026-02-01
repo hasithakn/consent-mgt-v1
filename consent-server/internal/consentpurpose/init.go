@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/wso2/consent-management-api/internal/system/constants"
-	"github.com/wso2/consent-management-api/internal/system/middleware"
 	"github.com/wso2/consent-management-api/internal/system/stores"
 )
 
@@ -22,24 +21,18 @@ func Initialize(mux *http.ServeMux, registry *stores.StoreRegistry) ConsentPurpo
 
 // registerRoutes registers all consent purpose routes
 func registerRoutes(mux *http.ServeMux, handler *consentPurposeHandler) {
-	corsOptions := middleware.CORSOptions{
-		AllowOrigin:  "*",
-		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders: []string{"Content-Type", "x-org-id", "TPP-client-id", "Authorization"},
-	}
-
 	// POST /api/v1/consent-purposes - Create consent purpose
-	mux.HandleFunc(middleware.WithCORS("POST "+constants.APIBasePath+"/consent-purposes", handler.createPurpose, corsOptions))
+	mux.HandleFunc("POST "+constants.APIBasePath+"/consent-purposes", handler.createPurpose)
 
 	// GET /api/v1/consent-purposes/{purposeId} - Get consent purpose by ID
-	mux.HandleFunc(middleware.WithCORS("GET "+constants.APIBasePath+"/consent-purposes/{purposeId}", handler.getPurpose, corsOptions))
+	mux.HandleFunc("GET "+constants.APIBasePath+"/consent-purposes/{purposeId}", handler.getPurpose)
 
 	// GET /api/v1/consent-purposes - List consent purposes
-	mux.HandleFunc(middleware.WithCORS("GET "+constants.APIBasePath+"/consent-purposes", handler.listPurposes, corsOptions))
+	mux.HandleFunc("GET "+constants.APIBasePath+"/consent-purposes", handler.listPurposes)
 
 	// PUT /api/v1/consent-purposes/{purposeId} - Update consent purpose
-	mux.HandleFunc(middleware.WithCORS("PUT "+constants.APIBasePath+"/consent-purposes/{purposeId}", handler.updatePurpose, corsOptions))
+	mux.HandleFunc("PUT "+constants.APIBasePath+"/consent-purposes/{purposeId}", handler.updatePurpose)
 
 	// DELETE /api/v1/consent-purposes/{purposeId} - Delete consent purpose
-	mux.HandleFunc(middleware.WithCORS("DELETE "+constants.APIBasePath+"/consent-purposes/{purposeId}", handler.deletePurpose, corsOptions))
+	mux.HandleFunc("DELETE "+constants.APIBasePath+"/consent-purposes/{purposeId}", handler.deletePurpose)
 }

@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/wso2/consent-management-api/internal/system/constants"
-	"github.com/wso2/consent-management-api/internal/system/middleware"
 	"github.com/wso2/consent-management-api/internal/system/stores"
 )
 
@@ -22,31 +21,24 @@ func Initialize(mux *http.ServeMux, registry *stores.StoreRegistry) ConsentServi
 
 // registerRoutes registers all consent routes
 func registerRoutes(mux *http.ServeMux, handler *consentHandler) {
-	corsOpts := middleware.CORSOptions{
-		AllowOrigin:      "*",
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Content-Type", "Authorization", "X-Organization-ID", "X-Correlation-ID"},
-		AllowCredentials: true,
-	}
-
 	// POST /api/v1/consents - Create consent
-	mux.HandleFunc(middleware.WithCORS("POST "+constants.APIBasePath+"/consents", handler.createConsent, corsOpts))
+	mux.HandleFunc("POST "+constants.APIBasePath+"/consents", handler.createConsent)
 
 	// GET /api/v1/consents/{consentId} - Get consent by ID
-	mux.HandleFunc(middleware.WithCORS("GET "+constants.APIBasePath+"/consents/{consentId}", handler.getConsent, corsOpts))
+	mux.HandleFunc("GET "+constants.APIBasePath+"/consents/{consentId}", handler.getConsent)
 
 	// GET /api/v1/consents - List/search consents
-	mux.HandleFunc(middleware.WithCORS("GET "+constants.APIBasePath+"/consents", handler.listConsents, corsOpts))
+	mux.HandleFunc("GET "+constants.APIBasePath+"/consents", handler.listConsents)
 
 	// PUT /api/v1/consents/{consentId} - Update consent
-	mux.HandleFunc(middleware.WithCORS("PUT "+constants.APIBasePath+"/consents/{consentId}", handler.updateConsent, corsOpts))
+	mux.HandleFunc("PUT "+constants.APIBasePath+"/consents/{consentId}", handler.updateConsent)
 
 	// PUT /api/v1/consents/{consentId}/revoke - Revoke consent
-	mux.HandleFunc(middleware.WithCORS("PUT "+constants.APIBasePath+"/consents/{consentId}/revoke", handler.revokeConsent, corsOpts))
+	mux.HandleFunc("PUT "+constants.APIBasePath+"/consents/{consentId}/revoke", handler.revokeConsent)
 
 	// POST /api/v1/consents/validate - Validate consent
-	mux.HandleFunc(middleware.WithCORS("POST "+constants.APIBasePath+"/consents/validate", handler.validateConsent, corsOpts))
+	mux.HandleFunc("POST "+constants.APIBasePath+"/consents/validate", handler.validateConsent)
 
 	// GET /api/v1/consents/attributes - Search consents by attribute
-	mux.HandleFunc(middleware.WithCORS("GET "+constants.APIBasePath+"/consents/attributes", handler.searchConsentsByAttribute, corsOpts))
+	mux.HandleFunc("GET "+constants.APIBasePath+"/consents/attributes", handler.searchConsentsByAttribute)
 }

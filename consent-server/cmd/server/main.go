@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (https://www.wso2.com).
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -95,6 +95,15 @@ func setupHTTPServer(cfg *config.Config, logger *log.Logger) *http.Server {
 		IdleTimeout:    cfg.Server.IdleTimeout,
 		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
+
+	// Log server configuration
+	logger.Info("HTTP server configured",
+		log.String("address", serverAddr),
+		log.Int("port", cfg.Server.Port),
+		log.String("read_timeout", cfg.Server.ReadTimeout.String()),
+		log.String("write_timeout", cfg.Server.WriteTimeout.String()),
+		log.String("idle_timeout", cfg.Server.IdleTimeout.String()),
+	)
 
 	return server
 }

@@ -1,76 +1,75 @@
+/*
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+// Package config provides structures and functions for loading and managing server configurations.
 package config
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/spf13/viper"
 	"github.com/wso2/consent-management-api/internal/system/log"
+	"gopkg.in/yaml.v3"
 )
 
 // Config holds all configuration for the application
 type Config struct {
-	Server           ServerConfig           `mapstructure:"server"`
-	Database         DatabasesConfig        `mapstructure:"database"`
-	ServiceExtension ServiceExtensionConfig `mapstructure:"service_extension"`
-	Logging          LoggingConfig          `mapstructure:"logging"`
-	Consent          ConsentConfig          `mapstructure:"consent"`
-	Security         SecurityConfig         `mapstructure:"security"`
-	CORS             CORSConfig             `mapstructure:"cors"`
+	Server   ServerConfig    `yaml:"server"`
+	Database DatabasesConfig `yaml:"database"`
+	Logging  LoggingConfig   `yaml:"logging"`
+	Consent  ConsentConfig   `yaml:"consent"`
 }
 
 // ServerConfig holds HTTP server configuration
 type ServerConfig struct {
-	Hostname     string        `mapstructure:"hostname"`
-	Port         int           `mapstructure:"port"`
-	ReadTimeout  time.Duration `mapstructure:"readTimeout"`
-	WriteTimeout time.Duration `mapstructure:"writeTimeout"`
-	IdleTimeout  time.Duration `mapstructure:"idleTimeout"`
+	Hostname     string        `yaml:"hostname"`
+	Port         int           `yaml:"port"`
+	ReadTimeout  time.Duration `yaml:"readTimeout"`
+	WriteTimeout time.Duration `yaml:"writeTimeout"`
+	IdleTimeout  time.Duration `yaml:"idleTimeout"`
 }
 
 // DatabasesConfig holds all database configurations
 type DatabasesConfig struct {
-	Consent DatabaseConfig `mapstructure:"consent"`
+	Consent DatabaseConfig `yaml:"consent"`
 }
 
 // DatabaseConfig holds individual database configuration
 type DatabaseConfig struct {
-	Type            string        `mapstructure:"type"`
-	Hostname        string        `mapstructure:"hostname"`
-	Port            int           `mapstructure:"port"`
-	User            string        `mapstructure:"user"`
-	Password        string        `mapstructure:"password"`
-	Database        string        `mapstructure:"database"`
-	MaxOpenConns    int           `mapstructure:"max_open_conns"`
-	MaxIdleConns    int           `mapstructure:"max_idle_conns"`
-	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
-}
-
-// ServiceExtensionConfig holds extension service configuration
-type ServiceExtensionConfig struct {
-	Enabled       bool               `mapstructure:"enabled"`
-	BaseURL       string             `mapstructure:"base_url"`
-	Timeout       time.Duration      `mapstructure:"timeout"`
-	RetryAttempts int                `mapstructure:"retry_attempts"`
-	Endpoints     ExtensionEndpoints `mapstructure:"endpoints"`
-}
-
-// ExtensionEndpoints holds all extension service endpoint paths
-type ExtensionEndpoints struct {
-	PreProcessConsentCreation     string `mapstructure:"pre_process_consent_creation"`
-	EnrichConsentCreationResponse string `mapstructure:"enrich_consent_creation_response"`
-	PreProcessConsentRetrieval    string `mapstructure:"pre_process_consent_retrieval"`
-	PreProcessConsentUpdate       string `mapstructure:"pre_process_consent_update"`
-	EnrichConsentUpdateResponse   string `mapstructure:"enrich_consent_update_response"`
-	PreProcessConsentRevoke       string `mapstructure:"pre_process_consent_revoke"`
-	MapAcceleratorErrorResponse   string `mapstructure:"map_accelerator_error_response"`
+	Type            string        `yaml:"type"`
+	Hostname        string        `yaml:"hostname"`
+	Port            int           `yaml:"port"`
+	User            string        `yaml:"user"`
+	Password        string        `yaml:"password"`
+	Database        string        `yaml:"database"`
+	MaxOpenConns    int           `yaml:"max_open_conns"`
+	MaxIdleConns    int           `yaml:"max_idle_conns"`
+	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime"`
 }
 
 // LoggingConfig holds logging configuration
 type LoggingConfig struct {
-	Level  string `mapstructure:"level"`
-	Format string `mapstructure:"format"`
-	Output string `mapstructure:"output"`
+	Level  string `yaml:"level"`
+	Format string `yaml:"format"`
+	Output string `yaml:"output"`
 }
 
 // ConsentStatus represents a typed consent status
@@ -81,26 +80,26 @@ type AuthStatus string
 
 // ConsentConfig holds consent-related configuration
 type ConsentConfig struct {
-	StatusMappings     ConsentStatusMappings `mapstructure:"status_mappings"`
-	AuthStatusMappings AuthStatusMappings    `mapstructure:"auth_status_mappings"`
+	StatusMappings     ConsentStatusMappings `yaml:"status_mappings"`
+	AuthStatusMappings AuthStatusMappings    `yaml:"auth_status_mappings"`
 }
 
 // ConsentStatusMappings holds the mapping of specific consent lifecycle states
 type ConsentStatusMappings struct {
-	ActiveStatus   string `mapstructure:"active_status"`
-	ExpiredStatus  string `mapstructure:"expired_status"`
-	RevokedStatus  string `mapstructure:"revoked_status"`
-	CreatedStatus  string `mapstructure:"created_status"`
-	RejectedStatus string `mapstructure:"rejected_status"`
+	ActiveStatus   string `yaml:"active_status"`
+	ExpiredStatus  string `yaml:"expired_status"`
+	RevokedStatus  string `yaml:"revoked_status"`
+	CreatedStatus  string `yaml:"created_status"`
+	RejectedStatus string `yaml:"rejected_status"`
 }
 
 // AuthStatusMappings holds the mapping of authorization resource lifecycle states
 type AuthStatusMappings struct {
-	ApprovedState      string `mapstructure:"approved_state"`
-	RejectedState      string `mapstructure:"rejected_state"`
-	CreatedState       string `mapstructure:"created_state"`
-	SystemExpiredState string `mapstructure:"system_expired_state"`
-	SystemRevokedState string `mapstructure:"system_revoked_state"`
+	ApprovedState      string `yaml:"approved_state"`
+	RejectedState      string `yaml:"rejected_state"`
+	CreatedState       string `yaml:"created_state"`
+	SystemExpiredState string `yaml:"system_expired_state"`
+	SystemRevokedState string `yaml:"system_revoked_state"`
 }
 
 // GetActiveConsentStatus returns the typed active status from config
@@ -153,33 +152,6 @@ func (c *ConsentConfig) GetSystemRevokedAuthStatus() AuthStatus {
 	return AuthStatus(c.AuthStatusMappings.SystemRevokedState)
 }
 
-// SecurityConfig holds security configuration
-type SecurityConfig struct {
-	BasicAuth BasicAuthConfig `mapstructure:"basic_auth"`
-}
-
-// BasicAuthConfig holds basic authentication configuration
-type BasicAuthConfig struct {
-	Enabled bool            `mapstructure:"enabled"`
-	Users   []BasicAuthUser `mapstructure:"users"`
-}
-
-// BasicAuthUser represents a basic auth user
-type BasicAuthUser struct {
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
-}
-
-// CORSConfig holds CORS configuration
-type CORSConfig struct {
-	Enabled          bool     `mapstructure:"enabled"`
-	AllowedOrigins   []string `mapstructure:"allowed_origins"`
-	AllowedMethods   []string `mapstructure:"allowed_methods"`
-	AllowedHeaders   []string `mapstructure:"allowed_headers"`
-	AllowCredentials bool     `mapstructure:"allow_credentials"`
-	MaxAge           int      `mapstructure:"max_age"`
-}
-
 var globalConfig *Config
 
 // Load reads configuration from file and environment variables
@@ -187,38 +159,55 @@ func Load(configPath string) (*Config, error) {
 	logger := log.GetLogger()
 	logger.Info("Loading configuration", log.String("config_path", configPath))
 
-	v := viper.New()
-
-	// Set config file path
+	// Determine config file path
+	var finalPath string
 	if configPath != "" {
-		v.SetConfigFile(configPath)
+		finalPath = configPath
 	} else {
 		// Default configuration lookup order:
 		// 1. ./repository/conf/deployment.yaml (production - relative to binary)
 		// 2. ./cmd/server/repository/conf/deployment.yaml (development)
-		v.SetConfigName("deployment")
-		v.SetConfigType("yaml")
-		v.AddConfigPath("./repository/conf")            // Production: <binary_dir>/repository/conf/
-		v.AddConfigPath("./cmd/server/repository/conf") // Development
-		v.AddConfigPath("../repository/conf")           // If running from subdirectory
-		v.AddConfigPath(".")
+		paths := []string{
+			"./repository/conf/deployment.yaml",
+			"./cmd/server/repository/conf/deployment.yaml",
+			"../repository/conf/deployment.yaml",
+			"./deployment.yaml",
+		}
+
+		for _, path := range paths {
+			if _, err := os.Stat(path); err == nil {
+				finalPath = path
+				break
+			}
+		}
+
+		if finalPath == "" {
+			return nil, fmt.Errorf("no configuration file found in default paths")
+		}
 	}
 
-	// Read from environment variables
-	v.AutomaticEnv()
-	v.SetEnvPrefix("CONSENT_MGT")
-
 	// Read the config file
-	if err := v.ReadInConfig(); err != nil {
+	finalPath = filepath.Clean(finalPath)
+	data, err := os.ReadFile(finalPath)
+	if err != nil {
 		logger.Error("Failed to read config file", log.Error(err))
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	logger.Info("Config file loaded", log.String("file", v.ConfigFileUsed()))
+	// Substitute environment variables
+	data, err = substituteEnvironmentVariables(data)
+	if err != nil {
+		logger.Error("Failed to substitute environment variables", log.Error(err))
+		return nil, fmt.Errorf("failed to substitute environment variables: %w", err)
+	}
+
+	logger.Info("Config file loaded", log.String("file", finalPath))
 
 	// Unmarshal config
 	var config Config
-	if err := v.Unmarshal(&config); err != nil {
+	decoder := yaml.NewDecoder(strings.NewReader(string(data)))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&config); err != nil {
 		logger.Error("Failed to unmarshal config", log.Error(err))
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
@@ -233,9 +222,37 @@ func Load(configPath string) (*Config, error) {
 	logger.Info("Configuration loaded and validated successfully",
 		log.String("server_port", fmt.Sprintf("%d", config.Server.Port)),
 		log.String("db_host", config.Database.Consent.Hostname),
-		log.Bool("extension_enabled", config.ServiceExtension.Enabled),
 	)
 	return &config, nil
+}
+
+// substituteEnvironmentVariables replaces ${VAR_NAME} patterns with environment variable values
+func substituteEnvironmentVariables(data []byte) ([]byte, error) {
+	content := string(data)
+
+	// Find all ${...} patterns
+	for {
+		start := strings.Index(content, "${")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(content[start:], "}")
+		if end == -1 {
+			return nil, fmt.Errorf("unclosed environment variable substitution at position %d", start)
+		}
+		end += start
+
+		// Extract variable name
+		varName := content[start+2 : end]
+
+		// Get environment variable value
+		varValue := os.Getenv(varName)
+
+		// Replace the pattern with the value
+		content = content[:start] + varValue + content[end+1:]
+	}
+
+	return []byte(content), nil
 }
 
 // validateConfig validates the configuration
@@ -250,10 +267,6 @@ func validateConfig(config *Config) error {
 
 	if config.Database.Consent.Database == "" {
 		return fmt.Errorf("database name is required")
-	}
-
-	if config.ServiceExtension.Enabled && config.ServiceExtension.BaseURL == "" {
-		return fmt.Errorf("service extension base URL is required when extension is enabled")
 	}
 
 	// Validate consent status mappings
@@ -317,26 +330,6 @@ func (d *DatabaseConfig) GetDSN() string {
 // GetServerAddress returns the server address in host:port format
 func (s *ServerConfig) GetServerAddress() string {
 	return fmt.Sprintf("%s:%d", s.Hostname, s.Port)
-}
-
-// GetExtensionURL returns the full URL for a service extension endpoint
-func (e *ServiceExtensionConfig) GetExtensionURL(endpoint string) string {
-	return e.BaseURL + endpoint
-}
-
-// IsBasicAuthEnabled returns whether basic auth is enabled
-func (s *SecurityConfig) IsBasicAuthEnabled() bool {
-	return s.BasicAuth.Enabled
-}
-
-// ValidateUser validates basic auth credentials
-func (s *SecurityConfig) ValidateUser(username, password string) bool {
-	for _, user := range s.BasicAuth.Users {
-		if user.Username == username && user.Password == password {
-			return true
-		}
-	}
-	return false
 }
 
 // IsStatusAllowed checks if a given status is a valid consent status

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (https://www.wso2.com).
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -21,6 +21,7 @@ package middleware
 import (
 	"net/http"
 
+	"github.com/wso2/consent-management-api/internal/system/constants"
 	sysContext "github.com/wso2/consent-management-api/internal/system/context"
 )
 
@@ -50,7 +51,7 @@ func CorrelationIDMiddleware(next http.Handler) http.Handler {
 		r = r.WithContext(ctx)
 
 		// Add correlation ID to response headers so clients can track requests
-		w.Header().Set("X-Correlation-ID", correlationID)
+		w.Header().Set(constants.CorrelationIDHeaderName, correlationID)
 
 		// Continue with the next handler
 		next.ServeHTTP(w, r)
@@ -62,9 +63,9 @@ func CorrelationIDMiddleware(next http.Handler) http.Handler {
 func extractCorrelationID(r *http.Request) string {
 	// Check common correlation ID header names in order of priority
 	headers := []string{
-		"X-Correlation-ID",
-		"X-Request-ID",
-		"X-Trace-ID",
+		constants.CorrelationIDHeaderName,
+		constants.RequestIdHeaderName,
+		constants.TraceIDHeaderName,
 	}
 
 	for _, header := range headers {

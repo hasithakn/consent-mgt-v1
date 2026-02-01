@@ -84,7 +84,7 @@ func (s *store) getDBClient() (provider.DBClientInterface, error) {
 
 // Create creates a new auth resource within a transaction
 func (s *store) Create(tx dbmodel.TxInterface, authResource *model.AuthResource) error {
-	_, err := tx.Exec(QueryCreateAuthResource.Query,
+	_, err := tx.Exec(QueryCreateAuthResource,
 		authResource.AuthID,
 		authResource.ConsentID,
 		authResource.AuthType,
@@ -135,7 +135,7 @@ func (s *store) GetByConsentID(ctx context.Context, consentID, orgID string) ([]
 
 // Update updates an auth resource within a transaction
 func (s *store) Update(tx dbmodel.TxInterface, authResource *model.AuthResource) error {
-	_, err := tx.Exec(QueryUpdateAuthResource.Query,
+	_, err := tx.Exec(QueryUpdateAuthResource,
 		authResource.AuthStatus,
 		authResource.UserID,
 		authResource.Resources,
@@ -148,19 +148,19 @@ func (s *store) Update(tx dbmodel.TxInterface, authResource *model.AuthResource)
 
 // UpdateStatus updates only the status of an auth resource within a transaction
 func (s *store) UpdateStatus(tx dbmodel.TxInterface, authID, orgID, status string, updatedTime int64) error {
-	_, err := tx.Exec(QueryUpdateAuthResourceStatus.Query, status, updatedTime, authID, orgID)
+	_, err := tx.Exec(QueryUpdateAuthResourceStatus, status, updatedTime, authID, orgID)
 	return err
 }
 
 // Delete deletes an auth resource within a transaction
 func (s *store) Delete(tx dbmodel.TxInterface, authID, orgID string) error {
-	_, err := tx.Exec(QueryDeleteAuthResource.Query, authID, orgID)
+	_, err := tx.Exec(QueryDeleteAuthResource, authID, orgID)
 	return err
 }
 
 // DeleteByConsentID deletes all auth resources for a consent within a transaction
 func (s *store) DeleteByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
-	_, err := tx.Exec(QueryDeleteAuthResourcesByConsentID.Query, consentID, orgID)
+	_, err := tx.Exec(QueryDeleteAuthResourcesByConsentID, consentID, orgID)
 	return err
 }
 
@@ -206,7 +206,7 @@ func (s *store) GetByUserID(ctx context.Context, userID, orgID string) ([]model.
 
 // UpdateAllStatusByConsentID updates status for all auth resources of a consent within a transaction
 func (s *store) UpdateAllStatusByConsentID(tx dbmodel.TxInterface, consentID, orgID, status string, updatedTime int64) error {
-	_, err := tx.Exec(QueryUpdateAllStatusByConsentID.Query, status, updatedTime, consentID, orgID)
+	_, err := tx.Exec(QueryUpdateAllStatusByConsentID, status, updatedTime, consentID, orgID)
 	return err
 }
 

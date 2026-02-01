@@ -24,26 +24,17 @@ import (
 
 // DBInterface defines the interface for database operations.
 type DBInterface interface {
-	Query(query string, args ...interface{}) (*sql.Rows, error)
-	Exec(query string, args ...interface{}) (sql.Result, error)
+	Query(query DBQuery, args ...any) (*sql.Rows, error)
+	Exec(query DBQuery, args ...any) (sql.Result, error)
 	Begin() (*sql.Tx, error)
+	BeginTx() (TxInterface, error)
 	Close() error
 }
 
 // TxInterface defines the interface for transaction operations.
 type TxInterface interface {
-	Exec(query string, args ...interface{}) (sql.Result, error)
-	Query(query string, args ...interface{}) (*sql.Rows, error)
+	Exec(query DBQuery, args ...any) (sql.Result, error)
+	Query(query DBQuery, args ...any) (*sql.Rows, error)
 	Commit() error
 	Rollback() error
-}
-
-// Tx wraps sql.Tx to implement TxInterface.
-type Tx struct {
-	*sql.Tx
-}
-
-// NewTx creates a new Tx instance.
-func NewTx(tx *sql.Tx) TxInterface {
-	return &Tx{Tx: tx}
 }

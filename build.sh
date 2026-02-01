@@ -264,6 +264,15 @@ function test_integration() {
         build_binary
     fi
     
+    # Replace app config with test config for integration tests
+    echo "Copying test configuration..."
+    if [ -f "tests/integration/repository/conf/deployment.yaml" ]; then
+        cp tests/integration/repository/conf/deployment.yaml "$OUTPUT_DIR/repository/conf/deployment.yaml"
+        echo "✓ Test configuration copied"
+    else
+        echo "⚠ Warning: Test configuration not found, using default config"
+    fi
+    
     # Run integration test suite
     echo "Starting integration test suite..."
     cd tests/integration || exit 1

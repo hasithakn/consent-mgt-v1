@@ -20,18 +20,38 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/wso2/consent-management-api/internal/system/config"
+	dbmodel "github.com/wso2/consent-management-api/internal/system/database/model"
 	"github.com/wso2/consent-management-api/internal/system/log"
 )
 
 // DB holds the database connection.
 type DB struct {
 	*sqlx.DB
+	dbType string
+}
+
+// Query executes a query with DBQuery parameter
+func (db *DB) Query(query dbmodel.DBQuery, args ...any) (*sql.Rows, error) {
+	sqlQuery := query.GetQuery(db.dbType)
+	return db.DB.Query(sqlQuery, args...)
+}
+
+// Exec executes a query with DBQuery parameter
+func (db *DB) Exec(query dbmodel.DBQuery, args ...any) (sql.Result, error) {
+	sqlQuery := query.GetQuery(db.dbType)
+	return db.DB.Exec(sqlQuery, args...)
+}
+
+// Begin starts a new transaction
+func (db *DB) Begin() (*sql.Tx, error) {
+	return db.DB.Begin()
 }
 
 // Initialize creates and initializes the database connection.
@@ -65,7 +85,7 @@ func Initialize(cfg *config.DatabaseConfig) (*DB, error) {
 
 	logger.Info("Successfully connected to database")
 
-	return &DB{DB: db}, nil
+	return &DB{DB: db, dbType: cfg.Type}, nil
 }
 
 // Close closes the database connection.

@@ -20,9 +20,13 @@
 package provider
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/wso2/consent-management-api/internal/system/database/model"
+	"github.com/wso2/consent-management-api/internal/system/database/transaction"
 	"github.com/wso2/consent-management-api/internal/system/log"
 )
 
@@ -30,10 +34,16 @@ import (
 type DBClientInterface interface {
 	// Query executes a sql query that returns rows, typically a SELECT, and returns the result as a slice of maps.
 	Query(query model.DBQuery, args ...interface{}) ([]map[string]interface{}, error)
+	// QueryContext executes a sql query with context awareness (checks for transaction in context).
+	QueryContext(ctx context.Context, query model.DBQuery, args ...interface{}) ([]map[string]interface{}, error)
 	// Execute executes a sql query without returning data in any rows, and returns number of rows affected.
 	Execute(query model.DBQuery, args ...interface{}) (int64, error)
+	// ExecuteContext executes a sql query with context awareness (checks for transaction in context).
+	ExecuteContext(ctx context.Context, query model.DBQuery, args ...interface{}) (int64, error)
 	// BeginTx starts a new database transaction.
 	BeginTx() (model.TxInterface, error)
+	// GetTransactioner returns a Transactioner for automatic transaction management.
+	GetTransactioner() (transaction.Transactioner, error)
 }
 
 // DBClient is the implementation of DBClientInterface.
@@ -44,19 +54,33 @@ type DBClient struct {
 
 // NewDBClient creates a new instance of DBClient with the provided database connection.
 func NewDBClient(db model.DBInterface, dbType string) DBClientInterface {
-	return &DBClient{
-		db:     db,
-		dbType: dbType,
-	}
+	return &DBClient{db: db, dbType: dbType}
 }
 
 // Query executes a sql query that returns rows, typically a SELECT, and returns the result as a slice of maps.
+// This is a convenience method that calls QueryContext with context.Background().
 func (client *DBClient) Query(query model.DBQuery, args ...interface{}) ([]map[string]interface{}, error) {
+	return client.QueryContext(context.Background(), query, args...)
+}
+
+// QueryContext executes a sql query with context awareness.
+// If a transaction exists in the context, it will be used automatically.
+func (client *DBClient) QueryContext(ctx context.Context, query model.DBQuery, args ...interface{}) ([]map[string]interface{}, error) {
 	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "DBClient"))
 	logger.Debug("Executing query", log.String("query_id", query.GetID()))
 
-	sqlQuery := query.GetQuery(client.dbType)
-	rows, err := client.db.Query(sqlQuery, args...)
+	// Check if there's a transaction in the context
+	var rows *sql.Rows
+	var err error
+	if tx := transaction.TxFromContext(ctx); tx != nil {
+		// Use transaction from context
+		sqlQuery := query.GetQuery(client.dbType)
+		rows, err = tx.QueryContext(ctx, sqlQuery, args...)
+	} else {
+		// Use direct connection
+		rows, err = client.db.Query(query, args...)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -99,13 +123,30 @@ func (client *DBClient) Query(query model.DBQuery, args ...interface{}) ([]map[s
 	return results, nil
 }
 
-// Execute executes a sql query without returning data in any rows, and returns number of rows affected.
+// Execute a sql query without returning data in any rows, and returns number of rows affected.
+// This is a convenience method that calls ExecuteContext with context.Background().
 func (client *DBClient) Execute(query model.DBQuery, args ...interface{}) (int64, error) {
+	return client.ExecuteContext(context.Background(), query, args...)
+}
+
+// ExecuteContext executes a sql query with context awareness.
+// If a transaction exists in the context, it will be used automatically.
+func (client *DBClient) ExecuteContext(ctx context.Context, query model.DBQuery, args ...interface{}) (int64, error) {
 	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "DBClient"))
 	logger.Debug("Executing query", log.String("query_id", query.GetID()))
 
-	sqlQuery := query.GetQuery(client.dbType)
-	res, err := client.db.Exec(sqlQuery, args...)
+	// Check if there's a transaction in the context
+	var res sql.Result
+	var err error
+	if tx := transaction.TxFromContext(ctx); tx != nil {
+		// Use transaction from context
+		sqlQuery := query.GetQuery(client.dbType)
+		res, err = tx.ExecContext(ctx, sqlQuery, args...)
+	} else {
+		// Use direct connection
+		res, err = client.db.Exec(query, args...)
+	}
+
 	if err != nil {
 		return 0, err
 	}
@@ -120,9 +161,14 @@ func (client *DBClient) Execute(query model.DBQuery, args ...interface{}) (int64
 
 // BeginTx starts a new database transaction.
 func (client *DBClient) BeginTx() (model.TxInterface, error) {
-	tx, err := client.db.Begin()
-	if err != nil {
-		return nil, err
+	return client.db.BeginTx()
+}
+
+// GetTransactioner returns a Transactioner for automatic transaction management.
+func (client *DBClient) GetTransactioner() (transaction.Transactioner, error) {
+	// Cast to *model.DB to create transaction wrapper
+	if db, ok := client.db.(*model.DB); ok {
+		return transaction.NewTransactioner(&transactionDBWrapper{db: db}), nil
 	}
-	return model.NewTx(tx), nil
+	return nil, fmt.Errorf("unsupported database type for transactioner")
 }

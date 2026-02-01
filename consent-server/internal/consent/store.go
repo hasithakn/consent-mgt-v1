@@ -180,7 +180,7 @@ func (s *store) getDBClient() (provider.DBClientInterface, error) {
 
 // Create creates a new consent within a transaction
 func (s *store) Create(tx dbmodel.TxInterface, consent *model.Consent) error {
-	_, err := tx.Exec(QueryCreateConsent.Query,
+	_, err := tx.Exec(QueryCreateConsent,
 		consent.ConsentID, consent.CreatedTime, consent.UpdatedTime, consent.ClientID,
 		consent.ConsentType, consent.CurrentStatus, consent.ConsentFrequency,
 		consent.ValidityTime, consent.RecurringIndicator, consent.DataAccessValidityDuration,
@@ -360,7 +360,7 @@ func (s *store) Search(ctx context.Context, filters model.ConsentSearchFilters) 
 
 // Update updates a consent within a transaction
 func (s *store) Update(tx dbmodel.TxInterface, consent *model.Consent) error {
-	_, err := tx.Exec(QueryUpdateConsent.Query,
+	_, err := tx.Exec(QueryUpdateConsent,
 		consent.UpdatedTime, consent.ConsentType, consent.ConsentFrequency,
 		consent.ValidityTime, consent.RecurringIndicator, consent.DataAccessValidityDuration,
 		consent.ConsentID, consent.OrgID)
@@ -369,7 +369,7 @@ func (s *store) Update(tx dbmodel.TxInterface, consent *model.Consent) error {
 
 // UpdateStatus updates consent status within a transaction
 func (s *store) UpdateStatus(tx dbmodel.TxInterface, consentID, orgID, status string, updatedTime int64) error {
-	result, err := tx.Exec(QueryUpdateConsentStatus.Query, status, updatedTime, consentID, orgID)
+	result, err := tx.Exec(QueryUpdateConsentStatus, status, updatedTime, consentID, orgID)
 	if err != nil {
 		return err
 	}
@@ -388,7 +388,7 @@ func (s *store) UpdateStatus(tx dbmodel.TxInterface, consentID, orgID, status st
 
 // Delete deletes a consent within a transaction
 func (s *store) Delete(tx dbmodel.TxInterface, consentID, orgID string) error {
-	_, err := tx.Exec(QueryDeleteConsent.Query, consentID, orgID)
+	_, err := tx.Exec(QueryDeleteConsent, consentID, orgID)
 	return err
 }
 
@@ -418,7 +418,7 @@ func (s *store) GetByClientID(ctx context.Context, clientID, orgID string) ([]mo
 // CreateAttributes creates multiple consent attributes within a transaction
 func (s *store) CreateAttributes(tx dbmodel.TxInterface, attributes []model.ConsentAttribute) error {
 	for _, attr := range attributes {
-		_, err := tx.Exec(QueryCreateAttribute.Query,
+		_, err := tx.Exec(QueryCreateAttribute,
 			attr.ConsentID, attr.AttKey, attr.AttValue, attr.OrgID)
 		if err != nil {
 			return err
@@ -501,7 +501,7 @@ func (s *store) GetAttributesByConsentIDs(ctx context.Context, consentIDs []stri
 
 // DeleteAttributesByConsentID deletes all attributes for a consent within a transaction
 func (s *store) DeleteAttributesByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
-	_, err := tx.Exec(QueryDeleteAttributesByConsentID.Query, consentID, orgID)
+	_, err := tx.Exec(QueryDeleteAttributesByConsentID, consentID, orgID)
 	return err
 }
 
@@ -565,7 +565,7 @@ func (s *store) FindConsentIDsByAttribute(ctx context.Context, key, value, orgID
 
 // CreateStatusAudit creates a status audit entry within a transaction
 func (s *store) CreateStatusAudit(tx dbmodel.TxInterface, audit *model.ConsentStatusAudit) error {
-	_, err := tx.Exec(QueryCreateStatusAudit.Query,
+	_, err := tx.Exec(QueryCreateStatusAudit,
 		audit.StatusAuditID, audit.ConsentID, audit.CurrentStatus, audit.ActionTime,
 		audit.Reason, audit.ActionBy, audit.PreviousStatus, audit.OrgID)
 	return err
@@ -768,7 +768,7 @@ func mapToStatusAudit(row map[string]interface{}) *model.ConsentStatusAudit {
 
 // CreateConsentPurposeConsent links a consent to a purpose
 func (s *store) CreateConsentPurposeConsent(tx dbmodel.TxInterface, consentID, purposeID, orgID string) error {
-	_, err := tx.Exec(QueryCreateConsentPurposeConsent.Query, consentID, purposeID, orgID)
+	_, err := tx.Exec(QueryCreateConsentPurposeConsent, consentID, purposeID, orgID)
 	return err
 }
 
@@ -827,7 +827,7 @@ func (s *store) GetConsentPurposesByConsentID(ctx context.Context, consentID, or
 
 // CreatePurposeApproval creates a purpose approval record
 func (s *store) CreatePurposeApproval(tx dbmodel.TxInterface, approval *model.ConsentPurposeApprovalRecord) error {
-	_, err := tx.Exec(QueryCreateElementApproval.Query,
+	_, err := tx.Exec(QueryCreateElementApproval,
 		approval.ConsentID,
 		approval.PurposeID,
 		approval.ElementID,
@@ -871,13 +871,13 @@ func (s *store) GetPurposeApprovalsByConsentID(ctx context.Context, consentID, o
 
 // DeleteConsentPurposesByConsentID deletes all purpose mappings for a consent
 func (s *store) DeleteConsentPurposesByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
-	_, err := tx.Exec(QueryDeleteConsentPurposesByConsentID.Query, consentID, orgID)
+	_, err := tx.Exec(QueryDeleteConsentPurposesByConsentID, consentID, orgID)
 	return err
 }
 
 // DeletePurposeApprovalsByConsentID deletes all purpose approval records for a consent
 func (s *store) DeletePurposeApprovalsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
-	_, err := tx.Exec(QueryDeleteElementApprovalsByConsentID.Query, consentID, orgID)
+	_, err := tx.Exec(QueryDeleteElementApprovalsByConsentID, consentID, orgID)
 	return err
 }
 

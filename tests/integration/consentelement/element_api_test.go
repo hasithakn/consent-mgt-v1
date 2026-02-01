@@ -76,7 +76,17 @@ func (ts *ElementAPITestSuite) TearDownSuite() {
 
 // TearDownTest runs after each test to ensure cleanup
 func (ts *ElementAPITestSuite) TearDownTest() {
-	// Additional per-test cleanup if needed
+	// Clean up elements created in this test
+	if len(ts.createdElementIDs) == 0 {
+		return
+	}
+
+	for _, id := range ts.createdElementIDs {
+		ts.deleteElementWithCheck(id)
+	}
+
+	// Clear the list for next test
+	ts.createdElementIDs = make([]string, 0)
 }
 
 func TestElementAPITestSuite(t *testing.T) {

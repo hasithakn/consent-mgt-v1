@@ -103,7 +103,7 @@ func (s *store) getDBClient() (provider.DBClientInterface, error) {
 
 // CreatePurpose creates a new purpose
 func (s *store) CreatePurpose(tx dbmodel.TxInterface, purpose *model.ConsentPurpose) error {
-	_, err := tx.Exec(QueryCreatePurpose.Query,
+	_, err := tx.Exec(QueryCreatePurpose,
 		purpose.ID,
 		purpose.Name,
 		purpose.Description,
@@ -352,7 +352,7 @@ func (s *store) ListPurposes(ctx context.Context, orgID, name string, clientIDs 
 
 // UpdatePurpose updates an existing purpose
 func (s *store) UpdatePurpose(tx dbmodel.TxInterface, purpose *model.ConsentPurpose) error {
-	_, err := tx.Exec(QueryUpdatePurpose.Query,
+	_, err := tx.Exec(QueryUpdatePurpose,
 		purpose.Name,
 		purpose.Description,
 		purpose.UpdatedTime,
@@ -364,7 +364,7 @@ func (s *store) UpdatePurpose(tx dbmodel.TxInterface, purpose *model.ConsentPurp
 
 // DeletePurpose deletes a purpose
 func (s *store) DeletePurpose(tx dbmodel.TxInterface, purposeID, orgID string) error {
-	_, err := tx.Exec(QueryDeletePurpose.Query, purposeID, orgID)
+	_, err := tx.Exec(QueryDeletePurpose, purposeID, orgID)
 	return err
 }
 
@@ -399,7 +399,7 @@ func (s *store) CheckPurposeNameExists(ctx context.Context, name, clientID, orgI
 
 // LinkElementToPurpose links an element to a purpose
 func (s *store) LinkElementToPurpose(tx dbmodel.TxInterface, purposeID, elementID, orgID string, isMandatory bool) error {
-	_, err := tx.Exec(QueryLinkElementToPurpose.Query,
+	_, err := tx.Exec(QueryLinkElementToPurpose,
 		purposeID,
 		elementID,
 		isMandatory,
@@ -439,7 +439,7 @@ func (s *store) GetPurposeElements(ctx context.Context, purposeID, orgID string)
 
 // DeletePurposeElements deletes all element mappings for a purpose
 func (s *store) DeletePurposeElements(tx dbmodel.TxInterface, purposeID, orgID string) error {
-	_, err := tx.Exec(QueryDeletePurposeElements.Query, purposeID, orgID)
+	_, err := tx.Exec(QueryDeletePurposeElements, purposeID, orgID)
 	return err
 }
 

@@ -20,17 +20,34 @@
 package provider
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"sync"
+	"time"
 
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 	"github.com/wso2/consent-management-api/internal/system/config"
-	"github.com/wso2/consent-management-api/internal/system/database"
+	"github.com/wso2/consent-management-api/internal/system/database/model"
+	"github.com/wso2/consent-management-api/internal/system/database/transaction"
 	"github.com/wso2/consent-management-api/internal/system/log"
 )
+
+// transactionDBWrapper wraps model.DB to implement transaction.DBInterface
+type transactionDBWrapper struct {
+	db *model.DB
+}
+
+// BeginTx implements transaction.DBInterface
+func (w *transactionDBWrapper) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	return w.db.BeginTxContext(ctx, opts)
+}
 
 // DBProviderInterface defines the interface for getting database clients.
 type DBProviderInterface interface {
 	GetConsentDBClient() (DBClientInterface, error)
+	GetConsentDBTransactioner() (transaction.Transactioner, error)
 }
 
 // DBProviderCloser is a separate interface for closing the provider.
@@ -41,9 +58,10 @@ type DBProviderCloser interface {
 
 // dbProvider is the implementation of DBProviderInterface.
 type dbProvider struct {
-	consentClient DBClientInterface
-	consentMutex  sync.RWMutex
-	db            *database.DB
+	consentClient        DBClientInterface
+	consentTransactioner transaction.Transactioner
+	consentMutex         sync.RWMutex
+	db                   *model.DB
 }
 
 var (
@@ -100,6 +118,33 @@ func (d *dbProvider) GetConsentDBClient() (DBClientInterface, error) {
 	return d.consentClient, nil
 }
 
+// GetConsentDBTransactioner returns a transactioner for consent datasource.
+func (d *dbProvider) GetConsentDBTransactioner() (transaction.Transactioner, error) {
+	d.consentMutex.RLock()
+	if d.consentTransactioner != nil {
+		t := d.consentTransactioner
+		d.consentMutex.RUnlock()
+		return t, nil
+	}
+	d.consentMutex.RUnlock()
+
+	// Initialize transactioner if not already done
+	d.consentMutex.Lock()
+	defer d.consentMutex.Unlock()
+
+	// Double-check after acquiring write lock
+	if d.consentTransactioner != nil {
+		return d.consentTransactioner, nil
+	}
+
+	// Initialize now
+	if err := d.initializeClientLocked(); err != nil {
+		return nil, err
+	}
+
+	return d.consentTransactioner, nil
+}
+
 // initializeClient initializes the database client at startup (called from once.Do).
 func (d *dbProvider) initializeClient() {
 	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "DBProvider"))
@@ -124,14 +169,15 @@ func (d *dbProvider) initializeClientLocked() error {
 
 	dbConfig := &cfg.Database.Consent
 
-	// Initialize database connection
-	db, err := database.Initialize(dbConfig)
+	// Initialize database
+	db, err := initializeDB(dbConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 
 	d.db = db
-	d.consentClient = NewDBClient(d.db.DB, "mysql")
+	d.consentClient = NewDBClient(d.db, "mysql")
+	d.consentTransactioner = transaction.NewTransactioner(&transactionDBWrapper{db: d.db})
 	logger.Debug("Consent DB client initialized")
 
 	return nil
@@ -157,4 +203,38 @@ func (d *dbProvider) Close() error {
 	logger.Debug("Database connections closed")
 
 	return nil
+}
+
+// initializeDB creates and initializes a new database connection.
+func initializeDB(cfg *config.DatabaseConfig) (*model.DB, error) {
+	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "Database"))
+	dsn := cfg.GetDSN()
+
+	logger.Info("Connecting to database...",
+		log.String("hostname", cfg.Hostname),
+		log.Int("port", cfg.Port),
+		log.String("database", cfg.Database))
+
+	// Open database connection
+	db, err := sqlx.Open("mysql", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	// Set connection pool settings
+	db.SetMaxOpenConns(cfg.MaxOpenConns)
+	db.SetMaxIdleConns(cfg.MaxIdleConns)
+	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+
+	// Test the connection
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	logger.Info("Successfully connected to database")
+
+	return &model.DB{DB: db, DBType: cfg.Type}, nil
 }

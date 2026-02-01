@@ -141,7 +141,7 @@ func (s *store) getDBClient() (provider.DBClientInterface, error) {
 
 // Create creates a new consent element within a transaction
 func (elementStore *store) Create(tx dbmodel.TxInterface, element *model.ConsentElement) error {
-	_, err := tx.Exec(QueryCreateElement.Query,
+	_, err := tx.Exec(QueryCreateElement,
 		element.ID, element.Name, element.Description, element.Type, element.OrgID)
 	return err
 }
@@ -240,14 +240,14 @@ func (elementStore *store) List(ctx context.Context, orgID string, limit, offset
 
 // Update updates an existing consent element within a transaction
 func (elementStore *store) Update(tx dbmodel.TxInterface, element *model.ConsentElement) error {
-	_, err := tx.Exec(QueryUpdateElement.Query,
+	_, err := tx.Exec(QueryUpdateElement,
 		element.Name, element.Description, element.Type, element.ID, element.OrgID)
 	return err
 }
 
 // Delete deletes a consent element within a transaction
 func (elementStore *store) Delete(tx dbmodel.TxInterface, elementID, orgID string) error {
-	_, err := tx.Exec(QueryDeleteElement.Query, elementID, orgID)
+	_, err := tx.Exec(QueryDeleteElement, elementID, orgID)
 	return err
 }
 
@@ -274,7 +274,7 @@ func (elementStore *store) CheckNameExists(ctx context.Context, name, orgID stri
 // CreateProperties creates multiple element properties within a transaction
 func (elementStore *store) CreateProperties(tx dbmodel.TxInterface, properties []model.ConsentElementProperty) error {
 	for _, prop := range properties {
-		_, err := tx.Exec(QueryCreateProperty.Query,
+		_, err := tx.Exec(QueryCreateProperty,
 			prop.ElementID, prop.Key, prop.Value, prop.OrgID)
 		if err != nil {
 			return err
@@ -308,7 +308,7 @@ func (elementStore *store) GetPropertiesByElementID(ctx context.Context, element
 
 // DeletePropertiesByElementID deletes all properties for an element within a transaction
 func (elementStore *store) DeletePropertiesByElementID(tx dbmodel.TxInterface, elementID, orgID string) error {
-	_, err := tx.Exec(QueryDeletePropertiesByElementID.Query, elementID, orgID)
+	_, err := tx.Exec(QueryDeletePropertiesByElementID, elementID, orgID)
 	return err
 }
 
@@ -422,7 +422,7 @@ func mapToConsentElementProperty(row map[string]interface{}) *model.ConsentEleme
 
 // LinkElementToConsent links an element to a consent within a transaction
 func (elementStore *store) LinkElementToConsent(tx dbmodel.TxInterface, consentID, elementID, orgID string, value *string, isUserApproved, isMandatory bool) error {
-	_, err := tx.Exec(QueryLinkElementToConsent.Query,
+	_, err := tx.Exec(QueryLinkElementToConsent,
 		consentID, elementID, orgID, value, isUserApproved, isMandatory)
 	return err
 }
@@ -624,6 +624,6 @@ func mapToConsentElementMapping(row map[string]interface{}) *model.ConsentElemen
 
 // DeleteMappingsByConsentID deletes all consent element mappings for a consent within a transaction
 func (elementStore *store) DeleteMappingsByConsentID(tx dbmodel.TxInterface, consentID, orgID string) error {
-	_, err := tx.Exec(QueryDeleteMappingsByConsentID.Query, consentID, orgID)
+	_, err := tx.Exec(QueryDeleteMappingsByConsentID, consentID, orgID)
 	return err
 }

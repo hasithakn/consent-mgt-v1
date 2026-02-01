@@ -30,6 +30,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// globalConfig holds the application configuration
+var globalConfig *Config
+
 // Config holds all configuration for the application
 type Config struct {
 	Server   ServerConfig    `yaml:"server"`
@@ -151,8 +154,6 @@ func (c *ConsentConfig) GetSystemExpiredAuthStatus() AuthStatus {
 func (c *ConsentConfig) GetSystemRevokedAuthStatus() AuthStatus {
 	return AuthStatus(c.AuthStatusMappings.SystemRevokedState)
 }
-
-var globalConfig *Config
 
 // Load reads configuration from file and environment variables
 func Load(configPath string) (*Config, error) {

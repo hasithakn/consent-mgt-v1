@@ -17,15 +17,6 @@ database:
     user: root
     password: password
 
-service_extension:
-  enabled: false
-  base_url: http://localhost:3001/api/services
-  timeout: 30s
-  retry_attempts: 3
-  endpoints:
-    pre_process_consent_creation: /pre-process-consent-creation
-    pre_process_consent_update: /pre-process-consent-update
-
 logging:
   level: debug
 
@@ -43,14 +34,3 @@ consent:
     created_state: CREATED
     system_expired_state: SYS_EXPIRED
     system_revoked_state: SYS_REVOKED
-
-security:
-  basic_auth:
-    enabled: true
-    users:
-      - username: admin
-        password: admin
-
-cors:
-  allowed_origins:
-    - "http://localhost:3000"

@@ -19,6 +19,7 @@
 package model
 
 import (
+	"context"
 	"errors"
 	"fmt"
 )
@@ -26,27 +27,24 @@ import (
 // ExecuteTransaction executes multiple queries in a single atomic transaction.
 // If any query fails, all changes are rolled back.
 //
+// Note: This function is kept for backward compatibility. New code should use
+// transaction.Transactioner for automatic transaction management.
+//
 // Example usage:
 //
 //	queries := []func(tx TxInterface) error{
 //	    func(tx TxInterface) error {
-//	        _, err := tx.Exec("INSERT INTO users (id, name) VALUES (?, ?)", id, name)
-//	        return err
-//	    },
-//	    func(tx TxInterface) error {
-//	        _, err := tx.Exec("UPDATE accounts SET balance = ? WHERE user_id = ?", balance, id)
+//	        _, err := tx.Exec(query, args...)
 //	        return err
 //	    },
 //	}
 //	err := ExecuteTransaction(db, queries)
 func ExecuteTransaction(db DBInterface, queries []func(tx TxInterface) error) error {
-	tx, err := db.Begin()
+	// Use BeginTx to get TxInterface directly
+	txInterface, err := db.BeginTx()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-
-	// Wrap tx in TxInterface
-	txInterface := NewTx(tx)
 
 	// Execute each query
 	for i, query := range queries {
@@ -65,6 +63,31 @@ func ExecuteTransaction(db DBInterface, queries []func(tx TxInterface) error) er
 
 	// Commit if all queries succeed
 	if err := txInterface.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// ExecuteTransactionContext is deprecated. Use transaction.Transactioner instead.
+// This exists only for backward compatibility during migration.
+func ExecuteTransactionContext(ctx context.Context, db DBInterface, fn func(tx TxInterface) error) error {
+	txInterface, err := db.BeginTx()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	defer func() {
+		if err != nil {
+			txInterface.Rollback()
+		}
+	}()
+
+	if err = fn(txInterface); err != nil {
+		return err
+	}
+
+	if err = txInterface.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 

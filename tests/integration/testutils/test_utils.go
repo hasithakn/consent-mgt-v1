@@ -13,7 +13,7 @@ import (
 
 const (
 	ServerBinary = "../../bin/consent-server"
-	ConfigPath   = "../repository/conf/deployment.yaml"
+	ConfigPath   = "repository/conf/deployment.yaml" // Relative to tests/integration
 )
 
 var serverCmd *exec.Cmd
@@ -63,16 +63,66 @@ func BuildServer() error {
 
 // SetupDatabase runs database migration scripts
 func SetupDatabase() error {
-	fmt.Println("Setting up test database...")
-	// For now, we assume the database is already set up
-	// In production, this would run migration scripts
+	fmt.Println("Cleaning and setting up test database configured in tests/integration/repository/conf/deployment.yaml...")
+
+	// Read database config
+	data, err := os.ReadFile(ConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var config struct {
+		Database struct {
+			Consent struct {
+				Hostname string `yaml:"hostname"`
+				Port     int    `yaml:"port"`
+				Database string `yaml:"database"`
+				User     string `yaml:"user"`
+				Password string `yaml:"password"`
+			} `yaml:"consent"`
+		} `yaml:"database"`
+	}
+
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	dbConfig := config.Database.Consent
+
+	// Build mysql command to run schema
+	schemaFile := "../../consent-server/dbscripts/db_schema_mysql.sql"
+
+	// Check if schema file exists
+	if _, err := os.Stat(schemaFile); os.IsNotExist(err) {
+		return fmt.Errorf("schema file not found: %s", schemaFile)
+	}
+
+	// Run mysql command to create schema
+	// First disable foreign key checks, drop all tables, run the schema, then re-enable
+	// This ensures a clean database state for testing
+	sqlScript := fmt.Sprintf("SET FOREIGN_KEY_CHECKS=0; DROP DATABASE IF EXISTS %s; CREATE DATABASE %s; USE %s; source %s; SET FOREIGN_KEY_CHECKS=1;",
+		dbConfig.Database, dbConfig.Database, dbConfig.Database, schemaFile)
+	cmd := exec.Command("mysql",
+		"-h", dbConfig.Hostname,
+		"-P", fmt.Sprintf("%d", dbConfig.Port),
+		"-u", dbConfig.User,
+		fmt.Sprintf("-p%s", dbConfig.Password),
+		"-e", sqlScript,
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to run database schema: %w\nOutput: %s", err, string(output))
+	}
+
 	return nil
 }
 
 // StartServer starts the consent-server in background
 func StartServer() error {
 	fmt.Println("Starting consent server...")
-	cmd := exec.Command(ServerBinary)
+	cmd := exec.Command("./consent-server")
+	cmd.Dir = "../../bin" // Run from bin directory where config files are located
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

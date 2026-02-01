@@ -50,18 +50,18 @@ func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Req
 
 	// Validate required headers
 	if orgID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "org-id header is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, "org-id header is required"))
 		return
 	}
 	if clientID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "TPP-client-id header is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, "TPP-client-id header is required"))
 		return
 	}
 
 	// Decode request
 	var req model.CreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, "invalid request body"))
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *consentPurposeHandler) createPurpose(w http.ResponseWriter, r *http.Req
 
 	// Return response
 	response := purpose.ToResponse()
-	w.Header().Set(constants.HeaderContentType, "application/json")
+	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
 }
@@ -87,12 +87,12 @@ func (h *consentPurposeHandler) getPurpose(w http.ResponseWriter, r *http.Reques
 
 	// Validate required headers
 	if orgID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "org-id header is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, "org-id header is required"))
 		return
 	}
 
 	if purposeID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "purposeId is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, "purposeId is required"))
 		return
 	}
 
@@ -105,7 +105,7 @@ func (h *consentPurposeHandler) getPurpose(w http.ResponseWriter, r *http.Reques
 
 	// Return response
 	response := purpose.ToResponse()
-	w.Header().Set(constants.HeaderContentType, "application/json")
+	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
@@ -117,7 +117,7 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 
 	// Validate required headers
 	if orgID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "org-id header is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, "org-id header is required"))
 		return
 	}
 
@@ -186,7 +186,7 @@ func (h *consentPurposeHandler) listPurposes(w http.ResponseWriter, r *http.Requ
 		},
 	}
 
-	w.Header().Set(constants.HeaderContentType, "application/json")
+	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
@@ -200,22 +200,22 @@ func (h *consentPurposeHandler) updatePurpose(w http.ResponseWriter, r *http.Req
 
 	// Validate required headers and parameters
 	if orgID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "org-id header is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, "org-id header is required"))
 		return
 	}
 	if clientID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "TPP-client-id header is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, "TPP-client-id header is required"))
 		return
 	}
 	if purposeID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "purposeId is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, "purposeId is required"))
 		return
 	}
 
 	// Decode request
 	var req model.UpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "invalid request body"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, "invalid request body"))
 		return
 	}
 
@@ -228,7 +228,7 @@ func (h *consentPurposeHandler) updatePurpose(w http.ResponseWriter, r *http.Req
 
 	// Return response
 	response := purpose.ToResponse()
-	w.Header().Set(constants.HeaderContentType, "application/json")
+	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
@@ -241,11 +241,11 @@ func (h *consentPurposeHandler) deletePurpose(w http.ResponseWriter, r *http.Req
 
 	// Validate required headers and parameters
 	if orgID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "org-id header is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, "org-id header is required"))
 		return
 	}
 	if purposeID == "" {
-		utils.SendError(w, r, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "purposeId is required"))
+		utils.SendError(w, r, serviceerror.CustomServiceError(ErrorInvalidRequestBody, "purposeId is required"))
 		return
 	}
 

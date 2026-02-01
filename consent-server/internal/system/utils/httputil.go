@@ -19,12 +19,13 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/wso2/consent-management-api/internal/system/constants"
 	"github.com/wso2/consent-management-api/internal/system/error/apierror"
-	"github.com/wso2/consent-management-api/internal/system/error/codes"
 	"github.com/wso2/consent-management-api/internal/system/error/serviceerror"
 	"github.com/wso2/consent-management-api/internal/system/log"
 )
@@ -33,21 +34,22 @@ func DecodeJSONBody(r *http.Request, v interface{}) error {
 	return json.NewDecoder(r.Body).Decode(v)
 }
 
-func JSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(data)
-}
+// WriteErrorResponse writes a JSON error response with the given status code and error details.
+func WriteErrorResponse(w http.ResponseWriter, statusCode int, errorResp apierror.ErrorResponse) {
+	logger := log.GetLogger()
 
-// WriteJSONError writes a JSON error response with the new format.
-// Deprecated: Use SendError instead which provides better error handling with trace IDs.
-func WriteJSONError(w http.ResponseWriter, code, description string, statusCode int) {
-	w.Header().Set("Content-Type", "application/json")
+	// Encode to buffer first to ensure encoding succeeds before sending headers
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(errorResp); err != nil {
+		logger.Error("Failed to encode error response", log.Error(err))
+		http.Error(w, ErrorEncodingError.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Encoding succeeded, now safe to send headers and write response
+	w.Header().Set(constants.HeaderContentType, constants.ContentTypeJSON)
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(map[string]string{
-		"error":             code,
-		"error_description": description,
-	})
+	_, _ = w.Write(buf.Bytes())
 }
 
 // SendError writes a ServiceError as an HTTP response with appropriate status code and trace ID.
@@ -96,17 +98,28 @@ func mapErrorToStatusCode(err *serviceerror.ServiceError) int {
 		return http.StatusInternalServerError
 	}
 
-	// Client error type - map specific codes
-	switch err.Code {
-	case codes.ResourceNotFound, codes.ConsentNotFound, codes.PurposeNotFound, codes.AuthResourceNotFound, "CE-1016":
-		return http.StatusNotFound
-	case codes.ConflictError, codes.PurposeInUse, "CE-1011", "CE-1012", "CE-1013":
+	// Client error type - map based on error code patterns
+	// Conflict errors (must check before Not Found to avoid conflicts with -404x patterns)
+	// Pattern 1: CSE-409x, CS-4090, CP-4090, CE-4090, AR-4090
+	// Pattern 2: CE-1011 (ElementNameExists), CE-1012 (DuplicateNameInBatch)
+	// Pattern 3: CP-4041 (PurposeNameExists - has 404 in it but should be conflict)
+	// Pattern 4: CS-4042 (ConsentStatusConflict - has 404 in it but should be conflict)
+	if strings.Contains(err.Code, "-409") || strings.HasSuffix(err.Code, "4090") ||
+		strings.HasSuffix(err.Code, "1011") || strings.HasSuffix(err.Code, "1012") ||
+		strings.HasSuffix(err.Code, "4041") || strings.HasSuffix(err.Code, "4042") { // CP-4041, CS-4042
 		return http.StatusConflict
-	case codes.ValidationError, codes.InvalidRequest:
-		return http.StatusBadRequest
-	default:
-		return http.StatusBadRequest
 	}
+
+	// Not Found errors
+	// Pattern 1: CSE-404x, CS-4040, CP-4040, CE-4040, AR-4040
+	// Pattern 2: CE-1016 (ElementNotFound), CS-4040 (ConsentNotFound), etc.
+	if strings.Contains(err.Code, "-404") || strings.HasSuffix(err.Code, "4040") ||
+		strings.HasSuffix(err.Code, "1016") { // CE-1016 ElementNotFound
+		return http.StatusNotFound
+	}
+
+	// All other client errors default to BadRequest
+	return http.StatusBadRequest
 }
 
 // extractTraceID extracts the trace ID (correlation ID) from the request context
@@ -123,3 +136,14 @@ func extractTraceID(r *http.Request) string {
 	}
 	return ""
 }
+
+// Server errors
+var (
+	// InternalServerError is the error returned for unexpected server errors.
+	ErrorEncodingError = serviceerror.ServiceError{
+		Type:        serviceerror.ServerErrorType,
+		Code:        "SSE-5000",
+		Message:     "Encoding error",
+		Description: "An error occurred while encoding the response",
+	}
+)

@@ -18,19 +18,19 @@
 
 package serviceerror
 
-import (
-	"github.com/wso2/consent-management-api/internal/system/error/codes"
-)
-
+// ServiceErrorType defines the type of error (client or server error)
 type ServiceErrorType string
 
 const (
+	// ClientErrorType indicates an error caused by client input (4xx errors)
 	ClientErrorType ServiceErrorType = "client_error"
+	// ServerErrorType indicates an error caused by server issues (5xx errors)
 	ServerErrorType ServiceErrorType = "server_error"
 )
 
 // ServiceError represents an error that occurred in the service layer.
-// It contains the error code, type, message, and detailed description.
+// Services should create and return ServiceError instances to provide
+// structured error information to the handlers.
 type ServiceError struct {
 	Code        string           `json:"code"`        // Error code (e.g., "CSE-4040")
 	Type        ServiceErrorType `json:"type"`        // Error type (client_error or server_error)
@@ -38,52 +38,17 @@ type ServiceError struct {
 	Description string           `json:"description"` // Detailed error description
 }
 
-// Predefined service errors for common scenarios
-var (
-	InternalServerError = ServiceError{
-		Type:        ServerErrorType,
-		Code:        codes.InternalServerError,
-		Message:     "Internal Server Error",
-		Description: "An unexpected error occurred while processing the request",
-	}
-
-	DatabaseError = ServiceError{
-		Type:        ServerErrorType,
-		Code:        codes.DatabaseError,
-		Message:     "Database Error",
-		Description: "A database error occurred while processing the request",
-	}
-
-	InvalidRequestError = ServiceError{
-		Type:        ClientErrorType,
-		Code:        codes.InvalidRequest,
-		Message:     "Invalid Request",
-		Description: "The request is invalid or malformed",
-	}
-
-	ResourceNotFoundError = ServiceError{
-		Type:        ClientErrorType,
-		Code:        codes.ResourceNotFound,
-		Message:     "Resource Not Found",
-		Description: "The requested resource was not found",
-	}
-
-	ConflictError = ServiceError{
-		Type:        ClientErrorType,
-		Code:        codes.ConflictError,
-		Message:     "Conflict",
-		Description: "The request conflicts with the current state of the resource",
-	}
-
-	ValidationError = ServiceError{
-		Type:        ClientErrorType,
-		Code:        codes.ValidationError,
-		Message:     "Validation Error",
-		Description: "Request validation failed",
-	}
-)
-
 // NewServiceError creates a new ServiceError with the specified details.
+// This is the primary way to create service errors.
+//
+// Example usage:
+//
+//	return serviceerror.NewServiceError(
+//	    "CSE-4040",
+//	    serviceerror.ClientErrorType,
+//	    "Consent Not Found",
+//	    fmt.Sprintf("Consent with ID '%s' not found", consentID),
+//	)
 func NewServiceError(code string, errorType ServiceErrorType, message, description string) *ServiceError {
 	return &ServiceError{
 		Code:        code,
@@ -93,12 +58,16 @@ func NewServiceError(code string, errorType ServiceErrorType, message, descripti
 	}
 }
 
-// CustomServiceError creates a custom service error based on a predefined error with a custom description.
-// Deprecated: Use NewServiceError instead for better clarity and consistency.
+// CustomServiceError creates a custom service error based on a base error with a custom description.
+// This is useful when you want to use a predefined error but customize the description.
+//
+// Example usage:
+//
+//	return serviceerror.CustomServiceError(ErrorInvalidRequestBody, err.Error())
 func CustomServiceError(baseError ServiceError, description string) *ServiceError {
 	return &ServiceError{
-		Type:        baseError.Type,
 		Code:        baseError.Code,
+		Type:        baseError.Type,
 		Message:     baseError.Message,
 		Description: description,
 	}

@@ -71,11 +71,11 @@ func (s *consentPurposeService) CreatePurpose(ctx context.Context, req model.Cre
 	exists, dbErr := s.stores.ConsentPurpose.CheckPurposeNameExists(ctx, req.Name, clientID, orgID, nil)
 	if dbErr != nil {
 		logger.Error("Failed to check purpose name existence", log.Error(dbErr), log.String("name", req.Name))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to check name existence: %v", dbErr))
+		return nil, &ErrorInternalServerError
 	}
 	if exists {
 		logger.Warn("Purpose name already exists for this client", log.String("name", req.Name), log.String("client_id", clientID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("purpose purpose with name '%s' already exists for this client", req.Name))
+		return nil, serviceerror.CustomServiceError(ErrorPurposeNameExists, fmt.Sprintf("purpose purpose with name '%s' already exists for this client", req.Name))
 	}
 
 	// Validate that all purpose names exist
@@ -89,7 +89,7 @@ func (s *consentPurposeService) CreatePurpose(ctx context.Context, req model.Cre
 		return nil, duplicateErr
 	}
 
-	// Create purpose purpose entity
+	// Create purpose entity
 	purposeID := utils.GenerateUUID()
 	now := time.Now().Unix()
 	desc := &req.Description
@@ -133,7 +133,7 @@ func (s *consentPurposeService) CreatePurpose(ctx context.Context, req model.Cre
 
 	if err := s.stores.ExecuteTransaction(queries); err != nil {
 		logger.Error("Failed to create consent purpose", log.Error(err))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create purpose: %v", err))
+		return nil, &ErrorInternalServerError
 	}
 
 	logger.Info("Purpose purpose created successfully", log.String("purpose_id", purposeID))
@@ -149,7 +149,7 @@ func (s *consentPurposeService) GetPurpose(ctx context.Context, purposeID, orgID
 	purpose, err := s.stores.ConsentPurpose.GetPurposeByID(ctx, purposeID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve consent purpose", log.Error(err), log.String("purpose_id", purposeID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, "purpose purpose not found")
+		return nil, serviceerror.CustomServiceError(ErrorPurposeNotFound, "purpose purpose not found")
 	}
 
 	return purpose, nil
@@ -168,7 +168,7 @@ func (s *consentPurposeService) ListPurposes(ctx context.Context, orgID, name st
 	purposes, total, err := s.stores.ConsentPurpose.ListPurposes(ctx, orgID, name, clientIDs, purposeNames, offset, limit)
 	if err != nil {
 		logger.Error("Failed to list consent purposes", log.Error(err))
-		return nil, 0, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to list purposes: %v", err))
+		return nil, 0, &ErrorInternalServerError
 	}
 
 	return purposes, total, nil
@@ -185,7 +185,7 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 
 	// Validate request
 	if err := s.validateUpdateRequest(req); err != nil {
-		logger.Warn("Purpose purpose update request validation failed", log.String("error", err.Error()))
+		logger.Warn("Purpose update request validation failed", log.String("error", err.Error()))
 		return nil, err
 	}
 
@@ -193,7 +193,7 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 	existingPurpose, err := s.stores.ConsentPurpose.GetPurposeByID(ctx, purposeID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve consent purpose", log.Error(err), log.String("purpose_id", purposeID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, "purpose purpose not found")
+		return nil, serviceerror.CustomServiceError(ErrorPurposeNotFound, "purpose not found")
 	}
 
 	// Verify client ownership
@@ -201,29 +201,29 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 		logger.Warn("Client does not own this consent purpose",
 			log.String("purpose_client_id", existingPurpose.ClientID),
 			log.String("request_client_id", clientID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, "you do not have permission to update this consent purpose")
+		return nil, serviceerror.CustomServiceError(ErrorPurposeNameExists, "you do not have permission to update this consent purpose")
 	}
 
 	// Check if purpose is being used in any consents
 	inUse, checkErr := s.stores.Consent.CheckPurposeUsedInConsents(ctx, purposeID, orgID)
 	if checkErr != nil {
 		logger.Error("Failed to check if purpose is in use", log.Error(checkErr))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, "failed to check purpose usage")
+		return nil, &ErrorInternalServerError
 	}
 	if inUse {
-		logger.Warn("Cannot update purpose purpose that is in use by consents", log.String("purpose_id", purposeID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, "cannot update purpose purpose that is currently used in consents")
+		logger.Warn("Cannot update purpose that is in use by consents", log.String("purpose_id", purposeID))
+		return nil, serviceerror.CustomServiceError(ErrorPurposeInUse, "cannot update purpose that is currently used in consents")
 	}
 
 	// Check if new name conflicts with another purpose (excluding current name)
 	exists, dbErr := s.stores.ConsentPurpose.CheckPurposeNameExists(ctx, req.Name, clientID, orgID, &purposeID)
 	if dbErr != nil {
 		logger.Error("Failed to check purpose name existence", log.Error(dbErr))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, "failed to check name existence")
+		return nil, &ErrorInternalServerError
 	}
 	if exists {
 		logger.Warn("Purpose name already exists for this client", log.String("name", req.Name))
-		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("purpose purpose with name '%s' already exists for this client", req.Name))
+		return nil, serviceerror.CustomServiceError(ErrorPurposeNameExists, fmt.Sprintf("purpose with name '%s' already exists for this client", req.Name))
 	}
 
 	// Validate purpose names exist
@@ -283,10 +283,10 @@ func (s *consentPurposeService) UpdatePurpose(ctx context.Context, purposeID str
 
 	if err := s.stores.ExecuteTransaction(queries); err != nil {
 		logger.Error("Failed to update consent purpose", log.Error(err))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to update purpose: %v", err))
+		return nil, &ErrorInternalServerError
 	}
 
-	logger.Info("Purpose purpose updated successfully", log.String("purpose_id", purposeID))
+	logger.Info("Purpose updated successfully", log.String("purpose_id", purposeID))
 	return purpose, nil
 }
 
@@ -300,18 +300,18 @@ func (s *consentPurposeService) DeletePurpose(ctx context.Context, purposeID, or
 	_, err := s.stores.ConsentPurpose.GetPurposeByID(ctx, purposeID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve consent purpose", log.Error(err))
-		return serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, "purpose purpose not found")
+		return serviceerror.CustomServiceError(ErrorPurposeNotFound, "purpose purpose not found")
 	}
 
 	// Check if purpose is being used in any consents
 	inUse, checkErr := s.stores.Consent.CheckPurposeUsedInConsents(ctx, purposeID, orgID)
 	if checkErr != nil {
 		logger.Error("Failed to check if purpose is in use", log.Error(checkErr))
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, "failed to check purpose usage")
+		return &ErrorInternalServerError
 	}
 	if inUse {
-		logger.Warn("Cannot delete purpose purpose that is in use by consents", log.String("purpose_id", purposeID))
-		return serviceerror.CustomServiceError(serviceerror.ConflictError, "cannot delete purpose purpose that is currently used in consents")
+		logger.Warn("Cannot delete purpose that is in use by consents", log.String("purpose_id", purposeID))
+		return serviceerror.CustomServiceError(ErrorPurposeInUse, "cannot delete purpose that is currently used in consents")
 	}
 
 	// Execute transaction for deletion
@@ -323,7 +323,7 @@ func (s *consentPurposeService) DeletePurpose(ctx context.Context, purposeID, or
 
 	if err := s.stores.ExecuteTransaction(queries); err != nil {
 		logger.Error("Failed to delete consent purpose", log.Error(err))
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to delete purpose: %v", err))
+		return &ErrorInternalServerError
 	}
 
 	logger.Info("Purpose purpose deleted successfully", log.String("purpose_id", purposeID))
@@ -333,20 +333,20 @@ func (s *consentPurposeService) DeletePurpose(ctx context.Context, purposeID, or
 // validateCreateRequest validates the create request
 func (s *consentPurposeService) validateCreateRequest(req model.CreateRequest) *serviceerror.ServiceError {
 	if req.Name == "" {
-		return serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "name is required")
+		return serviceerror.CustomServiceError(ErrorInvalidRequestBody, "name is required")
 	}
 	if len(req.Name) > 255 {
-		return serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "name must not exceed 255 characters")
+		return serviceerror.CustomServiceError(ErrorInvalidRequestBody, "name must not exceed 255 characters")
 	}
 	if len(req.Description) > 1024 {
-		return serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "description must not exceed 1024 characters")
+		return serviceerror.CustomServiceError(ErrorInvalidRequestBody, "description must not exceed 1024 characters")
 	}
 	if len(req.Elements) == 0 {
-		return serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "at least one purpose is required")
+		return serviceerror.CustomServiceError(ErrorInvalidRequestBody, "at least one purpose is required")
 	}
 	for _, purpose := range req.Elements {
 		if purpose.ElementName == "" {
-			return serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "purpose name is required")
+			return serviceerror.CustomServiceError(ErrorInvalidRequestBody, "purpose name is required")
 		}
 	}
 	return nil
@@ -355,20 +355,20 @@ func (s *consentPurposeService) validateCreateRequest(req model.CreateRequest) *
 // validateUpdateRequest validates the update request
 func (s *consentPurposeService) validateUpdateRequest(req model.UpdateRequest) *serviceerror.ServiceError {
 	if req.Name == "" {
-		return serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "name is required")
+		return serviceerror.CustomServiceError(ErrorInvalidRequestBody, "name is required")
 	}
 	if len(req.Name) > 255 {
-		return serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "name must not exceed 255 characters")
+		return serviceerror.CustomServiceError(ErrorInvalidRequestBody, "name must not exceed 255 characters")
 	}
 	if len(req.Description) > 1024 {
-		return serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "description must not exceed 1024 characters")
+		return serviceerror.CustomServiceError(ErrorInvalidRequestBody, "description must not exceed 1024 characters")
 	}
 	if len(req.Elements) == 0 {
-		return serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "at least one purpose is required")
+		return serviceerror.CustomServiceError(ErrorInvalidRequestBody, "at least one purpose is required")
 	}
 	for _, purpose := range req.Elements {
 		if purpose.ElementName == "" {
-			return serviceerror.CustomServiceError(serviceerror.InvalidRequestError, "purpose name is required")
+			return serviceerror.CustomServiceError(ErrorInvalidRequestBody, "purpose name is required")
 		}
 	}
 	return nil
@@ -383,13 +383,13 @@ func (s *consentPurposeService) validatePurposeNamesExist(ctx context.Context, p
 
 	elementNameToID, err := s.stores.ConsentElement.GetIDsByNames(ctx, elementNames, orgID)
 	if err != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to validate element names: %v", err))
+		return nil, &ErrorInternalServerError
 	}
 
 	// Check that all elements were found
 	for _, purpose := range purposes {
 		if _, found := elementNameToID[purpose.ElementName]; !found {
-			return nil, serviceerror.CustomServiceError(serviceerror.InvalidRequestError, fmt.Sprintf("element '%s' does not exist", purpose.ElementName))
+			return nil, serviceerror.CustomServiceError(ErrorInvalidRequestBody, fmt.Sprintf("element '%s' does not exist", purpose.ElementName))
 		}
 	}
 
@@ -401,7 +401,7 @@ func (s *consentPurposeService) checkDuplicatePurposeNames(purposes []model.Elem
 	seen := make(map[string]bool)
 	for _, purpose := range purposes {
 		if seen[purpose.ElementName] {
-			return serviceerror.CustomServiceError(serviceerror.InvalidRequestError, fmt.Sprintf("duplicate purpose '%s' found in request", purpose.ElementName))
+			return serviceerror.CustomServiceError(ErrorInvalidRequestBody, fmt.Sprintf("duplicate purpose '%s' found in request", purpose.ElementName))
 		}
 		seen[purpose.ElementName] = true
 	}

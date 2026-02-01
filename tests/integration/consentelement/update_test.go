@@ -253,7 +253,7 @@ func (ts *ElementAPITestSuite) TestUpdateElement_NameConflict_ReturnsBadRequest(
 
 	var errResp ErrorResponse
 	json.Unmarshal(bodyBytes, &errResp)
-	require.Equal(t, "CSE-4009", errResp.Code)
+	require.Equal(t, "CE-1011", errResp.Code)
 	require.Contains(t, strings.ToLower(errResp.Description), "already exists")
 }
 

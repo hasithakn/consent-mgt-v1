@@ -128,7 +128,7 @@ func (service *consentElementService) CreateElement(ctx context.Context, req mod
 	err := service.stores.ExecuteTransaction(queries)
 	if err != nil {
 		logger.Error("Failed to create element in transaction", log.Error(err), log.String("element_id", elementID))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create element: %v", err))
+		return nil, serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to create element: %v", err))
 	}
 
 	logger.Info("Consent element created successfully",
@@ -223,7 +223,7 @@ func (service *consentElementService) CreateElementsInBatch(ctx context.Context,
 
 	// Execute all operations in a single transaction
 	if err := service.stores.ExecuteTransaction(queries); err != nil {
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create elements in batch: %v", err))
+		return nil, serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to create elements in batch: %v", err))
 	}
 
 	return createdElements, nil
@@ -244,7 +244,7 @@ func (service *consentElementService) GetElement(ctx context.Context, elementID,
 			log.Error(err),
 			log.String("element_id", elementID),
 		)
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to retrieve element: %v", err))
+		return nil, serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to retrieve element: %v", err))
 	}
 	if element == nil {
 		logger.Warn("Element not found", log.String("element_id", elementID))
@@ -258,7 +258,7 @@ func (service *consentElementService) GetElement(ctx context.Context, elementID,
 			log.Error(err),
 			log.String("element_id", elementID),
 		)
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to load properties: %v", err))
+		return nil, serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to load properties: %v", err))
 	}
 
 	// Convert properties to map
@@ -301,7 +301,7 @@ func (service *consentElementService) ListElements(ctx context.Context, orgID st
 			log.Error(err),
 			log.String("org_id", orgID),
 		)
-		return nil, 0, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to list elements: %v", err))
+		return nil, 0, serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to list elements: %v", err))
 	}
 
 	// Load properties for each element
@@ -312,7 +312,7 @@ func (service *consentElementService) ListElements(ctx context.Context, orgID st
 				log.Error(propErr),
 				log.String("element_id", elements[i].ID),
 			)
-			return nil, 0, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to load properties: %v", propErr))
+			return nil, 0, serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to load properties: %v", propErr))
 		}
 
 		if elements[i].Properties == nil {
@@ -353,7 +353,7 @@ func (service *consentElementService) UpdateElement(ctx context.Context, element
 			log.Error(err),
 			log.String("element_id", elementID),
 		)
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to retrieve element: %v", err))
+		return nil, serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to retrieve element: %v", err))
 	}
 	if existing == nil {
 		logger.Warn("Element not found for update", log.String("element_id", elementID))
@@ -368,14 +368,14 @@ func (service *consentElementService) UpdateElement(ctx context.Context, element
 				log.Error(dbErr),
 				log.String("name", req.Name),
 			)
-			return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to check name existence: %v", dbErr))
+			return nil, serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to check name existence: %v", dbErr))
 		}
 		if exists {
 			logger.Warn("Element name already exists for another element",
 				log.String("name", req.Name),
 				log.String("element_id", elementID),
 			)
-			return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("element with name '%s' already exists", req.Name))
+			return nil, serviceerror.CustomServiceError(ErrorElementNameExists, fmt.Sprintf("element with name '%s' already exists", req.Name))
 		}
 	}
 
@@ -386,14 +386,14 @@ func (service *consentElementService) UpdateElement(ctx context.Context, element
 			log.Error(err),
 			log.String("element_id", elementID),
 		)
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to check element usage: %v", err))
+		return nil, serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to check element usage: %v", err))
 	}
 	if isUsed {
 		logger.Warn("Cannot update element that is used in consent purposes",
 			log.String("element_id", elementID),
 			log.String("element_name", existing.Name),
 		)
-		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("cannot update element '%s' as it is being used in one or more consent purposes", existing.Name))
+		return nil, serviceerror.CustomServiceError(ErrorElementNameExists, fmt.Sprintf("cannot update element '%s' as it is being used in one or more consent purposes", existing.Name))
 	}
 
 	// Update element fields
@@ -445,7 +445,7 @@ func (service *consentElementService) UpdateElement(ctx context.Context, element
 			log.Error(err),
 			log.String("element_id", elementID),
 		)
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to update element: %v", err))
+		return nil, serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to update element: %v", err))
 	}
 
 	logger.Info("Element updated successfully",
@@ -471,7 +471,7 @@ func (service *consentElementService) DeleteElement(ctx context.Context, element
 			log.Error(err),
 			log.String("element_id", elementID),
 		)
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to retrieve element: %v", err))
+		return serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to retrieve element: %v", err))
 	}
 	if existing == nil {
 		logger.Warn("Element not found for deletion", log.String("element_id", elementID))
@@ -485,14 +485,14 @@ func (service *consentElementService) DeleteElement(ctx context.Context, element
 			log.Error(err),
 			log.String("element_id", elementID),
 		)
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to check element usage: %v", err))
+		return serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to check element usage: %v", err))
 	}
 	if isUsed {
 		logger.Warn("Cannot delete element that is used in consent purposes",
 			log.String("element_id", elementID),
 			log.String("element_name", existing.Name),
 		)
-		return serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("cannot delete element '%s' as it is being used in one or more consent purposes", existing.Name))
+		return serviceerror.CustomServiceError(ErrorElementNameExists, fmt.Sprintf("cannot delete element '%s' as it is being used in one or more consent purposes", existing.Name))
 	}
 
 	// Delete properties and element in a transaction
@@ -510,7 +510,7 @@ func (service *consentElementService) DeleteElement(ctx context.Context, element
 			log.Error(err),
 			log.String("element_id", elementID),
 		)
-		return serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to delete element: %v", err))
+		return serviceerror.CustomServiceError(ErrorCreateElement, fmt.Sprintf("failed to delete element: %v", err))
 	}
 
 	logger.Info("Element deleted successfully",

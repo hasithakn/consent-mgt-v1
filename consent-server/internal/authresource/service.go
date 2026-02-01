@@ -1,21 +1,3 @@
-/*
- * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
- *
- * WSO2 LLC. licenses this file to you under the Apache License,
- * Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
-
 package authresource
 
 // Store Access Pattern:
@@ -91,10 +73,7 @@ func (s *authResourceService) CreateAuthResource(
 		resourcesBytes, err := json.Marshal(request.Resources)
 		if err != nil {
 			logger.Error("Failed to marshal authorization resources", log.Error(err), log.String("auth_id", authID))
-			return nil, serviceerror.CustomServiceError(
-				serviceerror.ValidationError,
-				fmt.Sprintf("failed to marshal resources: %v", err),
-			)
+			return nil, serviceerror.CustomServiceError(ErrorValidationFailed, fmt.Sprintf("failed to marshal resources: %v", err))
 		}
 		resourcesStr := string(resourcesBytes)
 		resourcesJSON = &resourcesStr
@@ -187,7 +166,7 @@ func (s *authResourceService) CreateAuthResource(
 			log.String("consent_id", consentID),
 		)
 		return nil, serviceerror.CustomServiceError(
-			serviceerror.DatabaseError,
+			ErrorInternalServerError,
 			fmt.Sprintf("failed to create auth resource: %v", err),
 		)
 	}
@@ -228,7 +207,7 @@ func (s *authResourceService) GetAuthResource(
 				log.String("auth_id", authID),
 			)
 			return nil, serviceerror.CustomServiceError(
-				serviceerror.ResourceNotFoundError,
+				ErrorAuthResourceNotFound,
 				fmt.Sprintf("auth resource not found: %s", authID),
 			)
 		}
@@ -237,7 +216,7 @@ func (s *authResourceService) GetAuthResource(
 			log.String("auth_id", authID),
 		)
 		return nil, serviceerror.CustomServiceError(
-			serviceerror.DatabaseError,
+			ErrorInternalServerError,
 			fmt.Sprintf("failed to retrieve auth resource: %v", err),
 		)
 	}
@@ -250,7 +229,7 @@ func (s *authResourceService) GetAuthResource(
 			log.String("actual_consent_id", authResource.ConsentID),
 		)
 		return nil, serviceerror.CustomServiceError(
-			serviceerror.ResourceNotFoundError,
+			ErrorAuthResourceNotFound,
 			fmt.Sprintf("auth resource %s does not belong to consent %s", authID, consentID),
 		)
 	}
@@ -287,7 +266,7 @@ func (s *authResourceService) GetAuthResourcesByConsentID(
 			log.String("consent_id", consentID),
 		)
 		return nil, serviceerror.CustomServiceError(
-			serviceerror.DatabaseError,
+			ErrorInternalServerError,
 			fmt.Sprintf("failed to fetch auth resources: %v", err),
 		)
 	}
@@ -322,7 +301,7 @@ func (s *authResourceService) GetAuthResourcesByUserID(
 	if userID == "" {
 		logger.Warn("User ID is required")
 		return nil, serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
+			ErrorInvalidRequestBody,
 			"user ID is required",
 		)
 	}
@@ -331,15 +310,15 @@ func (s *authResourceService) GetAuthResourcesByUserID(
 		return nil, err
 	}
 
-	store := s.stores.AuthResource
-	authResources, err := store.GetByUserID(ctx, userID, orgID)
+	authResourcesStore := s.stores.AuthResource
+	authResources, err := authResourcesStore.GetByUserID(ctx, userID, orgID)
 	if err != nil {
 		logger.Error("Failed to fetch auth resources by user ID",
 			log.Error(err),
 			log.String("user_id", userID),
 		)
 		return nil, serviceerror.CustomServiceError(
-			serviceerror.DatabaseError,
+			ErrorInternalServerError,
 			fmt.Sprintf("failed to fetch auth resources: %v", err),
 		)
 	}
@@ -395,12 +374,12 @@ func (s *authResourceService) UpdateAuthResource(
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return nil, serviceerror.CustomServiceError(
-				serviceerror.ResourceNotFoundError,
+				ErrorAuthResourceNotFound,
 				fmt.Sprintf("auth resource not found: %s", authID),
 			)
 		}
 		return nil, serviceerror.CustomServiceError(
-			serviceerror.DatabaseError,
+			ErrorRetrieveAuthResource,
 			fmt.Sprintf("failed to retrieve auth resource: %v", err),
 		)
 	}
@@ -413,7 +392,7 @@ func (s *authResourceService) UpdateAuthResource(
 			log.String("actual_consent_id", existingAuthResource.ConsentID),
 		)
 		return nil, serviceerror.CustomServiceError(
-			serviceerror.ResourceNotFoundError,
+			ErrorAuthResourceNotFound,
 			fmt.Sprintf("auth resource %s does not belong to consent %s", authID, consentID),
 		)
 	}
@@ -432,7 +411,7 @@ func (s *authResourceService) UpdateAuthResource(
 				log.Error(err),
 			)
 			return nil, serviceerror.CustomServiceError(
-				serviceerror.ValidationError,
+				ErrorValidationFailed,
 				err.Error(),
 			)
 		}
@@ -455,7 +434,7 @@ func (s *authResourceService) UpdateAuthResource(
 		resourcesBytes, err := json.Marshal(request.Resources)
 		if err != nil {
 			return nil, serviceerror.CustomServiceError(
-				serviceerror.ValidationError,
+				ErrorValidationFailed,
 				fmt.Sprintf("failed to marshal resources: %v", err),
 			)
 		}
@@ -542,7 +521,7 @@ func (s *authResourceService) UpdateAuthResource(
 			log.String("auth_id", authID),
 		)
 		return nil, serviceerror.CustomServiceError(
-			serviceerror.DatabaseError,
+			ErrorRetrieveAuthResource,
 			fmt.Sprintf("failed to update auth resource: %v", err),
 		)
 	}
@@ -577,12 +556,12 @@ func (s *authResourceService) DeleteAuthResource(
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return serviceerror.CustomServiceError(
-				serviceerror.ResourceNotFoundError,
+				ErrorAuthResourceNotFound,
 				fmt.Sprintf("auth resource not found: %s", authID),
 			)
 		}
 		return serviceerror.CustomServiceError(
-			serviceerror.DatabaseError,
+			ErrorRetrieveAuthResource,
 			fmt.Sprintf("failed to retrieve auth resource: %v", err),
 		)
 	}
@@ -657,7 +636,7 @@ func (s *authResourceService) DeleteAuthResource(
 			log.String("auth_id", authID),
 		)
 		return serviceerror.CustomServiceError(
-			serviceerror.DatabaseError,
+			ErrorRetrieveAuthResource,
 			fmt.Sprintf("failed to delete auth resource: %v", err),
 		)
 	}
@@ -699,7 +678,7 @@ func (s *authResourceService) DeleteAuthResourcesByConsentID(
 			log.String("consent_id", consentID),
 		)
 		return serviceerror.CustomServiceError(
-			serviceerror.DatabaseError,
+			ErrorRetrieveAuthResource,
 			fmt.Sprintf("failed to delete auth resources: %v", err),
 		)
 	}
@@ -731,7 +710,7 @@ func (s *authResourceService) UpdateAllStatusByConsentID(
 	if status == "" {
 		logger.Warn("Status is required")
 		return serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
+			ErrorInvalidRequestBody,
 			"status is required",
 		)
 	}
@@ -750,7 +729,7 @@ func (s *authResourceService) UpdateAllStatusByConsentID(
 			log.String("consent_id", consentID),
 		)
 		return serviceerror.CustomServiceError(
-			serviceerror.DatabaseError,
+			ErrorRetrieveAuthResource,
 			fmt.Sprintf("failed to update auth resource statuses: %v", err),
 		)
 	}
@@ -770,26 +749,26 @@ func (s *authResourceService) validateCreateRequest(consentID, orgID string, req
 	}
 	if request == nil {
 		return serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
+			ErrorInvalidRequestBody,
 			"request body is required",
 		)
 	}
 	if request.AuthType == "" {
 		return serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
+			ErrorInvalidRequestBody,
 			"auth type is required",
 		)
 	}
 	if request.AuthStatus == "" {
 		return serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
+			ErrorInvalidRequestBody,
 			"auth status is required",
 		)
 	}
 	// Validate that auth status is not a system-reserved status
 	if err := authvalidator.ValidateAuthStatus(request.AuthStatus); err != nil {
 		return serviceerror.CustomServiceError(
-			serviceerror.ValidationError,
+			ErrorValidationFailed,
 			err.Error(),
 		)
 	}
@@ -799,13 +778,13 @@ func (s *authResourceService) validateCreateRequest(consentID, orgID string, req
 func (s *authResourceService) validateAuthIDAndOrgID(authID, orgID string) *serviceerror.ServiceError {
 	if authID == "" {
 		return serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
+			ErrorInvalidRequestBody,
 			"auth ID is required",
 		)
 	}
 	if len(authID) > 255 {
 		return serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
+			ErrorInvalidRequestBody,
 			"auth ID too long: maximum 255 characters",
 		)
 	}
@@ -815,13 +794,13 @@ func (s *authResourceService) validateAuthIDAndOrgID(authID, orgID string) *serv
 func (s *authResourceService) validateConsentIDAndOrgID(consentID, orgID string) *serviceerror.ServiceError {
 	if consentID == "" {
 		return serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
+			ErrorInvalidRequestBody,
 			"consent ID is required",
 		)
 	}
 	if len(consentID) > 255 {
 		return serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
+			ErrorInvalidRequestBody,
 			"consent ID too long: maximum 255 characters",
 		)
 	}
@@ -831,13 +810,13 @@ func (s *authResourceService) validateConsentIDAndOrgID(consentID, orgID string)
 func (s *authResourceService) validateOrgID(orgID string) *serviceerror.ServiceError {
 	if orgID == "" {
 		return serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
+			ErrorInvalidRequestBody,
 			"organization ID is required",
 		)
 	}
 	if len(orgID) > 255 {
 		return serviceerror.CustomServiceError(
-			serviceerror.InvalidRequestError,
+			ErrorInvalidRequestBody,
 			"organization ID too long: maximum 255 characters",
 		)
 	}

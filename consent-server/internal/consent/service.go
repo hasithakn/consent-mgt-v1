@@ -70,7 +70,7 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 
 	if err := validator.ValidateConsentCreateRequest(req, clientID, orgID); err != nil {
 		logger.Warn("Consent create request validation failed", log.Error(err))
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
+		return nil, serviceerror.CustomServiceError(ErrorValidationFailed, err.Error())
 	}
 
 	logger.Debug("Request validation successful")
@@ -79,7 +79,7 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 	createReq, err := req.ToConsentCreateRequest()
 	if err != nil {
 		logger.Error("Failed to convert API request to internal format", log.Error(err))
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
+		return nil, serviceerror.CustomServiceError(ErrorValidationFailed, err.Error())
 	}
 
 	// HANDLE PURPOSES (validate and resolve all purposes)
@@ -89,7 +89,7 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 		resolvedPurposes, err = consentService.validatePurposes(ctx, createReq.Purposes, clientID, orgID)
 		if err != nil {
 			logger.Error("Purpose validation failed", log.Error(err))
-			return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
+			return nil, serviceerror.CustomServiceError(ErrorValidationFailed, err.Error())
 		}
 		logger.Debug("Purposes validated and resolved",
 			log.Int("purpose_count", len(resolvedPurposes)))
@@ -191,7 +191,7 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 				logger.Error("Failed to marshal authorization resources",
 					log.Error(err),
 					log.String("auth_id", authID))
-				return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("failed to marshal resources: %v", err))
+				return nil, serviceerror.CustomServiceError(ErrorValidationFailed, fmt.Sprintf("failed to marshal resources: %v", err))
 			}
 			resourcesStr := string(resourcesBytes)
 			resourcesJSON = &resourcesStr
@@ -250,7 +250,7 @@ func (consentService *consentService) CreateConsent(ctx context.Context, req mod
 		logger.Error("Failed to create consent in transaction",
 			log.Error(err),
 			log.String("consent_id", consentID))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to create consent: %v", err))
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, fmt.Sprintf("failed to create consent: %v", err))
 	}
 
 	logger.Info("Consent created successfully", log.String("consent_id", consentID))
@@ -325,11 +325,11 @@ func (consentService *consentService) GetConsent(ctx context.Context, consentID,
 			log.Error(err),
 			log.String("consent_id", consentID),
 		)
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, err.Error())
 	}
 	if consent == nil {
 		logger.Warn("Consent not found", log.String("consent_id", consentID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("Consent with ID '%s' not found", consentID))
+		return nil, serviceerror.CustomServiceError(ErrorConsentNotFound, fmt.Sprintf("Consent with ID '%s' not found", consentID))
 	}
 
 	// Check if consent is expired and update status accordingly
@@ -363,7 +363,7 @@ func (consentService *consentService) GetConsent(ctx context.Context, consentID,
 	purposes, err := consentService.getResolvedConsentPurposes(ctx, consentID, orgID)
 	if err != nil {
 		logger.Error("Failed to resolve purposes", log.Error(err))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to resolve purposes: %v", err))
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, fmt.Sprintf("failed to resolve purposes: %v", err))
 	}
 
 	// Build complete response with all related data
@@ -401,7 +401,7 @@ func (consentService *consentService) ListConsents(ctx context.Context, orgID st
 			log.Error(err),
 			log.String("org_id", orgID),
 		)
-		return nil, 0, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, 0, serviceerror.CustomServiceError(ErrorInternalServerError, err.Error())
 	}
 
 	// Convert to responses
@@ -455,7 +455,7 @@ func (consentService *consentService) SearchConsents(ctx context.Context, filter
 			log.Error(err),
 			log.String("org_id", filters.OrgID),
 		)
-		return nil, 0, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, 0, serviceerror.CustomServiceError(ErrorInternalServerError, err.Error())
 	}
 
 	// Convert to responses
@@ -506,7 +506,7 @@ func (consentService *consentService) SearchConsentsDetailed(ctx context.Context
 	consents, total, err := consentStore.Search(ctx, filters)
 	if err != nil {
 		logger.Error("Failed to search consents", log.Error(err))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, err.Error())
 	}
 
 	if len(consents) == 0 {
@@ -533,13 +533,13 @@ func (consentService *consentService) SearchConsentsDetailed(ctx context.Context
 	authResources, err := authResourceStore.GetByConsentIDs(ctx, consentIDs, filters.OrgID)
 	if err != nil {
 		logger.Error("Failed to get authorization resources", log.Error(err))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, err.Error())
 	}
 
 	attributesByConsent, err := consentStore.GetAttributesByConsentIDs(ctx, consentIDs, filters.OrgID)
 	if err != nil {
 		logger.Error("Failed to get consent attributes", log.Error(err))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, err.Error())
 	}
 
 	// Step 4: Group auth resources by consent ID
@@ -654,14 +654,14 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 
 	if err := validator.ValidateConsentUpdateRequest(req); err != nil {
 		logger.Warn("Consent update request validation failed", log.Error(err))
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
+		return nil, serviceerror.CustomServiceError(ErrorValidationFailed, err.Error())
 	}
 
 	// Convert to internal format
 	updateReq, convertErr := req.ToConsentUpdateRequest()
 	if convertErr != nil {
 		logger.Warn("Failed to convert update request", log.Error(convertErr))
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, convertErr.Error())
+		return nil, serviceerror.CustomServiceError(ErrorValidationFailed, convertErr.Error())
 	}
 
 	logger.Debug("Request validation successful")
@@ -670,11 +670,11 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 	existing, err := consentStore.GetByID(ctx, consentID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve consent", log.Error(err), log.String("consent_id", consentID))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, err.Error())
 	}
 	if existing == nil {
 		logger.Warn("Consent not found", log.String("consent_id", consentID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("Consent with ID '%s' not found", consentID))
+		return nil, serviceerror.CustomServiceError(ErrorConsentNotFound, fmt.Sprintf("Consent with ID '%s' not found", consentID))
 	}
 
 	// Validate clientID matches - only the owner client can update the consent
@@ -683,7 +683,7 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 			log.String("consent_client_id", existing.ClientID),
 			log.String("request_client_id", clientID),
 			log.String("consent_id", consentID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError,
+		return nil, serviceerror.CustomServiceError(ErrorConsentStatusConflict,
 			fmt.Sprintf("Client '%s' is not authorized to update consent '%s'", clientID, consentID))
 	}
 
@@ -694,7 +694,7 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 		// Validate that it's non-negative
 		if *req.DataAccessValidityDuration < 0 {
 			logger.Warn("Invalid data access validity duration", log.Any("duration", *req.DataAccessValidityDuration))
-			return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, "dataAccessValidityDuration must be non-negative")
+			return nil, serviceerror.CustomServiceError(ErrorConsentNotFound, "dataAccessValidityDuration must be non-negative")
 		}
 		updateReq.DataAccessValidityDuration = req.DataAccessValidityDuration
 	}
@@ -814,7 +814,7 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 				if authReq.Resources != nil {
 					resourcesBytes, err := json.Marshal(authReq.Resources)
 					if err != nil {
-						return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("failed to marshal resources: %v", err))
+						return nil, serviceerror.CustomServiceError(ErrorValidationFailed, fmt.Sprintf("failed to marshal resources: %v", err))
 					}
 					resourcesStr := string(resourcesBytes)
 					resourcesJSON = &resourcesStr
@@ -845,7 +845,7 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 		resolvedPurposes, err = consentService.validatePurposes(ctx, updateReq.Purposes, existing.ClientID, orgID)
 		if err != nil {
 			logger.Error("Purpose validation failed", log.Error(err))
-			return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, err.Error())
+			return nil, serviceerror.CustomServiceError(ErrorValidationFailed, err.Error())
 		}
 		logger.Debug("Purposes validated and resolved",
 			log.Int("purpose_count", len(resolvedPurposes)))
@@ -891,7 +891,7 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 		logger.Error("Failed to update consent in transaction",
 			log.Error(err),
 			log.String("consent_id", consentID))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, err.Error())
 	}
 
 	// Get updated consent
@@ -899,7 +899,7 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 	updated, getErr := consentStore.GetByID(ctx, consentID, orgID)
 	if getErr != nil {
 		logger.Error("Failed to retrieve updated consent", log.Error(getErr))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, getErr.Error())
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, getErr.Error())
 	}
 
 	// Check if consent expiration status needs to be updated
@@ -990,7 +990,7 @@ func (consentService *consentService) UpdateConsent(ctx context.Context, req mod
 	purposes, err := consentService.getResolvedConsentPurposes(ctx, consentID, orgID)
 	if err != nil {
 		logger.Error("Failed to resolve purposes", log.Error(err))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, fmt.Sprintf("failed to resolve purposes: %v", err))
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, fmt.Sprintf("failed to resolve purposes: %v", err))
 	}
 
 	// Build complete response
@@ -1017,7 +1017,7 @@ func (consentService *consentService) RevokeConsent(ctx context.Context, consent
 	// Validate action by
 	if req.ActionBy == "" {
 		logger.Warn("Validation failed: ActionBy is required")
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "ActionBy is required")
+		return nil, serviceerror.CustomServiceError(ErrorValidationFailed, "ActionBy is required")
 	}
 
 	logger.Debug("Request validation successful")
@@ -1029,11 +1029,11 @@ func (consentService *consentService) RevokeConsent(ctx context.Context, consent
 	existing, err := store.GetByID(ctx, consentID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve consent", log.Error(err), log.String("consent_id", consentID))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, err.Error())
 	}
 	if existing == nil {
 		logger.Warn("Consent not found", log.String("consent_id", consentID))
-		return nil, serviceerror.CustomServiceError(serviceerror.ResourceNotFoundError, fmt.Sprintf("Consent with ID '%s' not found", consentID))
+		return nil, serviceerror.CustomServiceError(ErrorConsentNotFound, fmt.Sprintf("Consent with ID '%s' not found", consentID))
 	}
 
 	// Check if consent is already revoked
@@ -1041,7 +1041,7 @@ func (consentService *consentService) RevokeConsent(ctx context.Context, consent
 		logger.Warn("Consent is already revoked",
 			log.String("consent_id", consentID),
 			log.String("status", existing.CurrentStatus))
-		return nil, serviceerror.CustomServiceError(serviceerror.ConflictError, fmt.Sprintf("Consent with ID '%s' is already revoked", consentID))
+		return nil, serviceerror.CustomServiceError(ErrorConsentStatusConflict, fmt.Sprintf("Consent with ID '%s' is already revoked", consentID))
 	}
 
 	currentTime := utils.GetCurrentTimeMillis()
@@ -1082,7 +1082,7 @@ func (consentService *consentService) RevokeConsent(ctx context.Context, consent
 		logger.Error("Failed to revoke consent in transaction",
 			log.Error(err),
 			log.String("consent_id", consentID))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, err.Error())
 	}
 
 	logger.Info("Consent revoked successfully",
@@ -1115,7 +1115,7 @@ func (consentService *consentService) ValidateConsent(ctx context.Context, req m
 	// Validate request
 	if req.ConsentID == "" {
 		logger.Warn("Validation failed: ConsentID is required")
-		return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, "ConsentID is required")
+		return nil, serviceerror.CustomServiceError(ErrorValidationFailed, "ConsentID is required")
 	}
 
 	logger.Debug("Request validation successful")
@@ -1125,14 +1125,14 @@ func (consentService *consentService) ValidateConsent(ctx context.Context, req m
 	consent, err := consentStore.GetByID(ctx, req.ConsentID, orgID)
 	if err != nil {
 		logger.Error("Failed to retrieve consent", log.Error(err), log.String("consent_id", req.ConsentID))
-		// return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		// return nil, serviceerror.CustomServiceError(ErrorDatabaseOperation, err.Error())
 		response.ErrorCode = 500
 		response.ErrorMessage = "database_error"
 		response.ErrorDescription = "Database error while retrieving consent"
 	}
 	if consent == nil {
 		logger.Warn("Consent not found", log.String("consent_id", req.ConsentID))
-		// return nil, serviceerror.CustomServiceError(serviceerror.ValidationError, fmt.Sprintf("Consent with ID '%s' not found", req.ConsentID))
+		// return nil, serviceerror.CustomServiceError(ErrorValidationFailed, fmt.Sprintf("Consent with ID '%s' not found", req.ConsentID))
 		response.ErrorCode = 404
 		response.ErrorMessage = "not_found"
 		response.ErrorDescription = "Consent not found"
@@ -1489,7 +1489,7 @@ func (consentService *consentService) SearchConsentsByAttribute(ctx context.Cont
 			log.Error(err),
 			log.String("key", key),
 			log.String("value", value))
-		return nil, serviceerror.CustomServiceError(serviceerror.DatabaseError, err.Error())
+		return nil, serviceerror.CustomServiceError(ErrorInternalServerError, err.Error())
 	}
 
 	logger.Info("Consents searched by attribute successfully",

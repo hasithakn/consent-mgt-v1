@@ -55,7 +55,12 @@ func (r *StoreRegistry) getDBClient() (provider.DBClientInterface, error) {
 	return provider.GetDBProvider().GetConsentDBClient()
 }
 
-// ExecuteTransaction executes multiple store operations in a single transaction
+// ExecuteTransaction executes multiple store operations in a single transaction.
+// It provides automatic transaction management including rollback on error and panic recovery.
+//
+// Note: This method uses manual transaction management. Consider using context-based
+// transactions with Transactioner for new code, which provides better integration
+// with context propagation and automatic commit/rollback handling.
 func (r *StoreRegistry) ExecuteTransaction(queries []func(tx dbmodel.TxInterface) error) error {
 	logger := log.GetLogger()
 	logger.Debug("Starting transaction", log.Int("query_count", len(queries)))
@@ -72,13 +77,24 @@ func (r *StoreRegistry) ExecuteTransaction(queries []func(tx dbmodel.TxInterface
 		return err
 	}
 
+	// Ensure transaction is always closed
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			logger.Error("Transaction panicked and was rolled back", log.Any("panic", p))
+			panic(p) // Re-throw panic after rollback
+		}
+	}()
+
 	for i, query := range queries {
 		if err := query(tx); err != nil {
 			logger.Warn("Transaction query failed, rolling back",
 				log.Error(err),
 				log.Int("failed_query_index", i),
 			)
-			tx.Rollback()
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logger.Error("Failed to rollback transaction", log.Error(rbErr))
+			}
 			return err
 		}
 	}

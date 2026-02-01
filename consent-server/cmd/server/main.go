@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2025, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+// Package main is the entry point for starting the consent server.
 package main
 
 import (
@@ -10,16 +29,9 @@ import (
 	"time"
 
 	"github.com/wso2/consent-management-api/internal/system/config"
-	"github.com/wso2/consent-management-api/internal/system/database"
 	"github.com/wso2/consent-management-api/internal/system/database/provider"
 	"github.com/wso2/consent-management-api/internal/system/log"
 	"github.com/wso2/consent-management-api/internal/system/middleware"
-)
-
-// Version information (set by build script)
-var (
-	version   = "dev"
-	buildDate = "unknown"
 )
 
 func main() {
@@ -28,12 +40,8 @@ func main() {
 	// Load configuration and setup logging
 	cfg := initializeConfiguration(logger)
 
-	// Setup database
-	db, dbClient := initializeDatabase(cfg, logger)
-	defer closeDatabase(db, logger)
-
 	// Setup HTTP server
-	server := setupHTTPServer(cfg, dbClient, logger)
+	server := setupHTTPServer(cfg, logger)
 
 	// Start server
 	startServer(server, cfg, logger)
@@ -44,9 +52,6 @@ func main() {
 
 // initializeConfiguration loads config and sets up log level
 func initializeConfiguration(logger *log.Logger) *config.Config {
-	logger.Info("Starting Consent Management API Server...",
-		log.String("version", version),
-		log.String("build_date", buildDate))
 
 	// Priority: CONFIG_PATH env var > repository/conf/deployment.yaml > cmd/server/repository/conf/deployment.yaml
 	configPath := os.Getenv("CONFIG_PATH")
@@ -69,44 +74,13 @@ func initializeConfiguration(logger *log.Logger) *config.Config {
 	return cfg
 }
 
-// initializeDatabase sets up database connection and returns db and client
-func initializeDatabase(cfg *config.Config, logger *log.Logger) (*database.DB, provider.DBClientInterface) {
-	// Initialize database
-	db, err := database.Initialize(&cfg.Database.Consent)
-	if err != nil {
-		logger.Fatal("Failed to initialize database", log.Error(err))
-	}
-
-	// Verify database connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := db.HealthCheck(ctx); err != nil {
-		logger.Fatal("Database health check failed", log.Error(err))
-	}
-
-	logger.Info("Database connection established successfully")
-
-	// Initialize DBProvider singleton
-	provider.InitDBProvider(db)
-	dbProvider := provider.GetDBProvider()
-
-	// Get database client from provider
-	dbClient, err := dbProvider.GetConsentDBClient()
-	if err != nil {
-		logger.Fatal("Failed to get database client", log.Error(err))
-	}
-
-	return db, dbClient
-}
-
 // setupHTTPServer creates and configures the HTTP server
-func setupHTTPServer(cfg *config.Config, dbClient provider.DBClientInterface, logger *log.Logger) *http.Server {
+func setupHTTPServer(cfg *config.Config, logger *log.Logger) *http.Server {
 	// Create HTTP mux
 	mux := http.NewServeMux()
 
 	// Register all services
-	registerServices(mux, dbClient)
+	registerServices(mux)
 
 	// Wrap with correlation ID middleware
 	httpHandler := middleware.WrapWithCorrelationID(mux)
@@ -162,10 +136,13 @@ func waitForShutdown(server *http.Server, logger *log.Logger) {
 	// Unregister services
 	unregisterServices()
 	logger.Info("Services unregistered")
+
+	closeDatabase(logger)
+	logger.Info("Server exited gracefully")
 }
 
 // closeDatabase closes database connections
-func closeDatabase(db *database.DB, logger *log.Logger) {
+func closeDatabase(logger *log.Logger) {
 	// Close database connections
 	dbCloser := provider.GetDBProviderCloser()
 	if err := dbCloser.Close(); err != nil {
@@ -173,11 +150,4 @@ func closeDatabase(db *database.DB, logger *log.Logger) {
 	} else {
 		logger.Debug("Database connections closed successfully")
 	}
-
-	// Close the database connection itself
-	if err := db.Close(); err != nil {
-		logger.Error("Error closing database", log.Error(err))
-	}
-
-	logger.Info("Server exited gracefully")
 }

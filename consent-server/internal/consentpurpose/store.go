@@ -89,14 +89,16 @@ var (
 
 // store implements the ConsentPurposeStore interface
 type store struct {
-	dbClient provider.DBClientInterface
 }
 
 // NewPurposeStore creates a new purpose store
-func NewPurposeStore(dbClient provider.DBClientInterface) interfaces.ConsentPurposeStore {
-	return &store{
-		dbClient: dbClient,
-	}
+func NewPurposeStore() interfaces.ConsentPurposeStore {
+	return &store{}
+}
+
+// getDBClient retrieves the database client from the provider
+func (s *store) getDBClient() (provider.DBClientInterface, error) {
+	return provider.GetDBProvider().GetConsentDBClient()
 }
 
 // CreatePurpose creates a new purpose
@@ -115,8 +117,13 @@ func (s *store) CreatePurpose(tx dbmodel.TxInterface, purpose *model.ConsentPurp
 
 // GetPurposeByID retrieves a purpose by ID with its purposes
 func (s *store) GetPurposeByID(ctx context.Context, purposeID, orgID string) (*model.ConsentPurpose, error) {
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
 	var purpose model.ConsentPurpose
-	rows, err := s.dbClient.Query(QueryGetPurposeByID, purposeID, orgID)
+	rows, err := dbClient.Query(QueryGetPurposeByID, purposeID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +171,13 @@ func (s *store) GetPurposeByID(ctx context.Context, purposeID, orgID string) (*m
 
 // GetPurposeByName retrieves a purpose by name
 func (s *store) GetPurposeByName(ctx context.Context, name, orgID string) (*model.ConsentPurpose, error) {
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
 	var purpose model.ConsentPurpose
-	rows, err := s.dbClient.Query(QueryGetPurposeByName, name, orgID)
+	rows, err := dbClient.Query(QueryGetPurposeByName, name, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -213,6 +225,11 @@ func (s *store) GetPurposeByName(ctx context.Context, name, orgID string) (*mode
 
 // ListPurposes retrieves a list of purposes with filtering
 func (s *store) ListPurposes(ctx context.Context, orgID, name string, clientIDs []string, purposeNames []string, offset, limit int) ([]model.ConsentPurpose, int, error) {
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get database client: %w", err)
+	}
+
 	// Build dynamic query based on filters
 	query := `SELECT ID, NAME, DESCRIPTION, CLIENT_ID, CREATED_TIME, UPDATED_TIME, ORG_ID 
 			  FROM CONSENT_PURPOSE 
@@ -266,7 +283,7 @@ func (s *store) ListPurposes(ctx context.Context, orgID, name string, clientIDs 
 		ID:    "COUNT_FILTERED_PURPOSES",
 		Query: countQuery,
 	}
-	rows, err := s.dbClient.Query(countQueryDB, countArgs...)
+	rows, err := dbClient.Query(countQueryDB, countArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -287,7 +304,7 @@ func (s *store) ListPurposes(ctx context.Context, orgID, name string, clientIDs 
 		ID:    "LIST_FILTERED_PURPOSES",
 		Query: query,
 	}
-	rows, err = s.dbClient.Query(listQueryDB, args...)
+	rows, err = dbClient.Query(listQueryDB, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -353,14 +370,18 @@ func (s *store) DeletePurpose(tx dbmodel.TxInterface, purposeID, orgID string) e
 
 // CheckPurposeNameExists checks if a purpose name exists for a client
 func (s *store) CheckPurposeNameExists(ctx context.Context, name, clientID, orgID string, excludePurposeID *string) (bool, error) {
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return false, fmt.Errorf("failed to get database client: %w", err)
+	}
+
 	var count int
 	var rows []map[string]interface{}
-	var err error
 
 	if excludePurposeID != nil {
-		rows, err = s.dbClient.Query(QueryCheckPurposeNameExistsExcluding, name, clientID, orgID, *excludePurposeID)
+		rows, err = dbClient.Query(QueryCheckPurposeNameExistsExcluding, name, clientID, orgID, *excludePurposeID)
 	} else {
-		rows, err = s.dbClient.Query(QueryCheckPurposeNameExists, name, clientID, orgID)
+		rows, err = dbClient.Query(QueryCheckPurposeNameExists, name, clientID, orgID)
 	}
 
 	if err != nil {
@@ -389,7 +410,12 @@ func (s *store) LinkElementToPurpose(tx dbmodel.TxInterface, purposeID, elementI
 
 // GetPurposeElements retrieves all elements for a purpose
 func (s *store) GetPurposeElements(ctx context.Context, purposeID, orgID string) ([]model.PurposeElement, error) {
-	rows, err := s.dbClient.Query(QueryGetPurposeElements, purposeID, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryGetPurposeElements, purposeID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -419,8 +445,13 @@ func (s *store) DeletePurposeElements(tx dbmodel.TxInterface, purposeID, orgID s
 
 // GetPurposeIDByName retrieves a purpose ID by name
 func (s *store) GetPurposeIDByName(ctx context.Context, purposeName, orgID string) (string, error) {
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return "", fmt.Errorf("failed to get database client: %w", err)
+	}
+
 	var purposeID string
-	rows, err := s.dbClient.Query(QueryGetElementIDByName, purposeName, orgID)
+	rows, err := dbClient.Query(QueryGetElementIDByName, purposeName, orgID)
 	if err != nil {
 		return "", err
 	}
@@ -455,7 +486,13 @@ func (s *store) ValidatePurposeNames(ctx context.Context, purposeNames []string,
 		ID:    "VALIDATE_PURPOSE_NAMES",
 		Query: query,
 	}
-	rows, err := s.dbClient.Query(validateQueryDB, args...)
+
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(validateQueryDB, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -477,8 +514,12 @@ func (s *store) ValidatePurposeNames(ctx context.Context, purposeNames []string,
 
 // IsElementUsedInPurposes checks if a purpose is used in any purpose
 func (s *store) IsElementUsedInPurposes(ctx context.Context, purposeID, orgID string) (bool, error) {
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return false, fmt.Errorf("failed to get database client: %w", err)
+	}
 
-	rows, err := s.dbClient.Query(queryCheckElementInPurposes, purposeID, orgID)
+	rows, err := dbClient.Query(queryCheckElementInPurposes, purposeID, orgID)
 	if err != nil {
 		return false, err
 	}

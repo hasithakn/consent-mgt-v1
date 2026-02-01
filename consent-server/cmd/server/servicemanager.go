@@ -7,7 +7,6 @@ import (
 	"github.com/wso2/consent-management-api/internal/consent"
 	"github.com/wso2/consent-management-api/internal/consentelement"
 	"github.com/wso2/consent-management-api/internal/consentpurpose"
-	"github.com/wso2/consent-management-api/internal/system/database/provider"
 	"github.com/wso2/consent-management-api/internal/system/healthcheck/handler"
 	"github.com/wso2/consent-management-api/internal/system/log"
 	"github.com/wso2/consent-management-api/internal/system/stores"
@@ -16,17 +15,15 @@ import (
 // registerServices registers all consent management services with the provided HTTP multiplexer.
 func registerServices(
 	mux *http.ServeMux,
-	dbClient provider.DBClientInterface,
 ) {
 	logger := log.GetLogger()
 
 	// Create Store Registry with all stores
 	storeRegistry := stores.NewStoreRegistry(
-		dbClient,
-		consent.NewConsentStore(dbClient),
-		authresource.NewAuthResourceStore(dbClient),
-		consentelement.NewConsentElementStore(dbClient),
-		consentpurpose.NewPurposeStore(dbClient),
+		consent.NewConsentStore(),
+		authresource.NewAuthResourceStore(),
+		consentelement.NewConsentElementStore(),
+		consentpurpose.NewPurposeStore(),
 	)
 	logger.Info("Store Registry initialized with all stores")
 

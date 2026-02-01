@@ -127,14 +127,16 @@ var (
 
 // store implements the interfaces.ConsentElementStore interface
 type store struct {
-	dbClient provider.DBClientInterface
 }
 
 // NewConsentElementStore creates a new consent element store
-func NewConsentElementStore(dbClient provider.DBClientInterface) interfaces.ConsentElementStore {
-	return &store{
-		dbClient: dbClient,
-	}
+func NewConsentElementStore() interfaces.ConsentElementStore {
+	return &store{}
+}
+
+// getDBClient retrieves the database client from the provider
+func (s *store) getDBClient() (provider.DBClientInterface, error) {
+	return provider.GetDBProvider().GetConsentDBClient()
 }
 
 // Create creates a new consent element within a transaction
@@ -146,7 +148,12 @@ func (elementStore *store) Create(tx dbmodel.TxInterface, element *model.Consent
 
 // GetByID retrieves a consent element by ID
 func (elementStore *store) GetByID(ctx context.Context, elementID, orgID string) (*model.ConsentElement, error) {
-	rows, err := elementStore.dbClient.Query(QueryGetElementByID, elementID, orgID)
+	dbClient, err := elementStore.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryGetElementByID, elementID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +165,12 @@ func (elementStore *store) GetByID(ctx context.Context, elementID, orgID string)
 
 // GetByName retrieves a consent element by name
 func (elementStore *store) GetByName(ctx context.Context, name, orgID string) (*model.ConsentElement, error) {
-	rows, err := elementStore.dbClient.Query(QueryGetElementByName, name, orgID)
+	dbClient, err := elementStore.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryGetElementByName, name, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -170,9 +182,13 @@ func (elementStore *store) GetByName(ctx context.Context, name, orgID string) (*
 
 // List retrieves a paginated list of consent elements
 func (elementStore *store) List(ctx context.Context, orgID string, limit, offset int, name string) ([]model.ConsentElement, int, error) {
+	dbClient, err := elementStore.getDBClient()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get database client: %w", err)
+	}
+
 	var countRows []map[string]interface{}
 	var rows []map[string]interface{}
-	var err error
 
 	// Use different queries based on whether name filter is provided
 	if name != "" {
@@ -180,25 +196,25 @@ func (elementStore *store) List(ctx context.Context, orgID string, limit, offset
 		namePattern := "%" + name + "%"
 
 		// Get total count with name filter
-		countRows, err = elementStore.dbClient.Query(QueryCountElementsWithName, orgID, namePattern)
+		countRows, err = dbClient.Query(QueryCountElementsWithName, orgID, namePattern)
 		if err != nil {
 			return nil, 0, err
 		}
 
 		// Get paginated results with name filter
-		rows, err = elementStore.dbClient.Query(QueryListElementsWithName, orgID, namePattern, limit, offset)
+		rows, err = dbClient.Query(QueryListElementsWithName, orgID, namePattern, limit, offset)
 		if err != nil {
 			return nil, 0, err
 		}
 	} else {
 		// Get total count without name filter
-		countRows, err = elementStore.dbClient.Query(QueryCountElements, orgID)
+		countRows, err = dbClient.Query(QueryCountElements, orgID)
 		if err != nil {
 			return nil, 0, err
 		}
 
 		// Get paginated results without name filter
-		rows, err = elementStore.dbClient.Query(QueryListElements, orgID, limit, offset)
+		rows, err = dbClient.Query(QueryListElements, orgID, limit, offset)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -237,7 +253,12 @@ func (elementStore *store) Delete(tx dbmodel.TxInterface, elementID, orgID strin
 
 // CheckNameExists checks if a element name already exists
 func (elementStore *store) CheckNameExists(ctx context.Context, name, orgID string) (bool, error) {
-	rows, err := elementStore.dbClient.Query(QueryCheckElementNameExists, name, orgID)
+	dbClient, err := elementStore.getDBClient()
+	if err != nil {
+		return false, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryCheckElementNameExists, name, orgID)
 	if err != nil {
 		return false, err
 	}
@@ -264,7 +285,12 @@ func (elementStore *store) CreateProperties(tx dbmodel.TxInterface, properties [
 
 // GetPropertiesByElementID retrieves all properties for an element
 func (elementStore *store) GetPropertiesByElementID(ctx context.Context, elementID, orgID string) ([]model.ConsentElementProperty, error) {
-	rows, err := elementStore.dbClient.Query(QueryGetPropertiesByElementID, elementID, orgID)
+	dbClient, err := elementStore.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryGetPropertiesByElementID, elementID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -403,7 +429,12 @@ func (elementStore *store) LinkElementToConsent(tx dbmodel.TxInterface, consentI
 
 // GetMappingsByConsentID retrieves all element mappings for a consent with their values
 func (elementStore *store) GetMappingsByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentElementMapping, error) {
-	rows, err := elementStore.dbClient.Query(QueryGetMappingsByConsentID, consentID, orgID)
+	dbClient, err := elementStore.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryGetMappingsByConsentID, consentID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +477,12 @@ func (elementStore *store) GetMappingsByConsentIDs(ctx context.Context, consentI
 				WHERE cpm.CONSENT_ID IN (%s) AND cpm.ORG_ID = ?`, placeholders),
 	}
 
-	rows, err := elementStore.dbClient.Query(query, args...)
+	dbClient, err := elementStore.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +526,12 @@ func (elementStore *store) GetIDsByNames(ctx context.Context, names []string, or
 		Query: query,
 	}
 
-	rows, err := elementStore.dbClient.Query(formattedQuery, args...)
+	dbClient, err := elementStore.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(formattedQuery, args...)
 	if err != nil {
 		return nil, err
 	}

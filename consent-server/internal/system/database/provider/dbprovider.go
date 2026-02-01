@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/wso2/consent-management-api/internal/system/config"
 	"github.com/wso2/consent-management-api/internal/system/database"
 	"github.com/wso2/consent-management-api/internal/system/log"
 )
@@ -50,30 +51,24 @@ var (
 	once     sync.Once
 )
 
-// InitDBProvider initializes the singleton instance of DBProvider with the database connection.
-func InitDBProvider(db *database.DB) {
+// initDBProvider initializes the singleton instance of DBProvider.
+func initDBProvider() {
 	once.Do(func() {
-		instance = &dbProvider{
-			db: db,
-		}
+		instance = &dbProvider{}
 		instance.initializeClient()
 	})
 }
 
 // GetDBProvider returns the instance of DBProvider.
 func GetDBProvider() DBProviderInterface {
-	if instance == nil {
-		panic("DBProvider not initialized. Call InitDBProvider first.")
-	}
+	initDBProvider()
 	return instance
 }
 
 // GetDBProviderCloser returns the DBProvider with closing capability.
 // This should only be called from the main lifecycle manager.
 func GetDBProviderCloser() DBProviderCloser {
-	if instance == nil {
-		panic("DBProvider not initialized. Call InitDBProvider first.")
-	}
+	initDBProvider()
 	return instance
 }
 
@@ -82,8 +77,9 @@ func GetDBProviderCloser() DBProviderCloser {
 func (d *dbProvider) GetConsentDBClient() (DBClientInterface, error) {
 	d.consentMutex.RLock()
 	if d.consentClient != nil {
-		defer d.consentMutex.RUnlock()
-		return d.consentClient, nil
+		client := d.consentClient
+		d.consentMutex.RUnlock()
+		return client, nil
 	}
 	d.consentMutex.RUnlock()
 
@@ -96,23 +92,49 @@ func (d *dbProvider) GetConsentDBClient() (DBClientInterface, error) {
 		return d.consentClient, nil
 	}
 
+	// Initialize now
+	if err := d.initializeClientLocked(); err != nil {
+		return nil, err
+	}
+
 	return d.consentClient, nil
 }
 
-// initializeClient initializes the database client.
+// initializeClient initializes the database client at startup (called from once.Do).
 func (d *dbProvider) initializeClient() {
+	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "DBProvider"))
+
 	d.consentMutex.Lock()
 	defer d.consentMutex.Unlock()
 
+	if err := d.initializeClientLocked(); err != nil {
+		logger.Error("Failed to initialize consent database client", log.Error(err))
+	}
+}
+
+// initializeClientLocked initializes the database client (must be called with lock held).
+func (d *dbProvider) initializeClientLocked() error {
 	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "DBProvider"))
 
-	if d.db == nil {
-		logger.Fatal("Database connection is nil")
-		return
+	// Get database configuration
+	cfg, err := config.Load("")
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	dbConfig := &cfg.Database.Consent
+
+	// Initialize database connection
+	db, err := database.Initialize(dbConfig)
+	if err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	d.db = db
 	d.consentClient = NewDBClient(d.db.DB, "mysql")
 	logger.Debug("Consent DB client initialized")
+
+	return nil
 }
 
 // Close closes the database connections. This should only be called by the lifecycle manager during shutdown.
@@ -120,33 +142,19 @@ func (d *dbProvider) Close() error {
 	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "DBProvider"))
 	logger.Debug("Closing database connections")
 
-	return d.closeClient(&d.consentClient, &d.consentMutex, "consent")
-}
+	d.consentMutex.Lock()
+	defer d.consentMutex.Unlock()
 
-// closeClient is a helper to close a DB client with locking.
-func (d *dbProvider) closeClient(clientPtr *DBClientInterface, mutex *sync.RWMutex, clientName string) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "DBProvider"))
-
-	if *clientPtr != nil {
-		// For now, we just set the client to nil since the underlying DB connection
-		// is managed by the database.DB instance which has its own Close() method.
-		// In the future, if DBClient needs specific cleanup, implement a close() method.
-		*clientPtr = nil
-		logger.Debug("DB client closed", log.String("client", clientName))
-	}
-	return nil
-}
-
-// close is a helper method to close the underlying database connection.
-// This delegates to the database.DB Close() method.
-func (d *dbProvider) closeDB() error {
 	if d.db != nil {
 		if err := d.db.Close(); err != nil {
+			logger.Error("Failed to close database connection", log.Error(err))
 			return fmt.Errorf("failed to close database: %w", err)
 		}
+		d.db = nil
 	}
+
+	d.consentClient = nil
+	logger.Debug("Database connections closed")
+
 	return nil
 }

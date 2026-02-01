@@ -70,14 +70,16 @@ var (
 
 // store implements interfaces.AuthResourceStore
 type store struct {
-	dbClient provider.DBClientInterface
 }
 
 // NewAuthResourceStore creates a new auth resource store
-func NewAuthResourceStore(dbClient provider.DBClientInterface) interfaces.AuthResourceStore {
-	return &store{
-		dbClient: dbClient,
-	}
+func NewAuthResourceStore() interfaces.AuthResourceStore {
+	return &store{}
+}
+
+// getDBClient retrieves the database client from the provider
+func (s *store) getDBClient() (provider.DBClientInterface, error) {
+	return provider.GetDBProvider().GetConsentDBClient()
 }
 
 // Create creates a new auth resource within a transaction
@@ -97,7 +99,12 @@ func (s *store) Create(tx dbmodel.TxInterface, authResource *model.AuthResource)
 
 // GetByID retrieves an auth resource by ID
 func (s *store) GetByID(ctx context.Context, authID, orgID string) (*model.AuthResource, error) {
-	results, err := s.dbClient.Query(QueryGetAuthResourceByID, authID, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	results, err := dbClient.Query(QueryGetAuthResourceByID, authID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +116,12 @@ func (s *store) GetByID(ctx context.Context, authID, orgID string) (*model.AuthR
 
 // GetByConsentID retrieves all auth resources for a consent
 func (s *store) GetByConsentID(ctx context.Context, consentID, orgID string) ([]model.AuthResource, error) {
-	results, err := s.dbClient.Query(QueryGetAuthResourcesByConsentID, consentID, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	results, err := dbClient.Query(QueryGetAuthResourcesByConsentID, consentID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +166,12 @@ func (s *store) DeleteByConsentID(tx dbmodel.TxInterface, consentID, orgID strin
 
 // Exists checks if an auth resource exists
 func (s *store) Exists(ctx context.Context, authID, orgID string) (bool, error) {
-	results, err := s.dbClient.Query(QueryCheckAuthResourceExists, authID, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return false, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	results, err := dbClient.Query(QueryCheckAuthResourceExists, authID, orgID)
 	if err != nil {
 		return false, err
 	}
@@ -170,7 +187,12 @@ func (s *store) Exists(ctx context.Context, authID, orgID string) (bool, error) 
 
 // GetByUserID retrieves all auth resources for a user
 func (s *store) GetByUserID(ctx context.Context, userID, orgID string) ([]model.AuthResource, error) {
-	results, err := s.dbClient.Query(QueryGetAuthResourcesByUserID, userID, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	results, err := dbClient.Query(QueryGetAuthResourcesByUserID, userID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +234,12 @@ func (s *store) GetByConsentIDs(ctx context.Context, consentIDs []string, orgID 
 		Query: fmt.Sprintf("SELECT AUTH_ID, CONSENT_ID, AUTH_TYPE, USER_ID, AUTH_STATUS, UPDATED_TIME, RESOURCES, ORG_ID FROM CONSENT_AUTH_RESOURCE WHERE CONSENT_ID IN (%s) AND ORG_ID = ?", placeholders),
 	}
 
-	results, err := s.dbClient.Query(query, args...)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	results, err := dbClient.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -166,14 +166,16 @@ var (
 
 // store implements the interfaces.ConsentStore interface
 type store struct {
-	dbClient provider.DBClientInterface
 }
 
 // NewConsentStore creates a new consent store
-func NewConsentStore(dbClient provider.DBClientInterface) interfaces.ConsentStore {
-	return &store{
-		dbClient: dbClient,
-	}
+func NewConsentStore() interfaces.ConsentStore {
+	return &store{}
+}
+
+// getDBClient retrieves the database client from the provider
+func (s *store) getDBClient() (provider.DBClientInterface, error) {
+	return provider.GetDBProvider().GetConsentDBClient()
 }
 
 // Create creates a new consent within a transaction
@@ -188,7 +190,12 @@ func (s *store) Create(tx dbmodel.TxInterface, consent *model.Consent) error {
 
 // GetByID retrieves a consent by ID
 func (s *store) GetByID(ctx context.Context, consentID, orgID string) (*model.Consent, error) {
-	rows, err := s.dbClient.Query(QueryGetConsentByID, consentID, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryGetConsentByID, consentID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +207,12 @@ func (s *store) GetByID(ctx context.Context, consentID, orgID string) (*model.Co
 
 // List retrieves paginated consents
 func (s *store) List(ctx context.Context, orgID string, limit, offset int) ([]model.Consent, int, error) {
-	countRows, err := s.dbClient.Query(QueryCountConsents, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	countRows, err := dbClient.Query(QueryCountConsents, orgID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -212,7 +224,7 @@ func (s *store) List(ctx context.Context, orgID string, limit, offset int) ([]mo
 		}
 	}
 
-	rows, err := s.dbClient.Query(QueryListConsents, orgID, limit, offset)
+	rows, err := dbClient.Query(QueryListConsents, orgID, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -230,6 +242,11 @@ func (s *store) List(ctx context.Context, orgID string, limit, offset int) ([]mo
 
 // Search retrieves consents based on filters with pagination
 func (s *store) Search(ctx context.Context, filters model.ConsentSearchFilters) ([]model.Consent, int, error) {
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get database client: %w", err)
+	}
+
 	// Build WHERE clause dynamically
 	whereConditions := []string{"CONSENT.ORG_ID = ?"}
 	args := []interface{}{filters.OrgID}
@@ -302,7 +319,7 @@ func (s *store) Search(ctx context.Context, filters model.ConsentSearchFilters) 
 		joinClause, whereClause)
 
 	// Execute count query
-	countRows, err := s.dbClient.Query(dbmodel.DBQuery{ID: "COUNT_SEARCH_RESULTS", Query: countQuery}, countArgs...)
+	countRows, err := dbClient.Query(dbmodel.DBQuery{ID: "COUNT_SEARCH_RESULTS", Query: countQuery}, countArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -325,7 +342,7 @@ func (s *store) Search(ctx context.Context, filters model.ConsentSearchFilters) 
 	args = append(args, filters.Limit, filters.Offset)
 
 	// Execute search query
-	rows, err := s.dbClient.Query(dbmodel.DBQuery{ID: "SEARCH_CONSENTS", Query: selectQuery}, args...)
+	rows, err := dbClient.Query(dbmodel.DBQuery{ID: "SEARCH_CONSENTS", Query: selectQuery}, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -377,7 +394,12 @@ func (s *store) Delete(tx dbmodel.TxInterface, consentID, orgID string) error {
 
 // GetByClientID retrieves consents by client ID
 func (s *store) GetByClientID(ctx context.Context, clientID, orgID string) ([]model.Consent, error) {
-	rows, err := s.dbClient.Query(QueryGetConsentsByClientID, clientID, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryGetConsentsByClientID, clientID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +429,12 @@ func (s *store) CreateAttributes(tx dbmodel.TxInterface, attributes []model.Cons
 
 // GetAttributesByConsentID retrieves attributes for a consent
 func (s *store) GetAttributesByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentAttribute, error) {
-	rows, err := s.dbClient.Query(QueryGetAttributesByConsentID, consentID, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryGetAttributesByConsentID, consentID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -429,6 +456,11 @@ func (s *store) GetAttributesByConsentIDs(ctx context.Context, consentIDs []stri
 		return make(map[string]map[string]string), nil
 	}
 
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
 	// Build placeholders for IN clause
 	placeholders := ""
 	args := make([]interface{}, 0, len(consentIDs)+1)
@@ -447,7 +479,7 @@ func (s *store) GetAttributesByConsentIDs(ctx context.Context, consentIDs []stri
 		Query: fmt.Sprintf("SELECT CONSENT_ID, ATT_KEY, ATT_VALUE, ORG_ID FROM CONSENT_ATTRIBUTE WHERE CONSENT_ID IN (%s) AND ORG_ID = ?", placeholders),
 	}
 
-	rows, err := s.dbClient.Query(query, args...)
+	rows, err := dbClient.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -475,7 +507,12 @@ func (s *store) DeleteAttributesByConsentID(tx dbmodel.TxInterface, consentID, o
 
 // FindConsentIDsByAttributeKey finds all consent IDs that have a specific attribute key
 func (s *store) FindConsentIDsByAttributeKey(ctx context.Context, key, orgID string) ([]string, error) {
-	rows, err := s.dbClient.Query(QueryFindConsentIDsByAttributeKey, key, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryFindConsentIDsByAttributeKey, key, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -499,7 +536,12 @@ func (s *store) FindConsentIDsByAttributeKey(ctx context.Context, key, orgID str
 
 // FindConsentIDsByAttribute finds all consent IDs that have a specific attribute key-value pair
 func (s *store) FindConsentIDsByAttribute(ctx context.Context, key, value, orgID string) ([]string, error) {
-	rows, err := s.dbClient.Query(QueryFindConsentIDsByAttribute, key, value, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryFindConsentIDsByAttribute, key, value, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -531,7 +573,12 @@ func (s *store) CreateStatusAudit(tx dbmodel.TxInterface, audit *model.ConsentSt
 
 // GetStatusAuditByConsentID retrieves status audit history for a consent
 func (s *store) GetStatusAuditByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentStatusAudit, error) {
-	rows, err := s.dbClient.Query(QueryGetStatusAuditByConsentID, consentID, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryGetStatusAuditByConsentID, consentID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -727,7 +774,12 @@ func (s *store) CreateConsentPurposeConsent(tx dbmodel.TxInterface, consentID, p
 
 // CheckPurposeUsedInConsents checks if a purpose is used in any consents
 func (s *store) CheckPurposeUsedInConsents(ctx context.Context, purposeID, orgID string) (bool, error) {
-	rows, err := s.dbClient.Query(QueryCheckPurposeUsedInConsents, purposeID, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return false, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryCheckPurposeUsedInConsents, purposeID, orgID)
 	if err != nil {
 		return false, err
 	}
@@ -750,7 +802,12 @@ func (s *store) CheckPurposeUsedInConsents(ctx context.Context, purposeID, orgID
 
 // GetConsentPurposesByConsentID retrieves all purpose mappings for a consent
 func (s *store) GetConsentPurposesByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentPurposeMapping, error) {
-	rows, err := s.dbClient.Query(QueryGetConsentPurposesByConsentID, consentID, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryGetConsentPurposesByConsentID, consentID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -783,7 +840,12 @@ func (s *store) CreatePurposeApproval(tx dbmodel.TxInterface, approval *model.Co
 
 // GetPurposeApprovalsByConsentID retrieves all purpose approvals for a consent, grouped by purpose
 func (s *store) GetPurposeApprovalsByConsentID(ctx context.Context, consentID, orgID string) ([]model.ConsentPurposeApprovalRecord, error) {
-	rows, err := s.dbClient.Query(QueryGetElementApprovalsByConsentID, consentID, orgID)
+	dbClient, err := s.getDBClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database client: %w", err)
+	}
+
+	rows, err := dbClient.Query(QueryGetElementApprovalsByConsentID, consentID, orgID)
 	if err != nil {
 		return nil, err
 	}

@@ -9,8 +9,6 @@ import (
 
 // StoreRegistry holds references to all stores in the application
 type StoreRegistry struct {
-	dbClient provider.DBClientInterface
-
 	// Store instances with typed interfaces
 	Consent        interfaces.ConsentStore
 	AuthResource   interfaces.AuthResourceStore
@@ -20,14 +18,12 @@ type StoreRegistry struct {
 
 // NewStoreRegistry creates a new store registry with all initialized stores
 func NewStoreRegistry(
-	dbClient provider.DBClientInterface,
 	consentStore interfaces.ConsentStore,
 	authResourceStore interfaces.AuthResourceStore,
 	consentElementStore interfaces.ConsentElementStore,
 	consentPurposeStore interfaces.ConsentPurposeStore,
 ) *StoreRegistry {
 	return &StoreRegistry{
-		dbClient:       dbClient,
 		Consent:        consentStore,
 		AuthResource:   authResourceStore,
 		ConsentElement: consentElementStore,
@@ -35,12 +31,23 @@ func NewStoreRegistry(
 	}
 }
 
+// getDBClient retrieves the database client from the provider
+func (r *StoreRegistry) getDBClient() (provider.DBClientInterface, error) {
+	return provider.GetDBProvider().GetConsentDBClient()
+}
+
 // ExecuteTransaction executes multiple store operations in a single transaction
 func (r *StoreRegistry) ExecuteTransaction(queries []func(tx dbmodel.TxInterface) error) error {
 	logger := log.GetLogger()
 	logger.Debug("Starting transaction", log.Int("query_count", len(queries)))
 
-	tx, err := r.dbClient.BeginTx()
+	dbClient, err := r.getDBClient()
+	if err != nil {
+		logger.Error("Failed to get database client", log.Error(err))
+		return err
+	}
+
+	tx, err := dbClient.BeginTx()
 	if err != nil {
 		logger.Error("Failed to begin transaction", log.Error(err))
 		return err
